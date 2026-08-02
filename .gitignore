@@ -8,6 +8,9 @@ functions/node_modules/
 # Real example screenshots contain other people's names/phone numbers - never publish these
 photos/
 
+# Product vision/spec docs - kept local only since this repo is public
+*.docx
+
 # Firebase local emulator/debug artifacts
 .firebase/
 firebase-debug.log

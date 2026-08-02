@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
@@ -39,4 +39,40 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
   }
 
   return reportRef.id;
+}
+
+export async function getFoundReport(reportId) {
+  const snap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Updates an existing found report's editable fields. New photos are added
+ * alongside any existing ones rather than replacing them.
+ */
+export async function updateFoundReport(reportId, fields, newPhotoFiles) {
+  await setDoc(
+    doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
+    {
+      colorDescription: fields.colorDescription || '',
+      markings: fields.markings || '',
+      hasCollar: fields.hasCollar ?? null,
+      location: fields.location || '',
+      dateText: fields.dateText || '',
+      condition: fields.condition || 'seen_only',
+      contactName: fields.contactName || '',
+      contactPhone: fields.contactPhone || '',
+      notes: fields.notes || '',
+      sourceGroupName: fields.sourceGroupName || '',
+      originalPosterName: fields.originalPosterName || '',
+      sharedByName: fields.sharedByName || '',
+      postAgeText: fields.postAgeText || '',
+    },
+    { merge: true }
+  );
+
+  if (newPhotoFiles && newPhotoFiles.length > 0) {
+    const newPhotos = await uploadPhotos(newPhotoFiles, 'found-reports', reportId);
+    await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: arrayUnion(...newPhotos) }, { merge: true });
+  }
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
+import { APP_VERSION } from '../../version.js';
 import { listFoundReports, listLostCases } from './dashboardApi.js';
 
 export default function Dashboard() {
@@ -21,7 +22,9 @@ export default function Dashboard() {
     <div className="mx-auto max-w-2xl p-4">
       <header className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800">איתור חיות מחמד</h1>
+          <h1 className="text-xl font-bold text-slate-800">
+            איתור חיות מחמד <span className="text-xs font-normal text-slate-400">{APP_VERSION}</span>
+          </h1>
           <p className="text-sm text-slate-500">{user?.displayName}</p>
         </div>
         <button onClick={signOut} className="text-sm text-slate-500 underline">

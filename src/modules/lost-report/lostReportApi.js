@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
@@ -33,4 +33,37 @@ export async function createLostCase(fields, photoFiles, ownerId) {
   }
 
   return caseRef.id;
+}
+
+export async function getLostCase(caseId) {
+  const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Updates an existing lost case's editable fields. New photos are added
+ * alongside any existing ones rather than replacing them.
+ */
+export async function updateLostCase(caseId, fields, newPhotoFiles) {
+  await setDoc(
+    doc(db, COLLECTIONS.LOST_CASES, caseId),
+    {
+      name: fields.name || '',
+      color: fields.color || '',
+      size: fields.size || '',
+      markings: fields.markings || '',
+      hasCollar: fields.hasCollar || false,
+      lastSeenLocation: fields.lastSeenLocation || '',
+      lastSeenAt: fields.lastSeenAt || '',
+      contactName: fields.contactName || '',
+      contactPhone: fields.contactPhone || '',
+      notes: fields.notes || '',
+    },
+    { merge: true }
+  );
+
+  if (newPhotoFiles && newPhotoFiles.length > 0) {
+    const newPhotos = await uploadPhotos(newPhotoFiles, 'lost-cases', caseId);
+    await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: arrayUnion(...newPhotos) }, { merge: true });
+  }
 }
