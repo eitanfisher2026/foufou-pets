@@ -1,0 +1,17 @@
+node_modules/
+dist/
+.env
+.env.local
+functions/.env
+functions/node_modules/
+
+# Real example screenshots contain other people's names/phone numbers - never publish these
+photos/
+
+# Firebase local emulator/debug artifacts
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+.DS_Store
