@@ -103,20 +103,20 @@ export default function LostCaseDetail() {
               עריכה
             </button>
           </div>
+          <PhotoGallery photos={lostCase.photos} />
           {lostCase.markings && <p className="mb-2 text-sm text-slate-600">{lostCase.markings}</p>}
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
           )}
-          {lostCase.photos?.length > 0 && (
-            <div className="mb-4 flex gap-2 overflow-x-auto">
-              {lostCase.photos.map((p, i) => (
-                <img key={i} src={p.url} alt="" className="h-28 w-28 flex-shrink-0 rounded-lg object-cover" />
-              ))}
-            </div>
-          )}
         </>
       ) : (
         <div className="mb-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+          {lostCase.photos?.length > 0 && (
+            <div>
+              <p className="mb-1 text-sm font-medium text-slate-600">תמונות קיימות</p>
+              <PhotoGallery photos={lostCase.photos} />
+            </div>
+          )}
           <Field label="שם החתולה">
             <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
           </Field>
@@ -247,6 +247,23 @@ function Field({ label, children }) {
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function PhotoGallery({ photos }) {
+  if (!photos || photos.length === 0) return null;
+  return (
+    <div className="mb-4 flex flex-wrap gap-3">
+      {photos.map((p, i) => (
+        <a key={i} href={p.url} target="_blank" rel="noreferrer">
+          <img
+            src={p.url}
+            alt=""
+            className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
+          />
+        </a>
+      ))}
     </div>
   );
 }

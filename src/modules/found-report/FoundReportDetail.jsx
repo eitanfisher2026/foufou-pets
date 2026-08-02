@@ -58,13 +58,7 @@ export default function FoundReportDetail() {
           {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
-          {report.photos?.length > 0 && (
-            <div className="mb-4 flex gap-2 overflow-x-auto">
-              {report.photos.map((p, i) => (
-                <img key={i} src={p.url} alt="" className="h-28 w-28 flex-shrink-0 rounded-lg object-cover" />
-              ))}
-            </div>
-          )}
+          <PhotoGallery photos={report.photos} />
 
           <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
@@ -76,6 +70,12 @@ export default function FoundReportDetail() {
         </>
       ) : (
         <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+          {report.photos?.length > 0 && (
+            <div>
+              <p className="mb-1 text-sm font-medium text-slate-600">תמונות קיימות</p>
+              <PhotoGallery photos={report.photos} />
+            </div>
+          )}
           <Field label="מקור המידע (שם הקבוצה)">
             <input
               className="input"
@@ -156,6 +156,23 @@ function Field({ label, children }) {
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       {children}
+    </div>
+  );
+}
+
+function PhotoGallery({ photos }) {
+  if (!photos || photos.length === 0) return null;
+  return (
+    <div className="mb-4 flex flex-wrap gap-3">
+      {photos.map((p, i) => (
+        <a key={i} href={p.url} target="_blank" rel="noreferrer">
+          <img
+            src={p.url}
+            alt=""
+            className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
+          />
+        </a>
+      ))}
     </div>
   );
 }
