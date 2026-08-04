@@ -80,7 +80,7 @@ export const extractReportFromImages = onCall(
 
     const response = await client.messages.create({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: 4096,
       system: SYSTEM_PROMPT,
       output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
       messages: [
@@ -97,12 +97,19 @@ export const extractReportFromImages = onCall(
     if (response.stop_reason === 'refusal') {
       throw new HttpsError('aborted', 'The image could not be processed.');
     }
+    if (response.stop_reason === 'max_tokens') {
+      throw new HttpsError('resource-exhausted', 'The extracted text was too long to complete.');
+    }
 
     const textBlock = response.content.find((block) => block.type === 'text');
     if (!textBlock) {
       throw new HttpsError('internal', 'No extraction result returned.');
     }
 
-    return JSON.parse(textBlock.text);
+    try {
+      return JSON.parse(textBlock.text);
+    } catch {
+      throw new HttpsError('internal', 'Could not parse the extraction result.');
+    }
   }
 );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -70,6 +70,9 @@ export default function LostReportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-lg space-y-5 p-4">
+      <Link to="/" className="inline-block text-sm text-slate-500 underline">
+        ← ביטול וחזרה לעמוד הראשי
+      </Link>
       <h1 className="text-xl font-bold text-slate-800">פתיחת תיק חיפוש - חתול אבד</h1>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">

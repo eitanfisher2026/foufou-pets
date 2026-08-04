@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -77,6 +77,9 @@ export default function FoundReportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto max-w-lg space-y-5 p-4">
+      <Link to="/" className="inline-block text-sm text-slate-500 underline">
+        ← ביטול וחזרה לעמוד הראשי
+      </Link>
       <h1 className="text-xl font-bold text-slate-800">דיווח על חתול שנראה / נמצא</h1>
       <p className="text-sm text-slate-500">
         אם ראית פוסט בפייסבוק על חתול - אין צורך להכיר את מי שכתב אותו. פשוט העלה/י צילום מסך.
