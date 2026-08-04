@@ -283,9 +283,16 @@ function PhotoGallery({ photos, onView, onRemove, confirm }) {
             <img
               src={p.url}
               alt=""
-              className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
+              className={`h-56 w-auto max-w-full rounded-lg object-contain bg-slate-50 ${
+                i === 0 ? 'ring-4 ring-amber-400' : 'border border-slate-200'
+              }`}
             />
           </button>
+          {i === 0 && (
+            <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              תמונה ראשית
+            </span>
+          )}
           {onRemove && (
             <button
               type="button"

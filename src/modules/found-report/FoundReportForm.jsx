@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
+import { extractMainPhoto } from '../shared/cropPhoto.js';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -59,6 +60,9 @@ export default function FoundReportForm() {
         postAgeText: result.postAgeText || prev.postAgeText,
       }));
       setExtracted(true);
+
+      const mainPhoto = await extractMainPhoto(files, result.mainPhotoRegion);
+      if (mainPhoto) setPhotos((prev) => [mainPhoto, ...prev]);
     } catch {
       // error already surfaced via readError
     }

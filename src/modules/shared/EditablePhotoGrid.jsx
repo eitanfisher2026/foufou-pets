@@ -40,11 +40,22 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
       <label className="mb-1 block text-sm font-medium text-slate-600">תמונות</label>
       {(existingPhotos.length > 0 || newPhotos.length > 0) && (
         <div className="mb-2 flex flex-wrap gap-3">
-          {existingPhotos.map((p) => (
+          {existingPhotos.map((p, i) => (
             <div key={p.path} className="relative">
               <button type="button" onClick={() => setLightboxUrl(p.url)}>
-                <img src={p.url} alt="" className="h-28 w-28 rounded-lg border border-slate-200 object-cover" />
+                <img
+                  src={p.url}
+                  alt=""
+                  className={`h-28 w-28 rounded-lg object-cover ${
+                    i === 0 ? 'ring-4 ring-amber-400' : 'border border-slate-200'
+                  }`}
+                />
               </button>
+              {i === 0 && (
+                <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-medium text-white">
+                  ראשית
+                </span>
+              )}
               <button
                 type="button"
                 onClick={() => handleRemoveExisting(p)}
@@ -55,21 +66,35 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
               </button>
             </div>
           ))}
-          {newPhotos.map((file, i) => (
-            <div key={i} className="relative">
-              <button type="button" onClick={() => setLightboxUrl(previews[i])}>
-                <img src={previews[i]} alt="" className="h-28 w-28 rounded-lg border border-emerald-300 object-cover" />
-              </button>
-              <button
-                type="button"
-                onClick={() => removeNewPhoto(i)}
-                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow"
-                aria-label="הסרת תמונה"
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+          {newPhotos.map((file, i) => {
+            const isMain = existingPhotos.length === 0 && i === 0;
+            return (
+              <div key={i} className="relative">
+                <button type="button" onClick={() => setLightboxUrl(previews[i])}>
+                  <img
+                    src={previews[i]}
+                    alt=""
+                    className={`h-28 w-28 rounded-lg object-cover ${
+                      isMain ? 'ring-4 ring-amber-400' : 'border border-emerald-300'
+                    }`}
+                  />
+                </button>
+                {isMain && (
+                  <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-medium text-white">
+                    ראשית
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeNewPhoto(i)}
+                  className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white shadow"
+                  aria-label="הסרת תמונה"
+                >
+                  ✕
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
       <input type="file" accept="image/*" multiple onChange={handleFileInput} />

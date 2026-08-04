@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
+import { extractMainPhoto } from '../shared/cropPhoto.js';
 import { CAT_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
@@ -52,6 +53,9 @@ export default function LostReportForm() {
         contactPhone: extracted.contactPhone || prev.contactPhone,
         notes: extracted.captionText || prev.notes,
       }));
+
+      const mainPhoto = await extractMainPhoto(files, extracted.mainPhotoRegion);
+      if (mainPhoto) setPhotos([mainPhoto, ...files]);
     } catch {
       // error already surfaced via readError; user can fill in manually
     }
