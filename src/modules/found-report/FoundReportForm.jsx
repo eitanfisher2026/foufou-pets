@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
+import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -86,7 +87,7 @@ export default function FoundReportForm() {
           צילום/י מסך של הפוסט (אפשר כמה תמונות, כולל אם הכיתוב נמשך ב"עוד")
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
-        {reading && <p className="mt-2 text-sm text-slate-500">קוראים את התמונה...</p>}
+        {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
       </div>
 

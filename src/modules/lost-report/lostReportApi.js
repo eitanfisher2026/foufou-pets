@@ -1,7 +1,7 @@
-import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 
 /**
@@ -22,7 +22,7 @@ export async function createLostCase(fields, photoFiles, ownerId) {
     contactPhone: fields.contactPhone || '',
     notes: fields.notes || '',
     photos: [],
-    status: 'open',
+    status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
     ownerId,
     createdAt: serverTimestamp(),
@@ -69,6 +69,10 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
   }
 }
 
+export async function updateLostCaseStatus(caseId, status) {
+  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { status }, { merge: true });
+}
+
 /**
  * Deletes one photo immediately: removes it from storage and updates the
  * case's `photos` array to match. Returns the resulting photo list.
@@ -78,4 +82,15 @@ export async function removeLostCasePhoto(caseId, photo, currentPhotos) {
   const remaining = currentPhotos.filter((p) => p.path !== photo.path);
   await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: remaining }, { merge: true });
   return remaining;
+}
+
+/**
+ * Permanently deletes a lost case: its photos from storage, its `matches`
+ * subcollection, and the case document itself.
+ */
+export async function deleteLostCase(caseId, photos = []) {
+  const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, caseId, 'matches'));
+  await Promise.all(matchesSnap.docs.map((d) => deleteDoc(d.ref)));
+  await Promise.all(photos.map((p) => deleteObject(ref(storage, p.path)).catch(() => {})));
+  await deleteDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
 }

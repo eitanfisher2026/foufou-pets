@@ -1,10 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { getFoundReport, updateFoundReport, removeFoundReportPhoto } from './foundReportApi.js';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  getFoundReport,
+  updateFoundReport,
+  updateFoundReportStatus,
+  removeFoundReportPhoto,
+  deleteFoundReport,
+} from './foundReportApi.js';
+import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
+import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
+import { useConfirm } from '../shared/useConfirm.jsx';
+import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'sourceGroupName', extractedKey: 'sourceGroupName', label: 'מקור המידע (קבוצה)' },
@@ -22,6 +32,7 @@ const EXTRACTION_FIELD_DEFS = [
 
 export default function FoundReportDetail() {
   const { reportId } = useParams();
+  const navigate = useNavigate();
   const [report, setReport] = useState(null);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
@@ -29,7 +40,9 @@ export default function FoundReportDetail() {
   const [pendingExtraction, setPendingExtraction] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     load();
@@ -45,10 +58,29 @@ export default function FoundReportDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleRecordStatusChange(status) {
+    await updateFoundReportStatus(reportId, status);
+    setReport((prev) => ({ ...prev, status }));
+  }
+
   async function handleRemoveExistingPhoto(photo) {
     const remaining = await removeFoundReportPhoto(reportId, photo, report.photos || []);
     setReport((prev) => ({ ...prev, photos: remaining }));
     setFields((prev) => ({ ...prev, photos: remaining }));
+  }
+
+  async function handleDelete() {
+    const ok = await confirm('למחוק את הדיווח לצמיתות? כל הפרטים והתמונות יימחקו ולא ניתן יהיה לשחזר אותם.', {
+      confirmLabel: 'מחיקת הדיווח',
+    });
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteFoundReport(reportId, report.photos || []);
+      navigate('/');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleExtractionUpload(e) {
@@ -88,10 +120,22 @@ export default function FoundReportDetail() {
       {!editing ? (
         <>
           <div className="mb-4 flex items-start justify-between">
-            <h1 className="text-xl font-bold text-slate-800">{report.colorDescription || 'חתול'}</h1>
-            <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
-              עריכה
-            </button>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-bold text-slate-800">{report.colorDescription || 'חתול'}</h1>
+              <RecordStatusSelect
+                status={report.status || RECORD_STATUS.ACTIVE}
+                labels={FOUND_REPORT_STATUS_LABELS}
+                onChange={handleRecordStatusChange}
+              />
+            </div>
+            <div className="flex shrink-0 gap-3">
+              <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
+                עריכה
+              </button>
+              <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
+                {deleting ? 'מוחקים...' : 'מחיקת הדיווח'}
+              </button>
+            </div>
           </div>
           <p className="mb-2 text-sm text-slate-500">
             {report.location} · {report.dateText}
@@ -99,7 +143,7 @@ export default function FoundReportDetail() {
           {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
-          <PhotoGallery photos={report.photos} onView={setLightboxUrl} onRemove={handleRemoveExistingPhoto} />
+          <PhotoGallery photos={report.photos} onView={setLightboxUrl} onRemove={handleRemoveExistingPhoto} confirm={confirm} />
 
           <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
@@ -169,7 +213,7 @@ export default function FoundReportDetail() {
               יש צילום מסך נוסף? אפשר להעלות ולעדכן פרטים אוטומטית מתוכו.
             </label>
             <input type="file" accept="image/*" multiple onChange={handleExtractionUpload} />
-            {extracting && <p className="mt-2 text-sm text-slate-500">קוראים את התמונה...</p>}
+            {extracting && <AnalyzingIndicator />}
             {extractError && <p className="mt-2 text-sm text-red-600">{extractError}</p>}
           </div>
 
@@ -210,6 +254,7 @@ export default function FoundReportDetail() {
       )}
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      {dialog}
     </div>
   );
 }
@@ -223,8 +268,13 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos, onView, onRemove }) {
+function PhotoGallery({ photos, onView, onRemove, confirm }) {
   if (!photos || photos.length === 0) return null;
+
+  async function handleRemove(photo) {
+    if (await confirm('להסיר את התמונה?')) onRemove(photo);
+  }
+
   return (
     <div className="mb-4 flex flex-wrap gap-3">
       {photos.map((p, i) => (
@@ -239,9 +289,7 @@ function PhotoGallery({ photos, onView, onRemove }) {
           {onRemove && (
             <button
               type="button"
-              onClick={() => {
-                if (window.confirm('להסיר את התמונה?')) onRemove(p);
-              }}
+              onClick={() => handleRemove(p)}
               className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow"
               aria-label="הסרת תמונה"
             >

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
+import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { CAT_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
@@ -41,6 +42,7 @@ export default function LostReportForm() {
       const extracted = await read(files);
       setFields((prev) => ({
         ...prev,
+        name: extracted.petName || prev.name,
         color: extracted.colorDescription || prev.color,
         markings: extracted.markings || prev.markings,
         hasCollar: extracted.hasCollar ?? prev.hasCollar,
@@ -75,7 +77,7 @@ export default function LostReportForm() {
           יש לך צילום מסך של פוסט מפייסבוק על החתולה? אפשר להעלות אותו וחלק מהשדות יתמלאו אוטומטית.
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
-        {reading && <p className="mt-2 text-sm text-slate-500">קוראים את התמונה...</p>}
+        {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
       </div>
 

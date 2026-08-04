@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PhotoLightbox from './PhotoLightbox.jsx';
+import { useConfirm } from './useConfirm.jsx';
 
 /**
  * Shows already-uploaded photos and newly-picked-but-unsaved photos side by
@@ -12,6 +13,7 @@ import PhotoLightbox from './PhotoLightbox.jsx';
 export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, newPhotos, onNewPhotosChange }) {
   const [previews, setPreviews] = useState([]);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     const urls = newPhotos.map((file) => URL.createObjectURL(file));
@@ -29,8 +31,8 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
     onNewPhotosChange(newPhotos.filter((_, i) => i !== index));
   }
 
-  function handleRemoveExisting(photo) {
-    if (window.confirm('להסיר את התמונה?')) onRemoveExisting(photo);
+  async function handleRemoveExisting(photo) {
+    if (await confirm('להסיר את התמונה?')) onRemoveExisting(photo);
   }
 
   return (
@@ -72,6 +74,7 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
       )}
       <input type="file" accept="image/*" multiple onChange={handleFileInput} />
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+      {dialog}
     </div>
   );
 }

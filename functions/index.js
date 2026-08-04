@@ -12,6 +12,7 @@ const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
     species: { type: 'string', enum: ['cat', 'dog', 'other', 'unknown'] },
+    petName: { type: ['string', 'null'] },
     colorDescription: { type: ['string', 'null'] },
     markings: { type: ['string', 'null'] },
     hasCollar: { type: ['boolean', 'null'] },
@@ -27,6 +28,7 @@ const EXTRACTION_SCHEMA = {
   },
   required: [
     'species',
+    'petName',
     'colorDescription',
     'markings',
     'hasCollar',
@@ -46,6 +48,7 @@ const EXTRACTION_SCHEMA = {
 const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about lost, found, or sighted pets, in Hebrew, Russian, English, or a mix, and extract structured facts. Follow these rules strictly:
 
 - Never invent information. If a field is not visible or not stated, return null for it.
+- "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" null and put the single visible author in "originalPosterName".
 - "contactName"/"contactPhone" are only for a phone number explicitly given in the post text for contacting someone about the animal - not the poster's account name if no phone is given.

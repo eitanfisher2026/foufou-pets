@@ -1,7 +1,7 @@
-import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 
 /**
@@ -28,7 +28,7 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
     sharedByName: fields.sharedByName || '',
     postAgeText: fields.postAgeText || '',
     photos: [],
-    status: 'new',
+    status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
     reportedByUid,
     createdAt: serverTimestamp(),
@@ -78,6 +78,10 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
   }
 }
 
+export async function updateFoundReportStatus(reportId, status) {
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { status }, { merge: true });
+}
+
 /**
  * Deletes one photo immediately: removes it from storage and updates the
  * report's `photos` array to match. Returns the resulting photo list.
@@ -87,4 +91,15 @@ export async function removeFoundReportPhoto(reportId, photo, currentPhotos) {
   const remaining = currentPhotos.filter((p) => p.path !== photo.path);
   await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: remaining }, { merge: true });
   return remaining;
+}
+
+/**
+ * Permanently deletes a found report: its photos from storage and the
+ * report document itself. Any existing matches pointing at it are left as
+ * broken references - lost-case detail pages already skip rendering a
+ * match whose found report no longer exists.
+ */
+export async function deleteFoundReport(reportId, photos = []) {
+  await Promise.all(photos.map((p) => deleteObject(ref(storage, p.path)).catch(() => {})));
+  await deleteDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId));
 }
