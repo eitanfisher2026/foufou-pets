@@ -5,6 +5,20 @@ import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, CAT_COLORS } from '../shared/collections.js';
 import { getLostCase, updateLostCase } from '../lost-report/lostReportApi.js';
 import { checkMatchesForLostCase, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
+import { useScreenshotReader } from '../shared/useScreenshotReader.js';
+import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
+import ExtractionApproval from '../shared/ExtractionApproval.jsx';
+
+const EXTRACTION_FIELD_DEFS = [
+  { targetKey: 'color', extractedKey: 'colorDescription', label: 'צבע' },
+  { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מזהים' },
+  { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
+  { targetKey: 'lastSeenLocation', extractedKey: 'location', label: 'מקום אחרון שנראתה' },
+  { targetKey: 'lastSeenAt', extractedKey: 'dateText', label: 'מועד האובדן' },
+  { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
+  { targetKey: 'contactPhone', extractedKey: 'contactPhone', label: 'טלפון' },
+  { targetKey: 'notes', extractedKey: 'captionText', label: 'הערות נוספות' },
+];
 
 const STATUS_LABELS = {
   [REPORT_STATUS.NEW]: 'חדש',
@@ -25,7 +39,10 @@ export default function LostCaseDetail() {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
+  const [removedPhotoPaths, setRemovedPhotoPaths] = useState([]);
+  const [pendingExtraction, setPendingExtraction] = useState(null);
   const [saving, setSaving] = useState(false);
+  const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
 
   useEffect(() => {
     load();
@@ -70,11 +87,35 @@ export default function LostCaseDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleRemoveExistingPhoto(photo) {
+    setFields((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p.path !== photo.path) }));
+    setRemovedPhotoPaths((prev) => [...prev, photo.path]);
+  }
+
+  async function handleExtractionUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setNewPhotos((prev) => [...prev, ...files]);
+    try {
+      const result = await extractFromPhotos(files);
+      setPendingExtraction(result);
+    } catch {
+      // error already surfaced via extractError
+    }
+    e.target.value = '';
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
-      await updateLostCase(caseId, fields, newPhotos);
+      await updateLostCase(caseId, fields, {
+        newPhotoFiles: newPhotos,
+        removedPhotoPaths,
+        existingPhotos: lostCase.photos || [],
+      });
       setNewPhotos([]);
+      setRemovedPhotoPaths([]);
+      setPendingExtraction(null);
       setEditing(false);
       await load();
     } finally {
@@ -111,12 +152,12 @@ export default function LostCaseDetail() {
         </>
       ) : (
         <div className="mb-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
-          {lostCase.photos?.length > 0 && (
-            <div>
-              <p className="mb-1 text-sm font-medium text-slate-600">תמונות קיימות</p>
-              <PhotoGallery photos={lostCase.photos} />
-            </div>
-          )}
+          <EditablePhotoGrid
+            existingPhotos={fields.photos || []}
+            onRemoveExisting={handleRemoveExistingPhoto}
+            newPhotos={newPhotos}
+            onNewPhotosChange={setNewPhotos}
+          />
           <Field label="שם החתולה">
             <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
           </Field>
@@ -160,9 +201,28 @@ export default function LostCaseDetail() {
           <Field label="הערות נוספות">
             <textarea className="input" value={fields.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
           </Field>
-          <Field label="הוספת תמונות">
-            <input type="file" accept="image/*" multiple onChange={(e) => setNewPhotos(Array.from(e.target.files || []))} />
-          </Field>
+
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+            <label className="mb-2 block text-sm font-medium text-slate-600">
+              יש צילום מסך נוסף? אפשר להעלות ולעדכן פרטים אוטומטית מתוכו.
+            </label>
+            <input type="file" accept="image/*" multiple onChange={handleExtractionUpload} />
+            {extracting && <p className="mt-2 text-sm text-slate-500">קוראים את התמונה...</p>}
+            {extractError && <p className="mt-2 text-sm text-red-600">{extractError}</p>}
+          </div>
+
+          {pendingExtraction && (
+            <ExtractionApproval
+              extracted={pendingExtraction}
+              fieldDefs={EXTRACTION_FIELD_DEFS}
+              currentValues={fields}
+              onApply={(updates) => {
+                setFields((prev) => ({ ...prev, ...updates }));
+                setPendingExtraction(null);
+              }}
+              onDiscard={() => setPendingExtraction(null)}
+            />
+          )}
 
           <div className="flex gap-2">
             <button
@@ -176,6 +236,8 @@ export default function LostCaseDetail() {
               onClick={() => {
                 setFields(lostCase);
                 setNewPhotos([]);
+                setRemovedPhotoPaths([]);
+                setPendingExtraction(null);
                 setEditing(false);
               }}
               className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-600"

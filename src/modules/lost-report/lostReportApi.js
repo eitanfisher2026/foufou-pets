@@ -1,5 +1,6 @@
-import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase.js';
+import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 
@@ -41,10 +42,11 @@ export async function getLostCase(caseId) {
 }
 
 /**
- * Updates an existing lost case's editable fields. New photos are added
- * alongside any existing ones rather than replacing them.
+ * Updates an existing lost case's editable fields. Photos removed by the
+ * user are deleted from storage; remaining existing photos plus any newly
+ * uploaded ones become the new `photos` array.
  */
-export async function updateLostCase(caseId, fields, newPhotoFiles) {
+export async function updateLostCase(caseId, fields, { newPhotoFiles = [], removedPhotoPaths = [], existingPhotos = [] } = {}) {
   await setDoc(
     doc(db, COLLECTIONS.LOST_CASES, caseId),
     {
@@ -62,8 +64,14 @@ export async function updateLostCase(caseId, fields, newPhotoFiles) {
     { merge: true }
   );
 
-  if (newPhotoFiles && newPhotoFiles.length > 0) {
-    const newPhotos = await uploadPhotos(newPhotoFiles, 'lost-cases', caseId);
-    await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: arrayUnion(...newPhotos) }, { merge: true });
+  if (removedPhotoPaths.length === 0 && newPhotoFiles.length === 0) return;
+
+  if (removedPhotoPaths.length > 0) {
+    await Promise.all(removedPhotoPaths.map((path) => deleteObject(ref(storage, path)).catch(() => {})));
   }
+
+  const keptPhotos = existingPhotos.filter((p) => !removedPhotoPaths.includes(p.path));
+  const uploaded = newPhotoFiles.length > 0 ? await uploadPhotos(newPhotoFiles, 'lost-cases', caseId) : [];
+
+  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: [...keptPhotos, ...uploaded] }, { merge: true });
 }

@@ -1,5 +1,6 @@
-import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase.js';
+import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { ref, deleteObject } from 'firebase/storage';
+import { db, storage } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 
@@ -47,10 +48,15 @@ export async function getFoundReport(reportId) {
 }
 
 /**
- * Updates an existing found report's editable fields. New photos are added
- * alongside any existing ones rather than replacing them.
+ * Updates an existing found report's editable fields. Photos removed by the
+ * user are deleted from storage; remaining existing photos plus any newly
+ * uploaded ones become the new `photos` array.
  */
-export async function updateFoundReport(reportId, fields, newPhotoFiles) {
+export async function updateFoundReport(
+  reportId,
+  fields,
+  { newPhotoFiles = [], removedPhotoPaths = [], existingPhotos = [] } = {}
+) {
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
@@ -71,8 +77,14 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles) {
     { merge: true }
   );
 
-  if (newPhotoFiles && newPhotoFiles.length > 0) {
-    const newPhotos = await uploadPhotos(newPhotoFiles, 'found-reports', reportId);
-    await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: arrayUnion(...newPhotos) }, { merge: true });
+  if (removedPhotoPaths.length === 0 && newPhotoFiles.length === 0) return;
+
+  if (removedPhotoPaths.length > 0) {
+    await Promise.all(removedPhotoPaths.map((path) => deleteObject(ref(storage, path)).catch(() => {})));
   }
+
+  const keptPhotos = existingPhotos.filter((p) => !removedPhotoPaths.includes(p.path));
+  const uploaded = newPhotoFiles.length > 0 ? await uploadPhotos(newPhotoFiles, 'found-reports', reportId) : [];
+
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: [...keptPhotos, ...uploaded] }, { merge: true });
 }
