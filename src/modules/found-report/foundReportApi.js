@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
@@ -48,15 +48,10 @@ export async function getFoundReport(reportId) {
 }
 
 /**
- * Updates an existing found report's editable fields. Photos removed by the
- * user are deleted from storage; remaining existing photos plus any newly
- * uploaded ones become the new `photos` array.
+ * Updates an existing found report's editable fields and appends any newly
+ * uploaded photos to the existing ones.
  */
-export async function updateFoundReport(
-  reportId,
-  fields,
-  { newPhotoFiles = [], removedPhotoPaths = [], existingPhotos = [] } = {}
-) {
+export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
@@ -77,14 +72,19 @@ export async function updateFoundReport(
     { merge: true }
   );
 
-  if (removedPhotoPaths.length === 0 && newPhotoFiles.length === 0) return;
-
-  if (removedPhotoPaths.length > 0) {
-    await Promise.all(removedPhotoPaths.map((path) => deleteObject(ref(storage, path)).catch(() => {})));
+  if (newPhotoFiles.length > 0) {
+    const uploaded = await uploadPhotos(newPhotoFiles, 'found-reports', reportId);
+    await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: arrayUnion(...uploaded) }, { merge: true });
   }
+}
 
-  const keptPhotos = existingPhotos.filter((p) => !removedPhotoPaths.includes(p.path));
-  const uploaded = newPhotoFiles.length > 0 ? await uploadPhotos(newPhotoFiles, 'found-reports', reportId) : [];
-
-  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: [...keptPhotos, ...uploaded] }, { merge: true });
+/**
+ * Deletes one photo immediately: removes it from storage and updates the
+ * report's `photos` array to match. Returns the resulting photo list.
+ */
+export async function removeFoundReportPhoto(reportId, photo, currentPhotos) {
+  await deleteObject(ref(storage, photo.path)).catch(() => {});
+  const remaining = currentPhotos.filter((p) => p.path !== photo.path);
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: remaining }, { merge: true });
+  return remaining;
 }

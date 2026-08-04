@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
@@ -42,11 +42,10 @@ export async function getLostCase(caseId) {
 }
 
 /**
- * Updates an existing lost case's editable fields. Photos removed by the
- * user are deleted from storage; remaining existing photos plus any newly
- * uploaded ones become the new `photos` array.
+ * Updates an existing lost case's editable fields and appends any newly
+ * uploaded photos to the existing ones.
  */
-export async function updateLostCase(caseId, fields, { newPhotoFiles = [], removedPhotoPaths = [], existingPhotos = [] } = {}) {
+export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
   await setDoc(
     doc(db, COLLECTIONS.LOST_CASES, caseId),
     {
@@ -64,14 +63,19 @@ export async function updateLostCase(caseId, fields, { newPhotoFiles = [], remov
     { merge: true }
   );
 
-  if (removedPhotoPaths.length === 0 && newPhotoFiles.length === 0) return;
-
-  if (removedPhotoPaths.length > 0) {
-    await Promise.all(removedPhotoPaths.map((path) => deleteObject(ref(storage, path)).catch(() => {})));
+  if (newPhotoFiles.length > 0) {
+    const uploaded = await uploadPhotos(newPhotoFiles, 'lost-cases', caseId);
+    await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: arrayUnion(...uploaded) }, { merge: true });
   }
+}
 
-  const keptPhotos = existingPhotos.filter((p) => !removedPhotoPaths.includes(p.path));
-  const uploaded = newPhotoFiles.length > 0 ? await uploadPhotos(newPhotoFiles, 'lost-cases', caseId) : [];
-
-  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: [...keptPhotos, ...uploaded] }, { merge: true });
+/**
+ * Deletes one photo immediately: removes it from storage and updates the
+ * case's `photos` array to match. Returns the resulting photo list.
+ */
+export async function removeLostCasePhoto(caseId, photo, currentPhotos) {
+  await deleteObject(ref(storage, photo.path)).catch(() => {});
+  const remaining = currentPhotos.filter((p) => p.path !== photo.path);
+  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: remaining }, { merge: true });
+  return remaining;
 }

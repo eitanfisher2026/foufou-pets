@@ -3,11 +3,12 @@ import { Link, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, CAT_COLORS } from '../shared/collections.js';
-import { getLostCase, updateLostCase } from '../lost-report/lostReportApi.js';
+import { getLostCase, updateLostCase, removeLostCasePhoto } from '../lost-report/lostReportApi.js';
 import { checkMatchesForLostCase, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
+import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'color', extractedKey: 'colorDescription', label: 'צבע' },
@@ -39,8 +40,8 @@ export default function LostCaseDetail() {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
-  const [removedPhotoPaths, setRemovedPhotoPaths] = useState([]);
   const [pendingExtraction, setPendingExtraction] = useState(null);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
 
@@ -87,9 +88,10 @@ export default function LostCaseDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleRemoveExistingPhoto(photo) {
-    setFields((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p.path !== photo.path) }));
-    setRemovedPhotoPaths((prev) => [...prev, photo.path]);
+  async function handleRemoveExistingPhoto(photo) {
+    const remaining = await removeLostCasePhoto(caseId, photo, lostCase.photos || []);
+    setLostCase((prev) => ({ ...prev, photos: remaining }));
+    setFields((prev) => ({ ...prev, photos: remaining }));
   }
 
   async function handleExtractionUpload(e) {
@@ -108,13 +110,8 @@ export default function LostCaseDetail() {
   async function handleSave() {
     setSaving(true);
     try {
-      await updateLostCase(caseId, fields, {
-        newPhotoFiles: newPhotos,
-        removedPhotoPaths,
-        existingPhotos: lostCase.photos || [],
-      });
+      await updateLostCase(caseId, fields, newPhotos);
       setNewPhotos([]);
-      setRemovedPhotoPaths([]);
       setPendingExtraction(null);
       setEditing(false);
       await load();
@@ -144,7 +141,11 @@ export default function LostCaseDetail() {
               עריכה
             </button>
           </div>
-          <PhotoGallery photos={lostCase.photos} />
+          <PhotoGallery
+            photos={lostCase.photos}
+            onView={setLightboxUrl}
+            onRemove={handleRemoveExistingPhoto}
+          />
           {lostCase.markings && <p className="mb-2 text-sm text-slate-600">{lostCase.markings}</p>}
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
@@ -236,7 +237,6 @@ export default function LostCaseDetail() {
               onClick={() => {
                 setFields(lostCase);
                 setNewPhotos([]);
-                setRemovedPhotoPaths([]);
                 setPendingExtraction(null);
                 setEditing(false);
               }}
@@ -300,6 +300,8 @@ export default function LostCaseDetail() {
           );
         })}
       </ul>
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
@@ -313,18 +315,32 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos }) {
+function PhotoGallery({ photos, onView, onRemove }) {
   if (!photos || photos.length === 0) return null;
   return (
     <div className="mb-4 flex flex-wrap gap-3">
       {photos.map((p, i) => (
-        <a key={i} href={p.url} target="_blank" rel="noreferrer">
-          <img
-            src={p.url}
-            alt=""
-            className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
-          />
-        </a>
+        <div key={i} className="relative">
+          <button type="button" onClick={() => onView(p.url)}>
+            <img
+              src={p.url}
+              alt=""
+              className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
+            />
+          </button>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('להסיר את התמונה?')) onRemove(p);
+              }}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow"
+              aria-label="הסרת תמונה"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );

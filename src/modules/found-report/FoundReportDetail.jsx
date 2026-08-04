@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getFoundReport, updateFoundReport } from './foundReportApi.js';
+import { getFoundReport, updateFoundReport, removeFoundReportPhoto } from './foundReportApi.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
+import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'sourceGroupName', extractedKey: 'sourceGroupName', label: 'מקור המידע (קבוצה)' },
@@ -25,8 +26,8 @@ export default function FoundReportDetail() {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
-  const [removedPhotoPaths, setRemovedPhotoPaths] = useState([]);
   const [pendingExtraction, setPendingExtraction] = useState(null);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
 
@@ -44,9 +45,10 @@ export default function FoundReportDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleRemoveExistingPhoto(photo) {
-    setFields((prev) => ({ ...prev, photos: (prev.photos || []).filter((p) => p.path !== photo.path) }));
-    setRemovedPhotoPaths((prev) => [...prev, photo.path]);
+  async function handleRemoveExistingPhoto(photo) {
+    const remaining = await removeFoundReportPhoto(reportId, photo, report.photos || []);
+    setReport((prev) => ({ ...prev, photos: remaining }));
+    setFields((prev) => ({ ...prev, photos: remaining }));
   }
 
   async function handleExtractionUpload(e) {
@@ -65,13 +67,8 @@ export default function FoundReportDetail() {
   async function handleSave() {
     setSaving(true);
     try {
-      await updateFoundReport(reportId, fields, {
-        newPhotoFiles: newPhotos,
-        removedPhotoPaths,
-        existingPhotos: report.photos || [],
-      });
+      await updateFoundReport(reportId, fields, newPhotos);
       setNewPhotos([]);
-      setRemovedPhotoPaths([]);
       setPendingExtraction(null);
       setEditing(false);
       await load();
@@ -102,7 +99,7 @@ export default function FoundReportDetail() {
           {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
-          <PhotoGallery photos={report.photos} />
+          <PhotoGallery photos={report.photos} onView={setLightboxUrl} onRemove={handleRemoveExistingPhoto} />
 
           <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
@@ -201,7 +198,6 @@ export default function FoundReportDetail() {
               onClick={() => {
                 setFields(report);
                 setNewPhotos([]);
-                setRemovedPhotoPaths([]);
                 setPendingExtraction(null);
                 setEditing(false);
               }}
@@ -212,6 +208,8 @@ export default function FoundReportDetail() {
           </div>
         </div>
       )}
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
@@ -225,18 +223,32 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos }) {
+function PhotoGallery({ photos, onView, onRemove }) {
   if (!photos || photos.length === 0) return null;
   return (
     <div className="mb-4 flex flex-wrap gap-3">
       {photos.map((p, i) => (
-        <a key={i} href={p.url} target="_blank" rel="noreferrer">
-          <img
-            src={p.url}
-            alt=""
-            className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
-          />
-        </a>
+        <div key={i} className="relative">
+          <button type="button" onClick={() => onView(p.url)}>
+            <img
+              src={p.url}
+              alt=""
+              className="h-56 w-auto max-w-full rounded-lg border border-slate-200 object-contain bg-slate-50"
+            />
+          </button>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('להסיר את התמונה?')) onRemove(p);
+              }}
+              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow"
+              aria-label="הסרת תמונה"
+            >
+              ✕
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
