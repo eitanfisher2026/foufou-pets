@@ -6,11 +6,14 @@ import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
+import { CAT_COLORS, CAT_SIZES, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
   title: '',
+  color: '',
   colorDescription: '',
+  size: '',
   markings: '',
   hasCollar: null,
   location: '',
@@ -76,7 +79,9 @@ export default function FoundReportForm() {
       setFields((prev) => ({
         ...prev,
         title: prev.title || result.colorDescription || prev.title,
+        color: result.color || prev.color,
         colorDescription: result.colorDescription || prev.colorDescription,
+        size: result.size || prev.size,
         markings: result.markings || prev.markings,
         hasCollar: result.hasCollar ?? prev.hasCollar,
         location: result.location || prev.location,
@@ -184,13 +189,37 @@ export default function FoundReportForm() {
 
       <Field label="מצב החתול">
         <select className="input" value={fields.condition} onChange={(e) => setField('condition', e.target.value)}>
-          <option value="seen_only">נראה בלבד (לא נתפס)</option>
-          <option value="held_by_finder">נמצא ונשאר בידי המדווח</option>
-          <option value="at_vet">הועבר למרפאה</option>
+          {CAT_CONDITIONS.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
         </select>
       </Field>
 
-      <Field label="צבע ותיאור">
+      <Field label="צבע">
+        <select className="input" value={fields.color} onChange={(e) => setField('color', e.target.value)}>
+          <option value="">בחר/י צבע</option>
+          {CAT_COLORS.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="גודל">
+        <select className="input" value={fields.size} onChange={(e) => setField('size', e.target.value)}>
+          <option value="">בחר/י</option>
+          {CAT_SIZES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
         <input
           className="input"
           value={fields.colorDescription}

@@ -41,13 +41,33 @@ export function scoreMatch(lostCase, foundReport) {
   const reasons = [];
   let score = 0;
 
-  // Color
-  if (lostCase.color && foundReport.colorDescription) {
+  // Color - prefer comparing the two structured dropdown values directly
+  // (exact match, both sides use the same fixed list) over the old fuzzy
+  // text check, which broke silently whenever a found report's free-text
+  // description was extracted in a different language than the dropdown.
+  if (lostCase.color && foundReport.color) {
+    if (lostCase.color === foundReport.color) {
+      score += 30;
+      reasons.push(`הצבע (${lostCase.color}) זהה בשני הדיווחים`);
+    } else {
+      reasons.push(`הצבע שדווח (${foundReport.color}) שונה מהצבע של החתולה שאבדה (${lostCase.color})`);
+    }
+  } else if (lostCase.color && foundReport.colorDescription) {
     if (containsAny(foundReport.colorDescription, lostCase.color)) {
       score += 30;
       reasons.push(`הצבע (${lostCase.color}) תואם לתיאור בדיווח`);
     } else {
       reasons.push('הצבע שצוין בדיווח שונה מהצבע שדווח לגבי החתולה שאבדה');
+    }
+  }
+
+  // Size - a soft signal only, since size/age judgment from a photo is rough
+  if (lostCase.size && foundReport.size) {
+    if (lostCase.size === foundReport.size) {
+      score += 10;
+      reasons.push('הגודל המדווח תואם');
+    } else {
+      reasons.push('הגודל המדווח שונה - ייתכן שמדובר בהערכה לא מדויקת');
     }
   }
 

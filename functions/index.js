@@ -8,6 +8,10 @@ import Anthropic from '@anthropic-ai/sdk';
 // match time, so this is the only AI spend in the whole app.
 const MODEL = 'claude-sonnet-5';
 
+// Must match CAT_COLORS in src/modules/shared/collections.js - the functions
+// package doesn't share modules with the client, so this is kept in sync by hand.
+const CAT_COLORS = ['לבן', 'שחור', 'אפור', 'כתום/ג׳ינג׳י', 'חום', 'טאבי (מנומר)', 'תלת-גוני (קליקו)', 'שחור-לבן', 'אחר'];
+
 const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
@@ -19,7 +23,9 @@ const EXTRACTION_SCHEMA = {
     // keeps real tri-state (true/false/null=unknown) since collapsing
     // "unknown" into false would misreport a case as collarless.
     petName: { type: 'string' },
+    color: { type: 'string', enum: CAT_COLORS },
     colorDescription: { type: 'string' },
+    size: { type: ['string', 'null'], enum: ['small', 'medium', 'large', null] },
     markings: { type: 'string' },
     hasCollar: { type: ['boolean', 'null'] },
     location: { type: 'string' },
@@ -50,7 +56,9 @@ const EXTRACTION_SCHEMA = {
   required: [
     'species',
     'petName',
+    'color',
     'colorDescription',
+    'size',
     'markings',
     'hasCollar',
     'location',
@@ -71,6 +79,8 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 
 - Never invent information. If a text field is not visible or not stated, return an empty string "" for it (not null). For "hasCollar", use null specifically to mean not stated/unclear - true and false are only for when the post clearly shows or says so.
 - "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
+- "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
+- "size" is your best guess at the animal's size/age class (small/young, medium, or large adult) from the photos, or null if no photo gives any real basis to judge.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" as "" and put the single visible author in "originalPosterName".
 - "contactName"/"contactPhone" are only for a phone number explicitly given in the post text for contacting someone about the animal - not the poster's account name if no phone is given.

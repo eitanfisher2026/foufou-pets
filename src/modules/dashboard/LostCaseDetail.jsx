@@ -2,7 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS, LOST_CASE_STATUS_LABELS, CAT_COLORS } from '../shared/collections.js';
+import {
+  COLLECTIONS,
+  REPORT_STATUS,
+  RECORD_STATUS,
+  LOST_CASE_STATUS_LABELS,
+  CAT_COLORS,
+  CAT_SIZES,
+} from '../shared/collections.js';
 import {
   getLostCase,
   updateLostCase,
@@ -19,10 +26,11 @@ import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
+import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
-  { targetKey: 'color', extractedKey: 'colorDescription', label: 'צבע' },
+  { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מזהים' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
   { targetKey: 'lastSeenLocation', extractedKey: 'location', label: 'מקום אחרון שנראתה' },
@@ -56,6 +64,7 @@ export default function LostCaseDetail() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
 
@@ -184,6 +193,9 @@ export default function LostCaseDetail() {
               </p>
             </div>
             <div className="flex shrink-0 gap-3">
+              <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
+                פרטים מלאים
+              </button>
               <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
                 עריכה
               </button>
@@ -222,6 +234,16 @@ export default function LostCaseDetail() {
               {CAT_COLORS.map((c) => (
                 <option key={c} value={c}>
                   {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="גודל">
+            <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
+              <option value="">בחר/י</option>
+              {CAT_SIZES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
                 </option>
               ))}
             </select>
@@ -370,6 +392,24 @@ export default function LostCaseDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {showDetails && (
+        <RecordDetailsDialog
+          title={lostCase.name || 'חתול ללא שם'}
+          onClose={() => setShowDetails(false)}
+          rows={[
+            { label: 'שם', value: lostCase.name },
+            { label: 'צבע', value: lostCase.color },
+            { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
+            { label: 'סימנים מזהים', value: lostCase.markings },
+            { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
+            { label: 'מקום אחרון שנראתה', value: lostCase.lastSeenLocation },
+            { label: 'מועד האובדן', value: lostCase.lastSeenAt },
+            { label: 'שם איש קשר', value: lostCase.contactName },
+            { label: 'טלפון', value: lostCase.contactPhone },
+            { label: 'הערות נוספות', value: lostCase.notes },
+          ]}
+        />
+      )}
     </div>
   );
 }

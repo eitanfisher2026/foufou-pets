@@ -15,7 +15,9 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
   const reportRef = await addDoc(collection(db, COLLECTIONS.FOUND_REPORTS), {
     species: 'cat',
     title: fields.title || '',
+    color: fields.color || '',
     colorDescription: fields.colorDescription || '',
+    size: fields.size || '',
     markings: fields.markings || '',
     hasCollar: fields.hasCollar ?? null,
     location: fields.location || '',
@@ -57,7 +59,9 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
       title: fields.title || '',
+      color: fields.color || '',
       colorDescription: fields.colorDescription || '',
+      size: fields.size || '',
       markings: fields.markings || '',
       hasCollar: fields.hasCollar ?? null,
       location: fields.location || '',

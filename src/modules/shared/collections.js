@@ -15,6 +15,21 @@ export const CAT_COLORS = [
   'אחר',
 ];
 
+// Shared between lost cases and found reports - both describe the same cat
+// using the same vocabulary, which also keeps matching (matchingEngine.js)
+// comparing like with like instead of a dropdown value against free text.
+export const CAT_SIZES = [
+  { value: 'small', label: 'קטן/גור' },
+  { value: 'medium', label: 'בינוני' },
+  { value: 'large', label: 'גדול' },
+];
+
+export const CAT_CONDITIONS = [
+  { value: 'seen_only', label: 'נראה בלבד (לא נתפס)' },
+  { value: 'held_by_finder', label: 'נמצא ונשאר בידי המדווח' },
+  { value: 'at_vet', label: 'הועבר למרפאה' },
+];
+
 // Lifecycle status of a lost case or found report itself (not to be
 // confused with REPORT_STATUS below, which tracks the review status of one
 // lost-case/found-report *match*).

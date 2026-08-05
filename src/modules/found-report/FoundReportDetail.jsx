@@ -8,7 +8,7 @@ import {
   makeFoundReportPhotoMain,
   deleteFoundReport,
 } from './foundReportApi.js';
-import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
+import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS, CAT_COLORS, CAT_SIZES, CAT_CONDITIONS } from '../shared/collections.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
@@ -16,13 +16,15 @@ import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
+import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'sourceGroupName', extractedKey: 'sourceGroupName', label: 'מקור המידע (קבוצה)' },
   { targetKey: 'originalPosterName', extractedKey: 'originalPosterName', label: 'מי כתב את הפוסט' },
   { targetKey: 'sharedByName', extractedKey: 'sharedByName', label: 'מי שיתף' },
   { targetKey: 'postAgeText', extractedKey: 'postAgeText', label: 'מתי פורסם' },
-  { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'צבע ותיאור' },
+  { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
+  { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מזהים' },
   { targetKey: 'location', extractedKey: 'location', label: 'מיקום' },
   { targetKey: 'dateText', extractedKey: 'dateText', label: 'מועד הראייה/המציאה' },
@@ -42,6 +44,7 @@ export default function FoundReportDetail() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
 
@@ -136,6 +139,9 @@ export default function FoundReportDetail() {
               />
             </div>
             <div className="flex shrink-0 gap-3">
+              <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
+                פרטים מלאים
+              </button>
               <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
                 עריכה
               </button>
@@ -145,7 +151,7 @@ export default function FoundReportDetail() {
             </div>
           </div>
           <p className="mb-2 text-sm text-slate-500">
-            {report.location} · {report.dateText}
+            {report.color} · {report.location} · {report.dateText}
           </p>
           {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
@@ -199,7 +205,39 @@ export default function FoundReportDetail() {
               onChange={(e) => setField('sharedByName', e.target.value)}
             />
           </Field>
-          <Field label="צבע ותיאור">
+          <Field label="מתי פורסם (כפי שכתוב בפוסט)">
+            <input className="input" value={fields.postAgeText || ''} onChange={(e) => setField('postAgeText', e.target.value)} />
+          </Field>
+          <Field label="מצב החתול">
+            <select className="input" value={fields.condition || 'seen_only'} onChange={(e) => setField('condition', e.target.value)}>
+              {CAT_CONDITIONS.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="צבע">
+            <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
+              <option value="">בחר/י צבע</option>
+              {CAT_COLORS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="גודל">
+            <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
+              <option value="">בחר/י</option>
+              {CAT_SIZES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
             <input
               className="input"
               value={fields.colorDescription || ''}
@@ -272,6 +310,30 @@ export default function FoundReportDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {showDetails && (
+        <RecordDetailsDialog
+          title={report.title || report.colorDescription || 'חתול'}
+          onClose={() => setShowDetails(false)}
+          rows={[
+            { label: 'כותרת', value: report.title },
+            { label: 'צבע', value: report.color },
+            { label: 'גודל', value: CAT_SIZES.find((s) => s.value === report.size)?.label },
+            { label: 'תיאור נוסף לצבע', value: report.colorDescription },
+            { label: 'סימנים מזהים', value: report.markings },
+            { label: 'קולר/רתמה', value: report.hasCollar === true ? 'כן' : report.hasCollar === false ? 'לא' : '' },
+            { label: 'מצב החתול', value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
+            { label: 'מיקום', value: report.location },
+            { label: 'מועד הראייה/המציאה', value: report.dateText },
+            { label: 'מקור המידע (קבוצה)', value: report.sourceGroupName },
+            { label: 'מי כתב את הפוסט', value: report.originalPosterName },
+            { label: 'מי שיתף', value: report.sharedByName },
+            { label: 'מתי פורסם', value: report.postAgeText },
+            { label: 'שם איש קשר', value: report.contactName },
+            { label: 'טלפון', value: report.contactPhone },
+            { label: 'הערות נוספות', value: report.notes },
+          ]}
+        />
+      )}
     </div>
   );
 }

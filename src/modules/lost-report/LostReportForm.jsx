@@ -72,7 +72,8 @@ export default function LostReportForm() {
       setFields((prev) => ({
         ...prev,
         name: extracted.petName || prev.name,
-        color: extracted.colorDescription || prev.color,
+        color: extracted.color || prev.color,
+        size: extracted.size || prev.size,
         markings: extracted.markings || prev.markings,
         hasCollar: extracted.hasCollar ?? prev.hasCollar,
         lastSeenLocation: extracted.location || prev.lastSeenLocation,
