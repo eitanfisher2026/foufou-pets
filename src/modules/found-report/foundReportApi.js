@@ -94,6 +94,17 @@ export async function removeFoundReportPhoto(reportId, photo, currentPhotos) {
 }
 
 /**
+ * Moves one photo to the front of the report's photo list (the "main
+ * photo" slot) immediately - lets the user override an AI-picked main
+ * photo that came out wrong. Returns the resulting photo list.
+ */
+export async function makeFoundReportPhotoMain(reportId, photo, currentPhotos) {
+  const reordered = [photo, ...currentPhotos.filter((p) => p.path !== photo.path)];
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: reordered }, { merge: true });
+  return reordered;
+}
+
+/**
  * Permanently deletes a found report: its photos from storage and the
  * report document itself. Any existing matches pointing at it are left as
  * broken references - lost-case detail pages already skip rendering a

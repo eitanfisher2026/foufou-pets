@@ -3,7 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS, LOST_CASE_STATUS_LABELS, CAT_COLORS } from '../shared/collections.js';
-import { getLostCase, updateLostCase, updateLostCaseStatus, removeLostCasePhoto, deleteLostCase } from '../lost-report/lostReportApi.js';
+import {
+  getLostCase,
+  updateLostCase,
+  updateLostCaseStatus,
+  removeLostCasePhoto,
+  makeLostCasePhotoMain,
+  deleteLostCase,
+} from '../lost-report/lostReportApi.js';
 import { checkMatchesForLostCase, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
@@ -106,6 +113,12 @@ export default function LostCaseDetail() {
     setFields((prev) => ({ ...prev, photos: remaining }));
   }
 
+  async function handleMakeMainPhoto(photo) {
+    const reordered = await makeLostCasePhotoMain(caseId, photo, lostCase.photos || []);
+    setLostCase((prev) => ({ ...prev, photos: reordered }));
+    setFields((prev) => ({ ...prev, photos: reordered }));
+  }
+
   async function handleDelete() {
     const ok = await confirm('למחוק את תיק החיפוש לצמיתות? כל הפרטים, התמונות וההתאמות יימחקו ולא ניתן יהיה לשחזר אותם.', {
       confirmLabel: 'מחיקת התיק',
@@ -183,6 +196,7 @@ export default function LostCaseDetail() {
             photos={lostCase.photos}
             onView={setLightboxUrl}
             onRemove={handleRemoveExistingPhoto}
+            onMakeMain={handleMakeMainPhoto}
             confirm={confirm}
           />
           {lostCase.markings && <p className="mb-2 text-sm text-slate-600">{lostCase.markings}</p>}
@@ -195,6 +209,7 @@ export default function LostCaseDetail() {
           <EditablePhotoGrid
             existingPhotos={fields.photos || []}
             onRemoveExisting={handleRemoveExistingPhoto}
+            onMakeMainExisting={handleMakeMainPhoto}
             newPhotos={newPhotos}
             onNewPhotosChange={setNewPhotos}
           />
@@ -359,7 +374,7 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos, onView, onRemove, confirm }) {
+function PhotoGallery({ photos, onView, onRemove, onMakeMain, confirm }) {
   if (!photos || photos.length === 0) return null;
 
   async function handleRemove(photo) {
@@ -379,10 +394,20 @@ function PhotoGallery({ photos, onView, onRemove, confirm }) {
               }`}
             />
           </button>
-          {i === 0 && (
+          {i === 0 ? (
             <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
               תמונה ראשית
             </span>
+          ) : (
+            onMakeMain && (
+              <button
+                type="button"
+                onClick={() => onMakeMain(p)}
+                className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-medium text-white"
+              >
+                הפוך לראשית
+              </button>
+            )
           )}
           {onRemove && (
             <button

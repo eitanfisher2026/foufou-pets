@@ -5,12 +5,22 @@ import { useConfirm } from './useConfirm.jsx';
 /**
  * Shows already-uploaded photos and newly-picked-but-unsaved photos side by
  * side, each removable and clickable to view full-size, plus an "add
- * photos" control. Used in edit mode for both lost cases and found reports.
- * Removing an existing photo happens immediately (onRemoveExisting deletes
- * it from storage right away); removing a newly-picked photo just drops it
- * from the pending selection, since it hasn't been uploaded yet.
+ * photos" control. Used in edit mode for both lost cases and found reports,
+ * and reused for the photo preview on the create forms (with
+ * existingPhotos always empty there). Removing/promoting an existing photo
+ * happens immediately via the parent's callback (persisted right away);
+ * removing/promoting a newly-picked photo is purely local state, since
+ * it hasn't been uploaded yet. Promoting a new photo to "main" is only
+ * offered when there are no existing photos ahead of it, since otherwise
+ * it wouldn't actually become the first photo overall.
  */
-export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, newPhotos, onNewPhotosChange }) {
+export default function EditablePhotoGrid({
+  existingPhotos,
+  onRemoveExisting,
+  onMakeMainExisting,
+  newPhotos,
+  onNewPhotosChange,
+}) {
   const [previews, setPreviews] = useState([]);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const { confirm, dialog } = useConfirm();
@@ -29,6 +39,10 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
 
   function removeNewPhoto(index) {
     onNewPhotosChange(newPhotos.filter((_, i) => i !== index));
+  }
+
+  function makeNewPhotoMain(index) {
+    onNewPhotosChange([newPhotos[index], ...newPhotos.filter((_, i) => i !== index)]);
   }
 
   async function handleRemoveExisting(photo) {
@@ -51,10 +65,20 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
                   }`}
                 />
               </button>
-              {i === 0 && (
+              {i === 0 ? (
                 <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-medium text-white">
                   ראשית
                 </span>
+              ) : (
+                onMakeMainExisting && (
+                  <button
+                    type="button"
+                    onClick={() => onMakeMainExisting(p)}
+                    className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
+                  >
+                    הפוך לראשית
+                  </button>
+                )
               )}
               <button
                 type="button"
@@ -79,10 +103,20 @@ export default function EditablePhotoGrid({ existingPhotos, onRemoveExisting, ne
                     }`}
                   />
                 </button>
-                {isMain && (
+                {isMain ? (
                   <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-medium text-white">
                     ראשית
                   </span>
+                ) : (
+                  existingPhotos.length === 0 && (
+                    <button
+                      type="button"
+                      onClick={() => makeNewPhotoMain(i)}
+                      className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
+                    >
+                      הפוך לראשית
+                    </button>
+                  )
                 )}
                 <button
                   type="button"

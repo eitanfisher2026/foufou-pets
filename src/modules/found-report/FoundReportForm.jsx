@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
+import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -97,6 +98,8 @@ export default function FoundReportForm() {
         {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
       </div>
+
+      <EditablePhotoGrid existingPhotos={[]} newPhotos={photos} onNewPhotosChange={setPhotos} />
 
       {extracted && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">

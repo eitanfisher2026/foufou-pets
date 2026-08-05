@@ -5,6 +5,7 @@ import {
   updateFoundReport,
   updateFoundReportStatus,
   removeFoundReportPhoto,
+  makeFoundReportPhotoMain,
   deleteFoundReport,
 } from './foundReportApi.js';
 import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
@@ -67,6 +68,12 @@ export default function FoundReportDetail() {
     const remaining = await removeFoundReportPhoto(reportId, photo, report.photos || []);
     setReport((prev) => ({ ...prev, photos: remaining }));
     setFields((prev) => ({ ...prev, photos: remaining }));
+  }
+
+  async function handleMakeMainPhoto(photo) {
+    const reordered = await makeFoundReportPhotoMain(reportId, photo, report.photos || []);
+    setReport((prev) => ({ ...prev, photos: reordered }));
+    setFields((prev) => ({ ...prev, photos: reordered }));
   }
 
   async function handleDelete() {
@@ -143,7 +150,13 @@ export default function FoundReportDetail() {
           {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
-          <PhotoGallery photos={report.photos} onView={setLightboxUrl} onRemove={handleRemoveExistingPhoto} confirm={confirm} />
+          <PhotoGallery
+            photos={report.photos}
+            onView={setLightboxUrl}
+            onRemove={handleRemoveExistingPhoto}
+            onMakeMain={handleMakeMainPhoto}
+            confirm={confirm}
+          />
 
           <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
@@ -158,6 +171,7 @@ export default function FoundReportDetail() {
           <EditablePhotoGrid
             existingPhotos={fields.photos || []}
             onRemoveExisting={handleRemoveExistingPhoto}
+            onMakeMainExisting={handleMakeMainPhoto}
             newPhotos={newPhotos}
             onNewPhotosChange={setNewPhotos}
           />
@@ -268,7 +282,7 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos, onView, onRemove, confirm }) {
+function PhotoGallery({ photos, onView, onRemove, onMakeMain, confirm }) {
   if (!photos || photos.length === 0) return null;
 
   async function handleRemove(photo) {
@@ -288,10 +302,20 @@ function PhotoGallery({ photos, onView, onRemove, confirm }) {
               }`}
             />
           </button>
-          {i === 0 && (
+          {i === 0 ? (
             <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
               תמונה ראשית
             </span>
+          ) : (
+            onMakeMain && (
+              <button
+                type="button"
+                onClick={() => onMakeMain(p)}
+                className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-medium text-white"
+              >
+                הפוך לראשית
+              </button>
+            )
           )}
           {onRemove && (
             <button

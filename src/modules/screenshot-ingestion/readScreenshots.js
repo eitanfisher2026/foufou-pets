@@ -1,12 +1,13 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase.js';
+import { compressImage } from '../shared/imageCompression.js';
 
-function fileToBase64(file) {
+function blobToBase64(blob) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(reader.result.split(',')[1]);
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(blob);
   });
 }
 
@@ -14,12 +15,15 @@ function fileToBase64(file) {
  * Sends 1+ screenshot files to the shared extraction function and returns
  * the structured fields Claude was able to read from them. Used by both
  * the lost-report and found-report modules - built once, called by both.
+ * Images are compressed the same way as before a storage upload: full-size
+ * WhatsApp/Facebook screenshots can be several MB, which slows the request
+ * and costs more in image tokens without improving OCR accuracy.
  */
 export async function readScreenshots(files) {
   const images = await Promise.all(
     files.map(async (file) => ({
-      base64: await fileToBase64(file),
-      mimeType: file.type || 'image/jpeg',
+      base64: await blobToBase64(await compressImage(file)),
+      mimeType: 'image/jpeg',
     }))
   );
 

@@ -85,6 +85,17 @@ export async function removeLostCasePhoto(caseId, photo, currentPhotos) {
 }
 
 /**
+ * Moves one photo to the front of the case's photo list (the "main photo"
+ * slot) immediately - lets the user override an AI-picked main photo that
+ * came out wrong. Returns the resulting photo list.
+ */
+export async function makeLostCasePhotoMain(caseId, photo, currentPhotos) {
+  const reordered = [photo, ...currentPhotos.filter((p) => p.path !== photo.path)];
+  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: reordered }, { merge: true });
+  return reordered;
+}
+
+/**
  * Permanently deletes a lost case: its photos from storage, its `matches`
  * subcollection, and the case document itself.
  */

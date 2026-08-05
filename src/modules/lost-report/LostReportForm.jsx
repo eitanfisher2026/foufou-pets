@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
+import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { CAT_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
@@ -88,6 +89,8 @@ export default function LostReportForm() {
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
       </div>
 
+      <EditablePhotoGrid existingPhotos={[]} newPhotos={photos} onNewPhotosChange={setPhotos} />
+
       <Field label="שם החתולה">
         <input className="input" value={fields.name} onChange={(e) => setField('name', e.target.value)} />
       </Field>
@@ -144,12 +147,6 @@ export default function LostReportForm() {
       <Field label="הערות נוספות">
         <textarea className="input" value={fields.notes} onChange={(e) => setField('notes', e.target.value)} />
       </Field>
-
-      {source === 'manual' && (
-        <Field label="תמונות">
-          <input type="file" accept="image/*" multiple onChange={(e) => setPhotos(Array.from(e.target.files || []))} />
-        </Field>
-      )}
 
       <button
         type="submit"
