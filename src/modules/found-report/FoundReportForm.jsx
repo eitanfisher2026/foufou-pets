@@ -9,6 +9,7 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
+  title: '',
   colorDescription: '',
   markings: '',
   hasCollar: null,
@@ -74,6 +75,7 @@ export default function FoundReportForm() {
       const result = await read(allScreenshots);
       setFields((prev) => ({
         ...prev,
+        title: prev.title || result.colorDescription || prev.title,
         colorDescription: result.colorDescription || prev.colorDescription,
         markings: result.markings || prev.markings,
         hasCollar: result.hasCollar ?? prev.hasCollar,
@@ -119,6 +121,15 @@ export default function FoundReportForm() {
       <p className="text-sm text-slate-500">
         אם ראית פוסט בפייסבוק על חתול - אין צורך להכיר את מי שכתב אותו. פשוט העלה/י צילום מסך.
       </p>
+
+      <Field label="כותרת (כך יופיע הדיווח ברשימה)">
+        <input
+          className="input"
+          value={fields.title}
+          onChange={(e) => setField('title', e.target.value)}
+          placeholder='למשל "חתול שחור-לבן ליד הפארק"'
+        />
+      </Field>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <label className="mb-2 block text-sm font-medium text-slate-600">

@@ -128,7 +128,7 @@ export default function FoundReportDetail() {
         <>
           <div className="mb-4 flex items-start justify-between">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-800">{report.colorDescription || 'חתול'}</h1>
+              <h1 className="text-xl font-bold text-slate-800">{report.title || report.colorDescription || 'חתול'}</h1>
               <RecordStatusSelect
                 status={report.status || RECORD_STATUS.ACTIVE}
                 labels={FOUND_REPORT_STATUS_LABELS}
@@ -175,6 +175,9 @@ export default function FoundReportDetail() {
             newPhotos={newPhotos}
             onNewPhotosChange={setNewPhotos}
           />
+          <Field label="כותרת (כך יופיע הדיווח ברשימה)">
+            <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
+          </Field>
           <Field label="מקור המידע (שם הקבוצה)">
             <input
               className="input"

@@ -108,7 +108,7 @@ export default function Dashboard() {
               <Link to={`/found/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
                 <div className="flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <span className="font-medium text-slate-800">{r.colorDescription || 'חתול'}</span>
+                    <span className="font-medium text-slate-800">{r.title || r.colorDescription || 'חתול'}</span>
                     <StatusBadge status={r.status} labels={FOUND_REPORT_STATUS_LABELS} />
                   </span>
                   <span className="text-xs text-slate-400">{r.location}</span>

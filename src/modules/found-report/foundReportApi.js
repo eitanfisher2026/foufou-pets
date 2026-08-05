@@ -14,6 +14,7 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
 export async function createFoundReport(fields, photoFiles, reportedByUid) {
   const reportRef = await addDoc(collection(db, COLLECTIONS.FOUND_REPORTS), {
     species: 'cat',
+    title: fields.title || '',
     colorDescription: fields.colorDescription || '',
     markings: fields.markings || '',
     hasCollar: fields.hasCollar ?? null,
@@ -55,6 +56,7 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
+      title: fields.title || '',
       colorDescription: fields.colorDescription || '',
       markings: fields.markings || '',
       hasCollar: fields.hasCollar ?? null,
