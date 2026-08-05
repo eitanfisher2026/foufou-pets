@@ -334,11 +334,13 @@ export default function LostCaseDetail() {
               </div>
 
               {report?.photos?.[0]?.url && (
-                <img
-                  src={report.photos[0].url}
-                  alt=""
-                  className="mb-2 h-40 w-full rounded-lg object-cover ring-4 ring-amber-400"
-                />
+                <button type="button" onClick={() => setLightboxUrl(report.photos[0].url)} className="mb-2 block w-full">
+                  <img
+                    src={report.photos[0].url}
+                    alt=""
+                    className="h-40 w-full rounded-lg object-cover ring-4 ring-amber-400"
+                  />
+                </button>
               )}
 
               <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
@@ -354,6 +356,13 @@ export default function LostCaseDetail() {
                   {report.contactPhone && <p>טלפון ליצירת קשר: {report.contactPhone}</p>}
                 </div>
               )}
+
+              <Link
+                to={`/found/${m.foundReportId}`}
+                className="mt-2 block text-center text-sm font-medium text-slate-600 underline"
+              >
+                צפייה בדיווח המלא
+              </Link>
             </li>
           );
         })}
