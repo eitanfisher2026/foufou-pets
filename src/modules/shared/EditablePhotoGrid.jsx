@@ -20,6 +20,8 @@ export default function EditablePhotoGrid({
   onMakeMainExisting,
   newPhotos,
   onNewPhotosChange,
+  label = 'תמונות',
+  addLabel = 'הוספת תמונות',
 }) {
   const [previews, setPreviews] = useState([]);
   const [lightboxUrl, setLightboxUrl] = useState(null);
@@ -51,7 +53,7 @@ export default function EditablePhotoGrid({
 
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-slate-600">תמונות</label>
+      <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       {(existingPhotos.length > 0 || newPhotos.length > 0) && (
         <div className="mb-2 flex flex-wrap gap-3">
           {existingPhotos.map((p, i) => (
@@ -131,6 +133,7 @@ export default function EditablePhotoGrid({
           })}
         </div>
       )}
+      <label className="mb-1 block text-xs text-slate-500">{addLabel}</label>
       <input type="file" accept="image/*" multiple onChange={handleFileInput} />
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}

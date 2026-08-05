@@ -97,9 +97,17 @@ export default function FoundReportForm() {
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
-      </div>
 
-      <EditablePhotoGrid existingPhotos={[]} newPhotos={photos} onNewPhotosChange={setPhotos} />
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <EditablePhotoGrid
+            existingPhotos={[]}
+            newPhotos={photos}
+            onNewPhotosChange={setPhotos}
+            label="תמונות שיתווספו לדיווח"
+            addLabel="יש לך גם תמונה רגילה (לא צילום מסך)? אפשר להוסיף אותה כאן"
+          />
+        </div>
+      </div>
 
       {extracted && (
         <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">

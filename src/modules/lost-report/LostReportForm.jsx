@@ -87,9 +87,17 @@ export default function LostReportForm() {
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
-      </div>
 
-      <EditablePhotoGrid existingPhotos={[]} newPhotos={photos} onNewPhotosChange={setPhotos} />
+        <div className="mt-4 border-t border-slate-200 pt-4">
+          <EditablePhotoGrid
+            existingPhotos={[]}
+            newPhotos={photos}
+            onNewPhotosChange={setPhotos}
+            label="תמונות שיתווספו לתיק"
+            addLabel="יש לך גם תמונה רגילה (לא צילום מסך)? אפשר להוסיף אותה כאן"
+          />
+        </div>
+      </div>
 
       <Field label="שם החתולה">
         <input className="input" value={fields.name} onChange={(e) => setField('name', e.target.value)} />

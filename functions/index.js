@@ -80,7 +80,9 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "mainPhotoRegion" locates the single clearest, most complete photo of the actual animal within the provided images, so it can be cropped out and used as the record's main photo. Getting this box right matters a lot - a bad box (cutting off the animal, or including surrounding text/background) is worse than not finding one at all, so be careful and conservative:
   - Treat each image as spanning from (0,0) at its top-left corner to (1,1) at its bottom-right corner. "imageIndex" is the 0-based position of the image (in the order the images were given) that contains this photo. "x" and "y" are the fractional coordinates of the region's top-left corner; "width" and "height" are its fractional size.
   - The box must contain the animal's *entire* body as shown in the photo (head to tail/paws) - never a box that only shows part of the animal, like just legs or just a face when more of the body is visible in the source photo.
-  - Many posts are designed flyers where a rectangular photo is placed inside a colored background with a caption printed above, below, or beside it. In that case, the box is exactly the photo's own rectangle - stop at the photo's edge. Do not extend the box into the surrounding flyer background or caption text even slightly, and do not shrink it to less than the full photo either.
+  - The box should always be a tight crop around just the animal itself, not the whole photo it appears in - this applies in every case, not only designed flyers:
+    - Many posts are designed flyers where a rectangular photo is placed inside a colored background with a caption printed above, below, or beside it. There, exclude the flyer background and caption entirely - crop to the inset photo's edge, then continue tightening to just the animal within it.
+    - Plain candid photos (e.g. a phone photo of a cat on the street, with pavement, bins, plants, or other clutter around it) need the same tight treatment - do not treat "the whole photo" as the answer just because there's no flyer graphic around it. Draw the box around the animal's body itself, excluding as much of the surrounding scenery as you can while still keeping the whole animal in frame.
   - If you are not confident you can draw an accurate box - for example the photo is small, at an angle, partly obscured, or its edges are unclear - set "found" to false rather than guessing. A missing main photo is a minor inconvenience; a wrong one is misleading.
   - If the screenshot shows several separate photos of the animal (e.g. a collage), pick the largest and clearest single one - do not draw one box spanning multiple photos.
   - If no clear photo of the animal is visible in any image (e.g. a text-only post), set "found" to false and set imageIndex/x/y/width/height to 0 - they will be ignored.`;
@@ -140,7 +142,11 @@ export const extractReportFromImages = onCall(
     }
 
     try {
-      return JSON.parse(textBlock.text);
+      const parsed = JSON.parse(textBlock.text);
+      // Cheap to log, useful when a main-photo crop comes out wrong - lets
+      // us check what box the model actually returned without guessing.
+      console.log('mainPhotoRegion:', JSON.stringify(parsed.mainPhotoRegion));
+      return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the extraction result.');
     }
