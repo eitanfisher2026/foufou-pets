@@ -5,6 +5,7 @@ import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
+import { useConfirm } from '../shared/useConfirm.jsx';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -27,9 +28,13 @@ export default function FoundReportForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { reading, error: readError, read } = useScreenshotReader();
+  const { confirm, dialog } = useConfirm();
 
   const [fields, setFields] = useState(EMPTY_FIELDS);
   const [photos, setPhotos] = useState([]);
+  const [screenshotFiles, setScreenshotFiles] = useState([]);
+  const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState('');
   const [source, setSource] = useState('manual');
   const [extracted, setExtracted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,12 +44,34 @@ export default function FoundReportForm() {
   }
 
   async function handleScreenshotUpload(e) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setPhotos((prev) => [...prev, ...files]);
+    const newFiles = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (newFiles.length === 0) return;
+
+    // A second, separate upload is ambiguous: it could be another screenshot
+    // of the same continued post (caption cut off, "...עוד"), or a mistake -
+    // someone uploading a different cat's screenshot into this same report.
+    // Selecting several files together in one go is unambiguous (that's the
+    // normal same-post case) and isn't gated.
+    if (screenshotFiles.length > 0) {
+      const samePost = await confirm(
+        'כבר הועלתה תמונה קודם לדיווח הזה. התמונה החדשה שייכת לאותה חתולה ולאותו פוסט?',
+        { confirmLabel: 'כן, אותה חתולה', cancelLabel: 'לא, זו חתולה אחרת', danger: false }
+      );
+      if (!samePost) {
+        setUploadNotice('כדי לדווח על חתול נוסף, יש לסיים ולשלוח קודם את הדיווח הנוכחי, ואז לפתוח דיווח חדש עבורו.');
+        return;
+      }
+      setUploadNotice('');
+    }
+
+    const allScreenshots = [...screenshotFiles, ...newFiles];
+    setScreenshotFiles(allScreenshots);
     setSource('screenshot');
+    setPhotos((prev) => [...prev, ...newFiles]);
+
     try {
-      const result = await read(files);
+      const result = await read(allScreenshots);
       setFields((prev) => ({
         ...prev,
         colorDescription: result.colorDescription || prev.colorDescription,
@@ -62,8 +89,11 @@ export default function FoundReportForm() {
       }));
       setExtracted(true);
 
-      const mainPhoto = await extractMainPhoto(files, result.mainPhotoRegion);
-      if (mainPhoto) setPhotos((prev) => [mainPhoto, ...prev]);
+      const mainPhoto = await extractMainPhoto(allScreenshots, result.mainPhotoRegion);
+      if (mainPhoto) {
+        setPhotos((prev) => [mainPhoto, ...(hasAutoMainPhoto ? prev.slice(1) : prev)]);
+        setHasAutoMainPhoto(true);
+      }
     } catch {
       // error already surfaced via readError
     }
@@ -97,6 +127,7 @@ export default function FoundReportForm() {
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
+        {uploadNotice && <p className="mt-2 text-sm text-amber-700">{uploadNotice}</p>}
 
         <div className="mt-4 border-t border-slate-200 pt-4">
           <EditablePhotoGrid
@@ -187,6 +218,7 @@ export default function FoundReportForm() {
       >
         {submitting ? 'שולחים...' : 'שליחת הדיווח'}
       </button>
+      {dialog}
     </form>
   );
 }

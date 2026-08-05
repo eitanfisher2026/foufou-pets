@@ -5,6 +5,7 @@ import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
+import { useConfirm } from '../shared/useConfirm.jsx';
 import { CAT_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
@@ -25,9 +26,13 @@ export default function LostReportForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { reading, error: readError, read } = useScreenshotReader();
+  const { confirm, dialog } = useConfirm();
 
   const [fields, setFields] = useState(EMPTY_FIELDS);
   const [photos, setPhotos] = useState([]);
+  const [screenshotFiles, setScreenshotFiles] = useState([]);
+  const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState('');
   const [source, setSource] = useState('manual');
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,12 +41,34 @@ export default function LostReportForm() {
   }
 
   async function handleScreenshotUpload(e) {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-    setPhotos(files);
+    const newFiles = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (newFiles.length === 0) return;
+
+    // A second, separate upload is ambiguous: it could be another screenshot
+    // of the same continued post (caption cut off, "...עוד"), or a mistake -
+    // someone uploading a different cat's screenshot into this same form.
+    // Selecting several files together in one go is unambiguous (that's the
+    // normal same-post case) and isn't gated.
+    if (screenshotFiles.length > 0) {
+      const samePost = await confirm(
+        'כבר הועלתה תמונה קודם לתיק הזה. התמונה החדשה שייכת לאותה חתולה ולאותו פוסט?',
+        { confirmLabel: 'כן, אותה חתולה', cancelLabel: 'לא, זו חתולה אחרת', danger: false }
+      );
+      if (!samePost) {
+        setUploadNotice('כדי לדווח על חתול נוסף, יש לסיים ולפתוח קודם את התיק הנוכחי, ואז לפתוח תיק חדש עבורו.');
+        return;
+      }
+      setUploadNotice('');
+    }
+
+    const allScreenshots = [...screenshotFiles, ...newFiles];
+    setScreenshotFiles(allScreenshots);
     setSource('screenshot');
+    setPhotos((prev) => [...prev, ...newFiles]);
+
     try {
-      const extracted = await read(files);
+      const extracted = await read(allScreenshots);
       setFields((prev) => ({
         ...prev,
         name: extracted.petName || prev.name,
@@ -55,8 +82,11 @@ export default function LostReportForm() {
         notes: extracted.captionText || prev.notes,
       }));
 
-      const mainPhoto = await extractMainPhoto(files, extracted.mainPhotoRegion);
-      if (mainPhoto) setPhotos([mainPhoto, ...files]);
+      const mainPhoto = await extractMainPhoto(allScreenshots, extracted.mainPhotoRegion);
+      if (mainPhoto) {
+        setPhotos((prev) => [mainPhoto, ...(hasAutoMainPhoto ? prev.slice(1) : prev)]);
+        setHasAutoMainPhoto(true);
+      }
     } catch {
       // error already surfaced via readError; user can fill in manually
     }
@@ -87,6 +117,7 @@ export default function LostReportForm() {
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
+        {uploadNotice && <p className="mt-2 text-sm text-amber-700">{uploadNotice}</p>}
 
         <div className="mt-4 border-t border-slate-200 pt-4">
           <EditablePhotoGrid
@@ -163,6 +194,7 @@ export default function LostReportForm() {
       >
         {submitting ? 'פותחים תיק...' : 'פתיחת תיק חיפוש'}
       </button>
+      {dialog}
     </form>
   );
 }
