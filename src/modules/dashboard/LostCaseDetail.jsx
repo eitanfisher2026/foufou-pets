@@ -338,7 +338,7 @@ export default function LostCaseDetail() {
                   <img
                     src={report.photos[0].url}
                     alt=""
-                    className="h-40 w-full rounded-lg object-cover ring-4 ring-amber-400"
+                    className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
                   />
                 </button>
               )}
