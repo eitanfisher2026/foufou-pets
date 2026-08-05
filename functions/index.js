@@ -80,7 +80,11 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "mainPhotoRegion" locates the single clearest, most complete photo of the actual animal within the provided images, so it can be cropped out and used as the record's main photo. Treat each image as spanning from (0,0) at its top-left corner to (1,1) at its bottom-right corner. "imageIndex" is the 0-based position of the image (in the order the images were given) that contains this photo. "x" and "y" are the fractional coordinates of the region's top-left corner; "width" and "height" are its fractional size. Pick the tightest box around just the animal's photo - excluding the post's text, logos, decorative frames, other people, and unrelated icons. If the screenshot shows several photos of the animal (e.g. a collage), pick the largest and clearest one. If no clear photo of the animal is visible in any image (e.g. a text-only post), set "found" to false and set imageIndex/x/y/width/height to 0 - they will be ignored.`;
 
 export const extractReportFromImages = onCall(
-  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'] },
+  // Default timeout (60s) was getting hit mid-request once mainPhotoRegion
+  // reasoning + a 4096 max_tokens budget pushed real-world latency past it -
+  // Cloud Run kills the request before the handler can return an error, which
+  // the browser sees as a bare CORS failure instead of a real error message.
+  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 120 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');

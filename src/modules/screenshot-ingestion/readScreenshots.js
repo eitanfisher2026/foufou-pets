@@ -23,7 +23,9 @@ export async function readScreenshots(files) {
     }))
   );
 
-  const extract = httpsCallable(functions, 'extractReportFromImages');
+  // Matches the function's own 120s timeout - the SDK's 70s default would
+  // otherwise abort client-side before a slower extraction finishes server-side.
+  const extract = httpsCallable(functions, 'extractReportFromImages', { timeout: 120000 });
   const result = await extract({ images });
   return result.data;
 }
