@@ -1,6 +1,6 @@
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { COLLECTIONS, REPORT_STATUS } from '../shared/collections.js';
+import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
 import { rankMatches } from './matchingEngine.js';
 
 /**
@@ -15,7 +15,12 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const lostCase = caseSnap.data();
 
   const reportsSnap = await getDocs(collection(db, COLLECTIONS.FOUND_REPORTS));
-  const foundReports = reportsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  // Skip anything not active: suspended/archived/resolved means that found
+  // cat has already been checked/accounted for, so it shouldn't keep
+  // surfacing as a fresh match candidate for other lost cases.
+  const foundReports = reportsSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((r) => (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE);
 
   const ranked = rankMatches(lostCase, foundReports);
 
