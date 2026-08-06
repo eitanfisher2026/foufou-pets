@@ -25,7 +25,10 @@ const EXTRACTION_SCHEMA = {
     petName: { type: 'string' },
     color: { type: 'string', enum: CAT_COLORS },
     colorDescription: { type: 'string' },
-    size: { type: ['string', 'null'], enum: ['small', 'medium', 'large', null] },
+    // anyOf, not type:['string','null']+enum - Anthropic rejects an enum
+    // combined with an array-form type ("Enum value 'small' does not match
+    // declared type '['string', 'null']'").
+    size: { anyOf: [{ type: 'string', enum: ['small', 'medium', 'large'] }, { type: 'null' }] },
     markings: { type: 'string' },
     hasCollar: { type: ['boolean', 'null'] },
     location: { type: 'string' },
