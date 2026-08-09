@@ -37,6 +37,20 @@ function compareExact(a, b) {
   return { ratio: na === nb ? 1 : 0 };
 }
 
+// For a rare, permanent marking (e.g. a clipped ear tip) where "false" just
+// means "doesn't have this marking" - the common default for most cats, not
+// evidence of anything. Both sides being false proves nothing about
+// identity, so it's treated as not comparable, same as missing data -
+// unlike compareExact, where false/false would wrongly score as a match.
+// Both true is a real positive signal; true vs false is a real mismatch
+// (the marking doesn't appear or disappear over time), so that's still
+// penalized like any other exact mismatch.
+function compareBooleanTrait(a, b) {
+  if (a === null || a === undefined || b === null || b === undefined) return null;
+  if (a === false && b === false) return null;
+  return { ratio: a === b ? 1 : 0 };
+}
+
 function compareTextOverlap(a, b) {
   const wordsA = new Set(tokenize(a));
   const wordsB = new Set(tokenize(b));
@@ -108,6 +122,7 @@ function comparePresence(a, b) {
 
 const COMPARATORS = {
   exact: compareExact,
+  booleanTrait: compareBooleanTrait,
   textOverlap: compareTextOverlap,
   markList: compareMarkList,
   dateProximity: compareDateProximity,
@@ -129,7 +144,7 @@ export const DEFAULT_MATCH_CONFIG = {
   relativeScoring: true,
   parameters: [
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
-    { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10 },
+    { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'exact', lostField: 'color', foundField: 'color' },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
@@ -168,6 +183,7 @@ export const COMPARABLE_FIELDS = [
 
 export const COMPARISON_TYPE_LABELS = {
   exact: 'התאמה מדויקת',
+  booleanTrait: 'סימן נדיר (קיים/לא קיים - "לא קיים" משני הצדדים לא נחשב כהתאמה)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
@@ -188,6 +204,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
   const reasons = [];
   let earned = 0;
   let comparableWeight = 0;
+  let disqualified = false;
 
   for (const p of config.parameters) {
     if (!p.enabled) continue;
@@ -202,10 +219,18 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
 
     comparableWeight += p.weight;
 
-    if (p.comparisonType === 'exact') {
+    if (p.comparisonType === 'exact' || p.comparisonType === 'booleanTrait') {
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);
+      } else if (p.disqualifying) {
+        // A hard mismatch on a defining trait (e.g. color, or a permanent
+        // marking like a clipped ear) - this isn't just "less similar," it
+        // rules the pair out entirely. Score drops to 0 but the pair still
+        // shows up in the ranked list (never fully filtered out), so a
+        // wrongly-classified field doesn't hide a real match from the owner.
+        disqualified = true;
+        reasons.unshift(`${p.label}: אינו תואם - פוסל התאמה`);
       } else if (p.mismatchPenalty) {
         earned -= p.mismatchPenalty;
         reasons.push(`${p.label}: אינו תואם`);
@@ -228,6 +253,10 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
 
   if (comparableWeight === 0) {
     return { score: 0, reasons: ['אין מספיק מידע משותף להשוואה'] };
+  }
+
+  if (disqualified) {
+    return { score: 0, reasons };
   }
 
   const rawScore = config.relativeScoring ? (earned / comparableWeight) * 100 : earned;

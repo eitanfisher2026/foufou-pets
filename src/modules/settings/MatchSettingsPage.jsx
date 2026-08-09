@@ -220,17 +220,32 @@ function ParameterRow({ param, onChange, onRemove }) {
               ))}
             </select>
           </label>
-          {param.comparisonType === 'exact' && (
-            <label className="block">
-              <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס)</span>
-              <input
-                type="number"
-                min="0"
-                className="input"
-                value={param.mismatchPenalty || 0}
-                onChange={(e) => onChange({ mismatchPenalty: Number(e.target.value) })}
-              />
-            </label>
+          {(param.comparisonType === 'exact' || param.comparisonType === 'booleanTrait') && (
+            <>
+              <label className="block">
+                <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס)</span>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  disabled={param.disqualifying}
+                  value={param.mismatchPenalty || 0}
+                  onChange={(e) => onChange({ mismatchPenalty: Number(e.target.value) })}
+                />
+              </label>
+              <label className="col-span-2 flex items-start gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={!!param.disqualifying}
+                  onChange={(e) => onChange({ disqualifying: e.target.checked })}
+                />
+                <span>
+                  אי-התאמה בפרמטר זה פוסלת את ההתאמה כליל (ציון 0), לא רק מפחיתה ממנו - מתאים לפרמטר שאם הוא לא תואם, זו
+                  כמעט בוודאות לא אותה חתולה
+                </span>
+              </label>
+            </>
           )}
         </div>
       )}
