@@ -17,6 +17,7 @@ import {
   COLLAR_COLORS,
   CAT_CONDITIONS,
 } from '../shared/collections.js';
+import { formatDate } from '../shared/formatDate.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
@@ -415,7 +416,7 @@ export default function FoundReportDetail() {
             { label: 'מצב החתול', value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
             { label: 'מיקום', value: report.location },
             { label: 'מועד הראייה/המציאה', value: report.dateText },
-            { label: 'תאריך מדויק', value: report.seenDate },
+            { label: 'תאריך מדויק', value: formatDate(report.seenDate) },
             { label: 'מקור המידע (קבוצה)', value: report.sourceGroupName },
             { label: 'מי כתב את הפוסט', value: report.originalPosterName },
             { label: 'מי שיתף', value: report.sharedByName },

@@ -12,6 +12,7 @@ import {
   CAT_AGE_CLASSES,
   COLLAR_COLORS,
 } from '../shared/collections.js';
+import { formatDate } from '../shared/formatDate.js';
 import {
   getLostCase,
   updateLostCase,
@@ -492,7 +493,7 @@ export default function LostCaseDetail() {
             { label: 'שכונה', value: lostCase.neighborhood },
             { label: 'פרטי מיקום נוספים', value: lostCase.lastSeenLocation },
             { label: 'מועד האובדן', value: lostCase.lastSeenAt },
-            { label: 'תאריך מדויק', value: lostCase.lastSeenDate },
+            { label: 'תאריך מדויק', value: formatDate(lostCase.lastSeenDate) },
             { label: 'שם איש קשר', value: lostCase.contactName },
             { label: 'טלפון', value: lostCase.contactPhone },
             { label: 'הערות נוספות', value: lostCase.notes },
