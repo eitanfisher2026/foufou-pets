@@ -220,7 +220,9 @@ function ParameterRow({ param, onChange, onRemove }) {
               ))}
             </select>
           </label>
-          {(param.comparisonType === 'exact' || param.comparisonType === 'booleanTrait') && (
+          {(param.comparisonType === 'exact' ||
+            param.comparisonType === 'booleanTrait' ||
+            param.comparisonType === 'colorMatch') && (
             <>
               <label className="block">
                 <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס)</span>

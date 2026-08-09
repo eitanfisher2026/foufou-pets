@@ -17,6 +17,16 @@
 
 const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 
+// Solid-color pairs that are commonly confused by camera lighting/white
+// balance rather than being genuinely different cats - white/gray is the
+// classic case. Must reference the same values as CAT_COLORS in
+// src/modules/shared/collections.js. Any other color disagreement,
+// including solid vs. patterned (a solid-colored cat can't become
+// patterned or vice versa), is treated as a real mismatch. "אחר" (other)
+// is excluded entirely - it's an AI catch-all with no reliable meaning, so
+// a comparison involving it is inconclusive, not a mismatch.
+const COLOR_LIGHTING_CONFUSABLE_PAIRS = [['לבן', 'אפור']];
+
 function tokenize(text) {
   if (!text) return [];
   return text
@@ -49,6 +59,20 @@ function compareBooleanTrait(a, b) {
   if (a === null || a === undefined || b === null || b === undefined) return null;
   if (a === false && b === false) return null;
   return { ratio: a === b ? 1 : 0 };
+}
+
+// Color-aware comparison: exact match scores full, a genuine cross-group
+// mismatch (solid vs. patterned) or two unrelated solid colors score a
+// hard 0, and a lighting-confusable pair (e.g. white vs. gray) scores
+// partial credit instead of 0, since that disagreement is as likely to be
+// a photo artifact as a real difference.
+function compareColor(a, b) {
+  if (!a || !b) return null;
+  if (a === 'אחר' || b === 'אחר') return null;
+  if (a === b) return { ratio: 1 };
+  const isConfusable = COLOR_LIGHTING_CONFUSABLE_PAIRS.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
+  if (isConfusable) return { ratio: 0.6 };
+  return { ratio: 0 };
 }
 
 function compareTextOverlap(a, b) {
@@ -123,6 +147,7 @@ function comparePresence(a, b) {
 const COMPARATORS = {
   exact: compareExact,
   booleanTrait: compareBooleanTrait,
+  colorMatch: compareColor,
   textOverlap: compareTextOverlap,
   markList: compareMarkList,
   dateProximity: compareDateProximity,
@@ -146,7 +171,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
-    { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'exact', lostField: 'color', foundField: 'color' },
+    { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
     { key: 'city', label: 'עיר', weight: 10, enabled: true, comparisonType: 'textOverlap', lostField: 'city', foundField: 'city' },
     { key: 'hasCollar', label: 'קולר/רתמה', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'hasCollar', foundField: 'hasCollar', mismatchPenalty: 5 },
@@ -184,6 +209,7 @@ export const COMPARABLE_FIELDS = [
 export const COMPARISON_TYPE_LABELS = {
   exact: 'התאמה מדויקת',
   booleanTrait: 'סימן נדיר (קיים/לא קיים - "לא קיים" משני הצדדים לא נחשב כהתאמה)',
+  colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
@@ -219,10 +245,16 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
 
     comparableWeight += p.weight;
 
-    if (p.comparisonType === 'exact' || p.comparisonType === 'booleanTrait') {
+    if (p.comparisonType === 'exact' || p.comparisonType === 'booleanTrait' || p.comparisonType === 'colorMatch') {
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);
+      } else if (result.ratio > 0) {
+        // Only colorMatch produces this: a lighting-confusable pair (e.g.
+        // white vs. gray) isn't a real disagreement, so it earns partial
+        // credit instead of triggering a mismatch penalty/disqualification.
+        earned += result.ratio * p.weight;
+        reasons.push(`${p.label}: התאמה חלקית (יתכן הבדל עקב תאורת הצילום)`);
       } else if (p.disqualifying) {
         // A hard mismatch on a defining trait (e.g. color, or a permanent
         // marking like a clipped ear) - this isn't just "less similar," it
