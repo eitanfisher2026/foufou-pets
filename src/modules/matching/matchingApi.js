@@ -63,6 +63,20 @@ export async function checkMatchesForLostCase(lostCaseId) {
   return ranked;
 }
 
+/**
+ * Deletes every existing match record for a lost case - including whatever
+ * status a person already set on them - so the next check starts every
+ * pairing fresh as if it were being compared for the first time. Used when
+ * a matching-config change (a new field, a re-tuned weight) makes the old
+ * results worth throwing away rather than just refreshing scores in place.
+ */
+export async function clearMatches(lostCaseId) {
+  const existingSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
+  const batch = writeBatch(db);
+  existingSnap.docs.forEach((d) => batch.delete(d.ref));
+  await batch.commit();
+}
+
 export async function getMatches(lostCaseId) {
   const snap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.score - a.score);

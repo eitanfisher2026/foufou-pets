@@ -22,7 +22,7 @@ import {
   makeLostCasePhotoMain,
   deleteLostCase,
 } from '../lost-report/lostReportApi.js';
-import { checkMatchesForLostCase, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
+import { checkMatchesForLostCase, clearMatches, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
@@ -77,6 +77,7 @@ export default function LostCaseDetail() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [showProcessed, setShowProcessed] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
@@ -108,6 +109,22 @@ export default function LostCaseDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     try {
+      await checkMatchesForLostCase(caseId);
+      await load();
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleClearAndRecheck() {
+    const ok = await confirm(
+      'למחוק את כל ההתאמות הקיימות עבור התיק הזה - כולל סטטוסים שנקבעו ידנית - ולבדוק הכל מחדש מאפס?',
+      { confirmLabel: 'איפוס ובדיקה מחדש', danger: true }
+    );
+    if (!ok) return;
+    setChecking(true);
+    try {
+      await clearMatches(caseId);
       await checkMatchesForLostCase(caseId);
       await load();
     } finally {
@@ -182,6 +199,9 @@ export default function LostCaseDetail() {
   }
 
   if (!lostCase) return <p className="p-4 text-slate-500">טוען...</p>;
+
+  const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
+  const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
 
   return (
     <div className="mx-auto max-w-2xl p-4">
@@ -442,75 +462,67 @@ export default function LostCaseDetail() {
       <button
         onClick={handleCheckMatches}
         disabled={checking}
-        className="mb-6 w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
+        className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
       >
         {checking ? 'בודקים התאמות...' : 'בדיקת התאמות אפשריות'}
       </button>
+      {matches.length > 0 && (
+        <button
+          onClick={handleClearAndRecheck}
+          disabled={checking}
+          className="mb-6 mt-2 w-full text-center text-xs text-slate-400 underline disabled:opacity-50"
+        >
+          איפוס כל ההתאמות (כולל סטטוסים) ובדיקה מחדש
+        </button>
+      )}
+      {matches.length === 0 && <div className="mb-6" />}
 
       <h2 className="mb-1 text-lg font-semibold text-slate-700">התאמות אפשריות ({matches.length})</h2>
       {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין דיווחים במאגר.</p>}
       {matches.length > 0 && (
         <p className="mb-3 text-sm text-slate-500">
-          {matches.filter((m) => m.status === REPORT_STATUS.NEW).length > 0
-            ? `${matches.filter((m) => m.status === REPORT_STATUS.NEW).length} חדשות לבדיקה · הכי טובה ${matches[0].score}/100`
-            : `כל ההתאמות נבדקו · הכי טובה ${matches[0].score}/100`}
+          {newMatches.length > 0
+            ? `${newMatches.length} חדשות לבדיקה · הכי טובה ${matches[0].score}/100`
+            : `כל ההתאמות טופלו · הכי טובה ${matches[0].score}/100`}
         </p>
       )}
 
-      <ul className="space-y-3">
-        {matches.map((m) => {
-          const report = reportsById[m.foundReportId];
-          return (
-            <li key={m.foundReportId} className="rounded-xl border border-slate-200 bg-white p-4">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="font-medium text-slate-800">רמת התאמה: {m.score}/100</span>
-                <select
-                  className="input w-auto text-xs"
-                  value={m.status}
-                  onChange={(e) => handleStatusChange(m.foundReportId, e.target.value)}
-                >
-                  {Object.entries(MATCH_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+      {newMatches.length > 0 ? (
+        <ul className="space-y-3">
+          {newMatches.map((m) => (
+            <MatchCard
+              key={m.foundReportId}
+              match={m}
+              report={reportsById[m.foundReportId]}
+              onStatusChange={handleStatusChange}
+              onViewPhoto={setLightboxUrl}
+            />
+          ))}
+        </ul>
+      ) : (
+        matches.length > 0 && <p className="text-sm text-slate-400">אין התאמות חדשות שטרם נבדקו.</p>
+      )}
 
-              {report?.photos?.[0]?.url && (
-                <button type="button" onClick={() => setLightboxUrl(report.photos[0].url)} className="mb-2 block w-full">
-                  <img
-                    src={report.photos[0].url}
-                    alt=""
-                    className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
-                  />
-                </button>
-              )}
-
-              <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
-                {m.reasons.map((reason, i) => (
-                  <li key={i}>{reason}</li>
-                ))}
-              </ul>
-
-              {report && (
-                <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
-                  {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
-                  {report.originalPosterName && <p>פורסם ע"י: {report.originalPosterName}</p>}
-                  {report.contactPhone && <p>טלפון ליצירת קשר: {report.contactPhone}</p>}
-                </div>
-              )}
-
-              <Link
-                to={`/found/${m.foundReportId}`}
-                className="mt-2 block text-center text-sm font-medium text-slate-600 underline"
-              >
-                צפייה בדיווח המלא
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      {processedMatches.length > 0 && (
+        <div className="mt-6">
+          <button onClick={() => setShowProcessed((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
+            {showProcessed ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
+          </button>
+          {showProcessed && (
+            <ul className="space-y-3">
+              {processedMatches.map((m) => (
+                <MatchCard
+                  key={m.foundReportId}
+                  match={m}
+                  report={reportsById[m.foundReportId]}
+                  onStatusChange={handleStatusChange}
+                  onViewPhoto={setLightboxUrl}
+                />
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
@@ -547,6 +559,55 @@ export default function LostCaseDetail() {
         />
       )}
     </div>
+  );
+}
+
+function MatchCard({ match, report, onStatusChange, onViewPhoto }) {
+  return (
+    <li className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-medium text-slate-800">רמת התאמה: {match.score}/100</span>
+        <select
+          className="input w-auto text-xs"
+          value={match.status}
+          onChange={(e) => onStatusChange(match.foundReportId, e.target.value)}
+        >
+          {Object.entries(MATCH_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {report?.photos?.[0]?.url && (
+        <button type="button" onClick={() => onViewPhoto(report.photos[0].url)} className="mb-2 block w-full">
+          <img
+            src={report.photos[0].url}
+            alt=""
+            className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
+          />
+        </button>
+      )}
+
+      <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
+        {match.reasons.map((reason, i) => (
+          <li key={i}>{reason}</li>
+        ))}
+      </ul>
+
+      {report && (
+        <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+          {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
+          {report.originalPosterName && <p>פורסם ע"י: {report.originalPosterName}</p>}
+          {report.contactPhone && <p>טלפון ליצירת קשר: {report.contactPhone}</p>}
+        </div>
+      )}
+
+      <Link to={`/found/${match.foundReportId}`} className="mt-2 block text-center text-sm font-medium text-slate-600 underline">
+        צפייה בדיווח המלא
+      </Link>
+    </li>
   );
 }
 
