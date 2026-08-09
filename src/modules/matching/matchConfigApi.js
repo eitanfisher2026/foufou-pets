@@ -16,6 +16,7 @@ export async function getMatchConfig() {
   return {
     relativeScoring: data.relativeScoring ?? DEFAULT_MATCH_CONFIG.relativeScoring,
     parameters: Array.isArray(data.parameters) ? data.parameters : DEFAULT_MATCH_CONFIG.parameters,
+    colorGroups: Array.isArray(data.colorGroups) ? data.colorGroups : DEFAULT_MATCH_CONFIG.colorGroups,
   };
 }
 

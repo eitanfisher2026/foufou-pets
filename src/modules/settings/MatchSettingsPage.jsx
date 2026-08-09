@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMatchConfig, saveMatchConfig, resetMatchConfig } from '../matching/matchConfigApi.js';
 import { COMPARABLE_FIELDS, COMPARISON_TYPE_LABELS, fieldLabel } from '../matching/matchingEngine.js';
+import { CAT_COLORS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
+
+// "אחר" (other) is an AI catch-all, not a real color - grouping it with
+// anything wouldn't mean anything, so it's left out of the groupable list.
+const GROUPABLE_COLORS = CAT_COLORS.filter((c) => c !== 'אחר');
 
 /**
  * Lets the matching algorithm be tuned without a code change: reorder is
@@ -32,6 +37,23 @@ export default function MatchSettingsPage() {
 
   function removeParam(index) {
     setConfig((prev) => ({ ...prev, parameters: prev.parameters.filter((_, i) => i !== index) }));
+  }
+
+  function addColorGroup() {
+    setConfig((prev) => ({ ...prev, colorGroups: [...(prev.colorGroups || []), []] }));
+  }
+
+  function removeColorGroup(index) {
+    setConfig((prev) => ({ ...prev, colorGroups: prev.colorGroups.filter((_, i) => i !== index) }));
+  }
+
+  function toggleColorInGroup(groupIndex, color) {
+    setConfig((prev) => ({
+      ...prev,
+      colorGroups: prev.colorGroups.map((g, i) =>
+        i === groupIndex ? (g.includes(color) ? g.filter((c) => c !== color) : [...g, color]) : g
+      ),
+    }));
   }
 
   function addParam() {
@@ -116,6 +138,45 @@ export default function MatchSettingsPage() {
         className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
       >
         + הוספת פרמטר
+      </button>
+
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">קבוצות צבעים דומים</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל ביניהם
+        בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "צבע".
+      </p>
+      <div className="space-y-3">
+        {(config.colorGroups || []).map((group, i) => (
+          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-sm font-medium text-slate-600">קבוצה {i + 1}</span>
+              <button type="button" onClick={() => removeColorGroup(i)} className="text-sm text-red-600" aria-label="הסרת קבוצה">
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {GROUPABLE_COLORS.map((color) => (
+                <label
+                  key={color}
+                  className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
+                    group.includes(color) ? 'border-slate-800 bg-slate-100' : 'border-slate-200 text-slate-500'
+                  }`}
+                >
+                  <input type="checkbox" checked={group.includes(color)} onChange={() => toggleColorInGroup(i, color)} />
+                  {color}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <button
+        type="button"
+        onClick={addColorGroup}
+        className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
+      >
+        + הוספת קבוצת צבעים
       </button>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white p-3">

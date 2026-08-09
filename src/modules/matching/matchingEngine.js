@@ -17,15 +17,17 @@
 
 const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 
-// Solid-color pairs that are commonly confused by camera lighting/white
-// balance rather than being genuinely different cats - white/gray is the
-// classic case. Must reference the same values as CAT_COLORS in
-// src/modules/shared/collections.js. Any other color disagreement,
-// including solid vs. patterned (a solid-colored cat can't become
-// patterned or vice versa), is treated as a real mismatch. "אחר" (other)
-// is excluded entirely - it's an AI catch-all with no reliable meaning, so
-// a comparison involving it is inconclusive, not a mismatch.
-const COLOR_LIGHTING_CONFUSABLE_PAIRS = [['לבן', 'אפור']];
+// Default color-similarity groups: colors placed in the same group are
+// treated as "can't tell apart from a photo" (e.g. lighting/white balance
+// making white look gray) rather than a real mismatch - editable from the
+// settings panel (config.colorGroups), not fixed in code. Values must
+// reference CAT_COLORS in src/modules/shared/collections.js. Any color
+// disagreement outside a shared group, including solid vs. patterned (a
+// solid-colored cat can't become tabby/calico/bi-color or vice versa), is
+// treated as a real mismatch. "אחר" (other) is excluded entirely - it's an
+// AI catch-all with no reliable meaning, so a comparison involving it is
+// inconclusive, not a mismatch.
+export const DEFAULT_COLOR_GROUPS = [['לבן', 'אפור']];
 
 function tokenize(text) {
   if (!text) return [];
@@ -61,17 +63,18 @@ function compareBooleanTrait(a, b) {
   return { ratio: a === b ? 1 : 0 };
 }
 
-// Color-aware comparison: exact match scores full, a genuine cross-group
-// mismatch (solid vs. patterned) or two unrelated solid colors score a
-// hard 0, and a lighting-confusable pair (e.g. white vs. gray) scores
-// partial credit instead of 0, since that disagreement is as likely to be
-// a photo artifact as a real difference.
-function compareColor(a, b) {
+// Color-aware comparison: exact match scores full, two colors placed in
+// the same configured group (config.colorGroups, defaults to
+// DEFAULT_COLOR_GROUPS) score partial credit since they could be the same
+// cat photographed under different lighting, and any other disagreement
+// (including solid vs. patterned) scores a hard 0.
+function compareColor(a, b, ctx) {
   if (!a || !b) return null;
   if (a === 'אחר' || b === 'אחר') return null;
   if (a === b) return { ratio: 1 };
-  const isConfusable = COLOR_LIGHTING_CONFUSABLE_PAIRS.some(([x, y]) => (a === x && b === y) || (a === y && b === x));
-  if (isConfusable) return { ratio: 0.6 };
+  const groups = ctx?.colorGroups || DEFAULT_COLOR_GROUPS;
+  const sameGroup = groups.some((group) => group.includes(a) && group.includes(b));
+  if (sameGroup) return { ratio: 0.6 };
   return { ratio: 0 };
 }
 
@@ -129,12 +132,12 @@ function compareMarkList(a, b) {
 // anchored to whenever the post was viewed/screenshotted, not necessarily
 // the real event date. Doubling the cutoff in that case avoids letting a
 // likely match get buried just because one side's date is a rough guess.
-function compareDateProximity(a, b, lenient) {
+function compareDateProximity(a, b, ctx) {
   if (!a || !b) return null;
   const diffMs = Math.abs(new Date(a) - new Date(b));
   if (Number.isNaN(diffMs)) return null;
   const diffDays = diffMs / 86400000;
-  const cutoff = lenient ? DATE_PROXIMITY_CUTOFF_DAYS * 2 : DATE_PROXIMITY_CUTOFF_DAYS;
+  const cutoff = ctx?.lenient ? DATE_PROXIMITY_CUTOFF_DAYS * 2 : DATE_PROXIMITY_CUTOFF_DAYS;
   return { ratio: Math.max(0, 1 - diffDays / cutoff), diffDays: Math.round(diffDays) };
 }
 
@@ -167,6 +170,7 @@ export const DEFAULT_MATCH_CONFIG = {
   // those few fields from being penalized just for having less data than
   // a fully-filled-in pair would.
   relativeScoring: true,
+  colorGroups: DEFAULT_COLOR_GROUPS,
   parameters: [
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
@@ -240,7 +244,8 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const lenient =
       p.comparisonType === 'dateProximity' &&
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
-    const result = compare(lostCase[p.lostField], foundReport[p.foundField], lenient);
+    const ctx = { lenient, colorGroups: config.colorGroups };
+    const result = compare(lostCase[p.lostField], foundReport[p.foundField], ctx);
     if (!result) continue;
 
     comparableWeight += p.weight;
