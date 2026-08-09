@@ -7,7 +7,7 @@ import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
-import { CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
+import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -16,6 +16,8 @@ const EMPTY_FIELDS = {
   colorDescription: '',
   size: '',
   ageClass: '',
+  furType: '',
+  hasFluffyTail: null,
   markings: '',
   hasCollar: null,
   collarColor: '',
@@ -93,6 +95,8 @@ export default function FoundReportForm() {
         colorDescription: result.colorDescription || prev.colorDescription,
         size: result.size || prev.size,
         ageClass: result.ageClass || prev.ageClass,
+        furType: result.furType || prev.furType,
+        hasFluffyTail: result.hasFluffyTail ?? prev.hasFluffyTail,
         markings: result.markings || prev.markings,
         hasCollar: result.hasCollar ?? prev.hasCollar,
         collarColor: result.collarColor || prev.collarColor,
@@ -256,6 +260,26 @@ export default function FoundReportForm() {
           onChange={(e) => setField('colorDescription', e.target.value)}
         />
       </Field>
+
+      <Field label="סוג פרווה">
+        <select className="input" value={fields.furType} onChange={(e) => setField('furType', e.target.value)}>
+          <option value="">בחר/י</option>
+          {CAT_FUR_TYPES.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={!!fields.hasFluffyTail}
+          onChange={(e) => setField('hasFluffyTail', e.target.checked)}
+        />
+        זנב שעיר/פלומתי במיוחד
+      </label>
 
       <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
         <textarea

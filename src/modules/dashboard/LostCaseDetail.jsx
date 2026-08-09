@@ -9,6 +9,7 @@ import {
   LOST_CASE_STATUS_LABELS,
   CAT_SIZES,
   CAT_AGE_CLASSES,
+  CAT_FUR_TYPES,
   COLLAR_COLORS,
 } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
@@ -34,6 +35,7 @@ import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
+  { targetKey: 'hasFluffyTail', extractedKey: 'hasFluffyTail', label: 'זנב שעיר במיוחד' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
@@ -268,6 +270,24 @@ export default function LostCaseDetail() {
               ))}
             </select>
           </Field>
+          <Field label="סוג פרווה">
+            <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
+              <option value="">בחר/י</option>
+              {CAT_FUR_TYPES.map((f) => (
+                <option key={f.value} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={!!fields.hasFluffyTail}
+              onChange={(e) => setField('hasFluffyTail', e.target.checked)}
+            />
+            זנב שעיר/פלומתי במיוחד
+          </label>
           <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
             <textarea
               className="input"
@@ -502,6 +522,8 @@ export default function LostCaseDetail() {
             { label: 'צבע', value: lostCase.color },
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
+            { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === lostCase.furType)?.label },
+            { label: 'זנב שעיר במיוחד', value: lostCase.hasFluffyTail === true ? 'כן' : lostCase.hasFluffyTail === false ? 'לא' : '' },
             { label: 'סימנים מיוחדים', value: lostCase.markings },
             { label: 'אוזן קטומה', value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '' },
             { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },

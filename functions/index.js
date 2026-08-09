@@ -50,6 +50,8 @@ const EXTRACTION_SCHEMA = {
     // declared type '['string', 'null']'").
     size: { anyOf: [{ type: 'string', enum: ['small', 'medium', 'large'] }, { type: 'null' }] },
     ageClass: { anyOf: [{ type: 'string', enum: ['kitten', 'adult'] }, { type: 'null' }] },
+    furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'medium', 'long', 'curly'] }, { type: 'null' }] },
+    hasFluffyTail: { type: ['boolean', 'null'] },
     markings: { type: 'string' },
     hasCollar: { type: ['boolean', 'null'] },
     collarColor: { anyOf: [{ type: 'string', enum: COLLAR_COLORS }, { type: 'null' }] },
@@ -92,6 +94,8 @@ const EXTRACTION_SCHEMA = {
     'colorDescription',
     'size',
     'ageClass',
+    'furType',
+    'hasFluffyTail',
     'markings',
     'hasCollar',
     'collarColor',
@@ -123,6 +127,7 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
 - "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
 - "ageClass" is separate from size - "kitten" only if the animal is clearly a young kitten, "adult" otherwise, or null if unclear. A small adult cat is "adult", not "kitten".
+- "furType" is your best classification of the coat itself into exactly one of 5 categories, based on what's visible in the photos: "hairless" (little to no fur, e.g. Sphynx), "short" (fur lies close to the body - the large majority of house cats), "medium" (visibly longer/fluffier, especially around the neck or tail, but not dramatically long all over), "long" (fur is clearly long over the whole body, e.g. Persian), "curly" (fur is wavy or curly rather than straight, regardless of length, e.g. Devon Rex/Cornish Rex). Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-haired cat), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.
 - "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).
 - "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.
 - "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.

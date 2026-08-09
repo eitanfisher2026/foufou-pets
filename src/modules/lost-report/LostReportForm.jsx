@@ -7,7 +7,7 @@ import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
-import { CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS } from '../shared/collections.js';
+import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -15,6 +15,8 @@ const EMPTY_FIELDS = {
   color: '',
   size: '',
   ageClass: '',
+  furType: '',
+  hasFluffyTail: false,
   markings: '',
   hasCollar: false,
   collarColor: '',
@@ -85,6 +87,8 @@ export default function LostReportForm() {
         color: extracted.color || prev.color,
         size: extracted.size || prev.size,
         ageClass: extracted.ageClass || prev.ageClass,
+        furType: extracted.furType || prev.furType,
+        hasFluffyTail: extracted.hasFluffyTail ?? prev.hasFluffyTail,
         markings: extracted.markings || prev.markings,
         hasCollar: extracted.hasCollar ?? prev.hasCollar,
         collarColor: extracted.collarColor || prev.collarColor,
@@ -185,6 +189,26 @@ export default function LostReportForm() {
           ))}
         </select>
       </Field>
+
+      <Field label="סוג פרווה">
+        <select className="input" value={fields.furType} onChange={(e) => setField('furType', e.target.value)}>
+          <option value="">בחר/י</option>
+          {CAT_FUR_TYPES.map((f) => (
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={fields.hasFluffyTail}
+          onChange={(e) => setField('hasFluffyTail', e.target.checked)}
+        />
+        זנב שעיר/פלומתי במיוחד
+      </label>
 
       <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
         <textarea

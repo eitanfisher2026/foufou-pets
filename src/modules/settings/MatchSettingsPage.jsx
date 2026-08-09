@@ -38,8 +38,6 @@ export default function MatchSettingsPage() {
   const [savedNotice, setSavedNotice] = useState(false);
   const [colorOptions, setColorOptions] = useState(null);
   const [colorInput, setColorInput] = useState('');
-  const [savingColors, setSavingColors] = useState(false);
-  const [colorsSavedNotice, setColorsSavedNotice] = useState(false);
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
@@ -61,17 +59,6 @@ export default function MatchSettingsPage() {
       ...prev,
       colorGroups: (prev.colorGroups || []).map((g) => g.filter((c) => c !== color)),
     }));
-  }
-
-  async function handleSaveColors() {
-    setSavingColors(true);
-    try {
-      await saveColorOptions(colorOptions);
-      setColorsSavedNotice(true);
-      setTimeout(() => setColorsSavedNotice(false), 2500);
-    } finally {
-      setSavingColors(false);
-    }
   }
 
   function updateParam(index, patch) {
@@ -120,10 +107,16 @@ export default function MatchSettingsPage() {
     }));
   }
 
+  // One save button for the whole page - parameters, color-similarity
+  // groups, and the color list itself all live in different Firestore docs
+  // under the hood, but a single button saving only some of them (while a
+  // second, easy-to-miss button saves the rest) is exactly what silently
+  // lost the color-groups edit last time. Everything on this page is saved
+  // together, every time.
   async function handleSave() {
     setSaving(true);
     try {
-      await saveMatchConfig(config);
+      await Promise.all([saveMatchConfig(config), saveColorOptions(colorOptions)]);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
     } finally {
@@ -132,10 +125,13 @@ export default function MatchSettingsPage() {
   }
 
   async function handleReset() {
-    const ok = await confirm('לאפס את כל הגדרות ההתאמה לברירת המחדל? כל שינוי שנעשה כאן יימחק.', { confirmLabel: 'איפוס' });
+    const ok = await confirm('לאפס את כל הגדרות ההתאמה לברירת המחדל, כולל רשימת הצבעים? כל שינוי שנעשה כאן יימחק.', {
+      confirmLabel: 'איפוס',
+    });
     if (!ok) return;
-    const defaults = await resetMatchConfig();
+    const [defaults] = await Promise.all([resetMatchConfig(), saveColorOptions(CAT_COLORS.filter((c) => c !== 'אחר'))]);
     setConfig(defaults);
+    setColorOptions(CAT_COLORS.filter((c) => c !== 'אחר'));
   }
 
   if (!config || !colorOptions) return <p className="p-4 text-slate-500">טוען...</p>;
@@ -240,14 +236,9 @@ export default function MatchSettingsPage() {
             הוספה
           </button>
         </div>
-        <button
-          type="button"
-          onClick={handleSaveColors}
-          disabled={savingColors}
-          className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {savingColors ? 'שומרים...' : colorsSavedNotice ? 'נשמר ✓' : 'שמירת רשימת הצבעים'}
-        </button>
+        <p className="mt-2 text-xs text-slate-400">
+          שינויים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.
+        </p>
       </div>
 
       <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">קבוצות צבעים דומים</h2>

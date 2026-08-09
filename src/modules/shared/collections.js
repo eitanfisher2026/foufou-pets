@@ -38,6 +38,20 @@ export const CAT_AGE_CLASSES = [
   { value: 'adult', label: 'מבוגר' },
 ];
 
+// Real cat coat taxonomy has more nuance (length/texture/density/double
+// coat), but for reliable classification from a photo by a non-expert (or
+// by AI), 5 buckets covering length + the one texture that's visually
+// unmistakable (curly/wavy) is the practical limit - a fluffy/bushy tail
+// is tracked as its own separate trait below since it can stand out even
+// on an otherwise short-haired cat.
+export const CAT_FUR_TYPES = [
+  { value: 'hairless', label: 'ללא פרווה / כמעט ללא פרווה' },
+  { value: 'short', label: 'שיער קצר' },
+  { value: 'medium', label: 'שיער בינוני / חצי-ארוך' },
+  { value: 'long', label: 'שיער ארוך' },
+  { value: 'curly', label: 'מתולתל / גלי' },
+];
+
 export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 export const CAT_CONDITIONS = [
