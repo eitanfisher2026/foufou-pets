@@ -8,7 +8,15 @@ import {
   makeFoundReportPhotoMain,
   deleteFoundReport,
 } from './foundReportApi.js';
-import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS, CAT_COLORS, CAT_SIZES, CAT_CONDITIONS } from '../shared/collections.js';
+import {
+  RECORD_STATUS,
+  FOUND_REPORT_STATUS_LABELS,
+  CAT_COLORS,
+  CAT_SIZES,
+  CAT_AGE_CLASSES,
+  COLLAR_COLORS,
+  CAT_CONDITIONS,
+} from '../shared/collections.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
@@ -25,7 +33,11 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'postAgeText', extractedKey: 'postAgeText', label: 'מתי פורסם' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
-  { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מזהים' },
+  { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
+  { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
+  { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
+  { targetKey: 'city', extractedKey: 'city', label: 'עיר' },
+  { targetKey: 'neighborhood', extractedKey: 'neighborhood', label: 'שכונה' },
   { targetKey: 'location', extractedKey: 'location', label: 'מיקום' },
   { targetKey: 'dateText', extractedKey: 'dateText', label: 'מועד הראייה/המציאה' },
   { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
@@ -237,6 +249,16 @@ export default function FoundReportDetail() {
               ))}
             </select>
           </Field>
+          <Field label="גור או מבוגר">
+            <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
+              <option value="">בחר/י</option>
+              {CAT_AGE_CLASSES.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </Field>
           <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
             <input
               className="input"
@@ -244,14 +266,62 @@ export default function FoundReportDetail() {
               onChange={(e) => setField('colorDescription', e.target.value)}
             />
           </Field>
-          <Field label="סימנים מזהים">
+          <Field label="סימנים מיוחדים">
             <textarea className="input" value={fields.markings || ''} onChange={(e) => setField('markings', e.target.value)} />
           </Field>
-          <Field label="מיקום">
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" checked={!!fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />
+            לובשת קולר/רתמה
+          </label>
+          {fields.hasCollar && (
+            <>
+              <Field label="צבע הקולר">
+                <select
+                  className="input"
+                  value={fields.collarColor || ''}
+                  onChange={(e) => setField('collarColor', e.target.value)}
+                >
+                  <option value="">בחר/י צבע</option>
+                  {COLLAR_COLORS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={!!fields.collarHasBell}
+                  onChange={(e) => setField('collarHasBell', e.target.checked)}
+                />
+                יש פעמון על הקולר
+              </label>
+            </>
+          )}
+          <Field label="עיר">
+            <input className="input" value={fields.city || ''} onChange={(e) => setField('city', e.target.value)} />
+          </Field>
+          <Field label="שכונה">
+            <input
+              className="input"
+              value={fields.neighborhood || ''}
+              onChange={(e) => setField('neighborhood', e.target.value)}
+            />
+          </Field>
+          <Field label="פרטי מיקום נוספים">
             <input className="input" value={fields.location || ''} onChange={(e) => setField('location', e.target.value)} />
           </Field>
-          <Field label="מועד הראייה/המציאה">
+          <Field label="מועד הראייה/המציאה (כפי שידוע/נכתב)">
             <input className="input" value={fields.dateText || ''} onChange={(e) => setField('dateText', e.target.value)} />
+          </Field>
+          <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
+            <input
+              type="date"
+              className="input"
+              value={fields.seenDate || ''}
+              onChange={(e) => setField('seenDate', e.target.value)}
+            />
           </Field>
           <Field label="שם איש קשר">
             <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
@@ -318,12 +388,18 @@ export default function FoundReportDetail() {
             { label: 'כותרת', value: report.title },
             { label: 'צבע', value: report.color },
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === report.size)?.label },
+            { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },
             { label: 'תיאור נוסף לצבע', value: report.colorDescription },
-            { label: 'סימנים מזהים', value: report.markings },
+            { label: 'סימנים מיוחדים', value: report.markings },
             { label: 'קולר/רתמה', value: report.hasCollar === true ? 'כן' : report.hasCollar === false ? 'לא' : '' },
+            { label: 'צבע הקולר', value: report.collarColor },
+            { label: 'פעמון על הקולר', value: report.collarHasBell === true ? 'כן' : report.collarHasBell === false ? 'לא' : '' },
+            { label: 'עיר', value: report.city },
+            { label: 'שכונה', value: report.neighborhood },
             { label: 'מצב החתול', value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
             { label: 'מיקום', value: report.location },
             { label: 'מועד הראייה/המציאה', value: report.dateText },
+            { label: 'תאריך מדויק', value: report.seenDate },
             { label: 'מקור המידע (קבוצה)', value: report.sourceGroupName },
             { label: 'מי כתב את הפוסט', value: report.originalPosterName },
             { label: 'מי שיתף', value: report.sharedByName },

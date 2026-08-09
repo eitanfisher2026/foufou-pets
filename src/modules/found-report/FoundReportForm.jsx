@@ -6,7 +6,7 @@ import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
-import { CAT_COLORS, CAT_SIZES, CAT_CONDITIONS } from '../shared/collections.js';
+import { CAT_COLORS, CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -14,10 +14,16 @@ const EMPTY_FIELDS = {
   color: '',
   colorDescription: '',
   size: '',
+  ageClass: '',
   markings: '',
   hasCollar: null,
+  collarColor: '',
+  collarHasBell: null,
+  city: '',
+  neighborhood: '',
   location: '',
   dateText: '',
+  seenDate: '',
   condition: 'seen_only',
   contactName: '',
   contactPhone: '',
@@ -82,8 +88,13 @@ export default function FoundReportForm() {
         color: result.color || prev.color,
         colorDescription: result.colorDescription || prev.colorDescription,
         size: result.size || prev.size,
+        ageClass: result.ageClass || prev.ageClass,
         markings: result.markings || prev.markings,
         hasCollar: result.hasCollar ?? prev.hasCollar,
+        collarColor: result.collarColor || prev.collarColor,
+        collarHasBell: result.collarHasBell ?? prev.collarHasBell,
+        city: result.city || prev.city,
+        neighborhood: result.neighborhood || prev.neighborhood,
         location: result.location || prev.location,
         dateText: result.dateText || prev.dateText,
         contactName: result.contactName || prev.contactName,
@@ -219,6 +230,17 @@ export default function FoundReportForm() {
         </select>
       </Field>
 
+      <Field label="גור או מבוגר">
+        <select className="input" value={fields.ageClass} onChange={(e) => setField('ageClass', e.target.value)}>
+          <option value="">בחר/י</option>
+          {CAT_AGE_CLASSES.map((a) => (
+            <option key={a.value} value={a.value}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
       <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
         <input
           className="input"
@@ -227,16 +249,56 @@ export default function FoundReportForm() {
         />
       </Field>
 
-      <Field label="סימנים מזהים">
+      <Field label="סימנים מיוחדים (כתם, אוזן חתוכה, עיוורת בעין, חסרה רגל וכו')">
         <textarea className="input" value={fields.markings} onChange={(e) => setField('markings', e.target.value)} />
       </Field>
 
-      <Field label="מיקום">
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input type="checkbox" checked={!!fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />
+        לובשת קולר/רתמה
+      </label>
+
+      {fields.hasCollar && (
+        <>
+          <Field label="צבע הקולר">
+            <select className="input" value={fields.collarColor} onChange={(e) => setField('collarColor', e.target.value)}>
+              <option value="">בחר/י צבע</option>
+              {COLLAR_COLORS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={!!fields.collarHasBell}
+              onChange={(e) => setField('collarHasBell', e.target.checked)}
+            />
+            יש פעמון על הקולר
+          </label>
+        </>
+      )}
+
+      <Field label="עיר">
+        <input className="input" value={fields.city} onChange={(e) => setField('city', e.target.value)} />
+      </Field>
+
+      <Field label="שכונה">
+        <input className="input" value={fields.neighborhood} onChange={(e) => setField('neighborhood', e.target.value)} />
+      </Field>
+
+      <Field label="פרטי מיקום נוספים">
         <input className="input" value={fields.location} onChange={(e) => setField('location', e.target.value)} />
       </Field>
 
-      <Field label="מועד הראייה/המציאה">
+      <Field label="מועד הראייה/המציאה (כפי שידוע/נכתב)">
         <input className="input" value={fields.dateText} onChange={(e) => setField('dateText', e.target.value)} />
+      </Field>
+
+      <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
+        <input type="date" className="input" value={fields.seenDate} onChange={(e) => setField('seenDate', e.target.value)} />
       </Field>
 
       <Field label="שם איש קשר (אם קיים בפוסט)">

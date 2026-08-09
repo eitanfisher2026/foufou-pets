@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, increment, serverTimestamp, setDoc, w
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
 import { rankMatches } from './matchingEngine.js';
+import { getMatchConfig } from './matchConfigApi.js';
 
 /**
  * Manual "check for matches" action: compares one lost case against every
@@ -22,7 +23,8 @@ export async function checkMatchesForLostCase(lostCaseId) {
     .map((d) => ({ id: d.id, ...d.data() }))
     .filter((r) => (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE);
 
-  const ranked = rankMatches(lostCase, foundReports);
+  const config = await getMatchConfig();
+  const ranked = rankMatches(lostCase, foundReports, config);
 
   // Re-checking shouldn't reset a match the owner already triaged back to
   // "new" - only brand-new matches (found reports that weren't compared

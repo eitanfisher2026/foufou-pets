@@ -47,9 +47,14 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm text-slate-500">{user?.displayName}</p>
         </div>
-        <button onClick={signOut} className="text-sm text-slate-500 underline">
-          התנתקות
-        </button>
+        <div className="flex items-center gap-3">
+          <Link to="/settings/matching" className="text-sm text-slate-500 underline">
+            הגדרות התאמה
+          </Link>
+          <button onClick={signOut} className="text-sm text-slate-500 underline">
+            התנתקות
+          </button>
+        </div>
       </header>
 
       <div className="mb-6 flex gap-3">

@@ -9,6 +9,8 @@ import {
   LOST_CASE_STATUS_LABELS,
   CAT_COLORS,
   CAT_SIZES,
+  CAT_AGE_CLASSES,
+  COLLAR_COLORS,
 } from '../shared/collections.js';
 import {
   getLostCase,
@@ -31,8 +33,12 @@ import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
-  { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מזהים' },
+  { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
+  { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
+  { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
+  { targetKey: 'city', extractedKey: 'city', label: 'עיר' },
+  { targetKey: 'neighborhood', extractedKey: 'neighborhood', label: 'שכונה' },
   { targetKey: 'lastSeenLocation', extractedKey: 'location', label: 'מקום אחרון שנראתה' },
   { targetKey: 'lastSeenAt', extractedKey: 'dateText', label: 'מועד האובדן' },
   { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
@@ -248,7 +254,17 @@ export default function LostCaseDetail() {
               ))}
             </select>
           </Field>
-          <Field label="סימנים מזהים">
+          <Field label="גור או מבוגר">
+            <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
+              <option value="">בחר/י</option>
+              {CAT_AGE_CLASSES.map((a) => (
+                <option key={a.value} value={a.value}>
+                  {a.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="סימנים מיוחדים">
             <textarea className="input" value={fields.markings || ''} onChange={(e) => setField('markings', e.target.value)} />
           </Field>
           <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -259,15 +275,59 @@ export default function LostCaseDetail() {
             />
             לובשת קולר/רתמה
           </label>
-          <Field label="מקום אחרון שנראתה">
+          {fields.hasCollar && (
+            <>
+              <Field label="צבע הקולר">
+                <select
+                  className="input"
+                  value={fields.collarColor || ''}
+                  onChange={(e) => setField('collarColor', e.target.value)}
+                >
+                  <option value="">בחר/י צבע</option>
+                  {COLLAR_COLORS.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={!!fields.collarHasBell}
+                  onChange={(e) => setField('collarHasBell', e.target.checked)}
+                />
+                יש פעמון על הקולר
+              </label>
+            </>
+          )}
+          <Field label="עיר">
+            <input className="input" value={fields.city || ''} onChange={(e) => setField('city', e.target.value)} />
+          </Field>
+          <Field label="שכונה">
+            <input
+              className="input"
+              value={fields.neighborhood || ''}
+              onChange={(e) => setField('neighborhood', e.target.value)}
+            />
+          </Field>
+          <Field label="פרטי מיקום נוספים">
             <input
               className="input"
               value={fields.lastSeenLocation || ''}
               onChange={(e) => setField('lastSeenLocation', e.target.value)}
             />
           </Field>
-          <Field label="מועד האובדן">
+          <Field label="מועד האובדן (כפי שידוע/נכתב)">
             <input className="input" value={fields.lastSeenAt || ''} onChange={(e) => setField('lastSeenAt', e.target.value)} />
+          </Field>
+          <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
+            <input
+              type="date"
+              className="input"
+              value={fields.lastSeenDate || ''}
+              onChange={(e) => setField('lastSeenDate', e.target.value)}
+            />
           </Field>
           <Field label="שם איש קשר">
             <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
@@ -407,10 +467,16 @@ export default function LostCaseDetail() {
             { label: 'שם', value: lostCase.name },
             { label: 'צבע', value: lostCase.color },
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
-            { label: 'סימנים מזהים', value: lostCase.markings },
+            { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
+            { label: 'סימנים מיוחדים', value: lostCase.markings },
             { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
-            { label: 'מקום אחרון שנראתה', value: lostCase.lastSeenLocation },
+            { label: 'צבע הקולר', value: lostCase.collarColor },
+            { label: 'פעמון על הקולר', value: lostCase.collarHasBell === true ? 'כן' : lostCase.collarHasBell === false ? 'לא' : '' },
+            { label: 'עיר', value: lostCase.city },
+            { label: 'שכונה', value: lostCase.neighborhood },
+            { label: 'פרטי מיקום נוספים', value: lostCase.lastSeenLocation },
             { label: 'מועד האובדן', value: lostCase.lastSeenAt },
+            { label: 'תאריך מדויק', value: lostCase.lastSeenDate },
             { label: 'שם איש קשר', value: lostCase.contactName },
             { label: 'טלפון', value: lostCase.contactPhone },
             { label: 'הערות נוספות', value: lostCase.notes },

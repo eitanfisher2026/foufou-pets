@@ -8,9 +8,11 @@ import Anthropic from '@anthropic-ai/sdk';
 // match time, so this is the only AI spend in the whole app.
 const MODEL = 'claude-sonnet-5';
 
-// Must match CAT_COLORS in src/modules/shared/collections.js - the functions
-// package doesn't share modules with the client, so this is kept in sync by hand.
+// Must match CAT_COLORS/COLLAR_COLORS in src/modules/shared/collections.js -
+// the functions package doesn't share modules with the client, so these are
+// kept in sync by hand.
 const CAT_COLORS = ['לבן', 'שחור', 'אפור', 'כתום/ג׳ינג׳י', 'חום', 'טאבי (מנומר)', 'תלת-גוני (קליקו)', 'שחור-לבן', 'אחר'];
+const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'אחר'];
 
 const EXTRACTION_SCHEMA = {
   type: 'object',
@@ -29,8 +31,13 @@ const EXTRACTION_SCHEMA = {
     // combined with an array-form type ("Enum value 'small' does not match
     // declared type '['string', 'null']'").
     size: { anyOf: [{ type: 'string', enum: ['small', 'medium', 'large'] }, { type: 'null' }] },
+    ageClass: { anyOf: [{ type: 'string', enum: ['kitten', 'adult'] }, { type: 'null' }] },
     markings: { type: 'string' },
     hasCollar: { type: ['boolean', 'null'] },
+    collarColor: { anyOf: [{ type: 'string', enum: COLLAR_COLORS }, { type: 'null' }] },
+    collarHasBell: { type: ['boolean', 'null'] },
+    city: { type: 'string' },
+    neighborhood: { type: 'string' },
     location: { type: 'string' },
     dateText: { type: 'string' },
     contactName: { type: 'string' },
@@ -62,8 +69,13 @@ const EXTRACTION_SCHEMA = {
     'color',
     'colorDescription',
     'size',
+    'ageClass',
     'markings',
     'hasCollar',
+    'collarColor',
+    'collarHasBell',
+    'city',
+    'neighborhood',
     'location',
     'dateText',
     'contactName',
@@ -83,7 +95,10 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - Never invent information. If a text field is not visible or not stated, return an empty string "" for it (not null). For "hasCollar", use null specifically to mean not stated/unclear - true and false are only for when the post clearly shows or says so.
 - "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
 - "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
-- "size" is your best guess at the animal's size/age class (small/young, medium, or large adult) from the photos, or null if no photo gives any real basis to judge.
+- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
+- "ageClass" is separate from size - "kitten" only if the animal is clearly a young kitten, "adult" otherwise, or null if unclear. A small adult cat is "adult", not "kitten".
+- "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).
+- "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" as "" and put the single visible author in "originalPosterName".
 - "contactName"/"contactPhone" are only for a phone number explicitly given in the post text for contacting someone about the animal - not the poster's account name if no phone is given.

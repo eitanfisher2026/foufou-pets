@@ -6,17 +6,23 @@ import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
-import { CAT_COLORS } from '../shared/collections.js';
+import { CAT_COLORS, CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
 const EMPTY_FIELDS = {
   name: '',
   color: '',
   size: '',
+  ageClass: '',
   markings: '',
   hasCollar: false,
+  collarColor: '',
+  collarHasBell: false,
+  city: '',
+  neighborhood: '',
   lastSeenLocation: '',
   lastSeenAt: '',
+  lastSeenDate: '',
   contactName: '',
   contactPhone: '',
   notes: '',
@@ -74,8 +80,13 @@ export default function LostReportForm() {
         name: extracted.petName || prev.name,
         color: extracted.color || prev.color,
         size: extracted.size || prev.size,
+        ageClass: extracted.ageClass || prev.ageClass,
         markings: extracted.markings || prev.markings,
         hasCollar: extracted.hasCollar ?? prev.hasCollar,
+        collarColor: extracted.collarColor || prev.collarColor,
+        collarHasBell: extracted.collarHasBell ?? prev.collarHasBell,
+        city: extracted.city || prev.city,
+        neighborhood: extracted.neighborhood || prev.neighborhood,
         lastSeenLocation: extracted.location || prev.lastSeenLocation,
         lastSeenAt: extracted.dateText || prev.lastSeenAt,
         contactName: extracted.contactName || prev.contactName,
@@ -149,13 +160,26 @@ export default function LostReportForm() {
       <Field label="גודל">
         <select className="input" value={fields.size} onChange={(e) => setField('size', e.target.value)}>
           <option value="">בחר/י</option>
-          <option value="small">קטן/גור</option>
-          <option value="medium">בינוני</option>
-          <option value="large">גדול</option>
+          {CAT_SIZES.map((s) => (
+            <option key={s.value} value={s.value}>
+              {s.label}
+            </option>
+          ))}
         </select>
       </Field>
 
-      <Field label="סימנים מזהים">
+      <Field label="גור או מבוגר">
+        <select className="input" value={fields.ageClass} onChange={(e) => setField('ageClass', e.target.value)}>
+          <option value="">בחר/י</option>
+          {CAT_AGE_CLASSES.map((a) => (
+            <option key={a.value} value={a.value}>
+              {a.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <Field label="סימנים מיוחדים (כתם, אוזן חתוכה, עיוורת בעין, חסרה רגל וכו')">
         <textarea className="input" value={fields.markings} onChange={(e) => setField('markings', e.target.value)} />
       </Field>
 
@@ -164,7 +188,38 @@ export default function LostReportForm() {
         לובשת קולר/רתמה
       </label>
 
-      <Field label="מקום אחרון שנראתה">
+      {fields.hasCollar && (
+        <>
+          <Field label="צבע הקולר">
+            <select className="input" value={fields.collarColor} onChange={(e) => setField('collarColor', e.target.value)}>
+              <option value="">בחר/י צבע</option>
+              {COLLAR_COLORS.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={fields.collarHasBell}
+              onChange={(e) => setField('collarHasBell', e.target.checked)}
+            />
+            יש פעמון על הקולר
+          </label>
+        </>
+      )}
+
+      <Field label="עיר">
+        <input className="input" value={fields.city} onChange={(e) => setField('city', e.target.value)} />
+      </Field>
+
+      <Field label="שכונה">
+        <input className="input" value={fields.neighborhood} onChange={(e) => setField('neighborhood', e.target.value)} />
+      </Field>
+
+      <Field label="פרטי מיקום נוספים (רחוב, ציון דרך)">
         <input
           className="input"
           value={fields.lastSeenLocation}
@@ -172,8 +227,17 @@ export default function LostReportForm() {
         />
       </Field>
 
-      <Field label="מועד האובדן">
+      <Field label="מועד האובדן (כפי שידוע/נכתב)">
         <input className="input" value={fields.lastSeenAt} onChange={(e) => setField('lastSeenAt', e.target.value)} />
+      </Field>
+
+      <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
+        <input
+          type="date"
+          className="input"
+          value={fields.lastSeenDate}
+          onChange={(e) => setField('lastSeenDate', e.target.value)}
+        />
       </Field>
 
       <Field label="שם איש קשר">

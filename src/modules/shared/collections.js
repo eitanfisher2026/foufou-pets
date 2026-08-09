@@ -19,10 +19,19 @@ export const CAT_COLORS = [
 // using the same vocabulary, which also keeps matching (matchingEngine.js)
 // comparing like with like instead of a dropdown value against free text.
 export const CAT_SIZES = [
-  { value: 'small', label: 'קטן/גור' },
+  { value: 'small', label: 'קטן' },
   { value: 'medium', label: 'בינוני' },
   { value: 'large', label: 'גדול' },
 ];
+
+// Separate from size - a small adult and a kitten are a very different
+// matching signal, so they're no longer conflated into one dropdown.
+export const CAT_AGE_CLASSES = [
+  { value: 'kitten', label: 'גור' },
+  { value: 'adult', label: 'מבוגר' },
+];
+
+export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'אחר'];
 
 export const CAT_CONDITIONS = [
   { value: 'seen_only', label: 'נראה בלבד (לא נתפס)' },
