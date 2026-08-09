@@ -7,6 +7,7 @@ import LostReportForm from './modules/lost-report/LostReportForm.jsx';
 import FoundReportForm from './modules/found-report/FoundReportForm.jsx';
 import FoundReportDetail from './modules/found-report/FoundReportDetail.jsx';
 import MatchSettingsPage from './modules/settings/MatchSettingsPage.jsx';
+import SettingsPage from './modules/settings/SettingsPage.jsx';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -21,6 +22,7 @@ function AppRoutes() {
       <Route path="/lost/:caseId" element={<LostCaseDetail />} />
       <Route path="/found/new" element={<FoundReportForm />} />
       <Route path="/found/:reportId" element={<FoundReportDetail />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/matching" element={<MatchSettingsPage />} />
     </Routes>
   );

@@ -12,7 +12,7 @@ const STATUS_BADGE_COLORS = {
 };
 
 export default function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [lostCases, setLostCases] = useState([]);
   const [foundReports, setFoundReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,14 +47,9 @@ export default function Dashboard() {
           </h1>
           <p className="text-sm text-slate-500">{user?.displayName}</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Link to="/settings/matching" className="text-sm text-slate-500 underline">
-            הגדרות התאמה
-          </Link>
-          <button onClick={signOut} className="text-sm text-slate-500 underline">
-            התנתקות
-          </button>
-        </div>
+        <Link to="/settings" className="text-sm text-slate-500 underline">
+          הגדרות ⚙
+        </Link>
       </header>
 
       <div className="mb-6 flex gap-3">

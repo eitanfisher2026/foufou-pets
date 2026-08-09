@@ -2,12 +2,26 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMatchConfig, saveMatchConfig, resetMatchConfig } from '../matching/matchConfigApi.js';
 import { COMPARABLE_FIELDS, COMPARISON_TYPE_LABELS, fieldLabel } from '../matching/matchingEngine.js';
+import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { CAT_COLORS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 
-// "אחר" (other) is an AI catch-all, not a real color - grouping it with
-// anything wouldn't mean anything, so it's left out of the groupable list.
-const GROUPABLE_COLORS = CAT_COLORS.filter((c) => c !== 'אחר');
+// The AI extraction (functions/index.js) reads its own static copies of
+// any customizable vocabulary - not a live Firestore read, kept simple and
+// fast on purpose, the same pattern as Roy News' static include/exclude
+// word lists. That means it's only ever as current as the last code
+// deploy. Only settings that constrain what the AI is allowed to choose
+// from (an enum in its extraction schema) belong in this list - most of
+// this panel (weights, comparison method, disqualifying, color-similarity
+// groups) is pure scoring configuration the AI never needs to know about.
+const AI_KNOWN_COLORS = new Set(CAT_COLORS.filter((c) => c !== 'אחר'));
+
+function getAiSyncIssues(colorOptions) {
+  const issues = [];
+  const colorsInSync = colorOptions.length === AI_KNOWN_COLORS.size && colorOptions.every((c) => AI_KNOWN_COLORS.has(c));
+  if (!colorsInSync) issues.push('רשימת הצבעים');
+  return issues;
+}
 
 /**
  * Lets the matching algorithm be tuned without a code change: reorder is
@@ -22,11 +36,43 @@ export default function MatchSettingsPage() {
   const [config, setConfig] = useState(null);
   const [saving, setSaving] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [colorOptions, setColorOptions] = useState(null);
+  const [colorInput, setColorInput] = useState('');
+  const [savingColors, setSavingColors] = useState(false);
+  const [colorsSavedNotice, setColorsSavedNotice] = useState(false);
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     getMatchConfig().then(setConfig);
+    getColorOptions().then((colors) => setColorOptions(colors.filter((c) => c !== 'אחר')));
   }, []);
+
+  function addColorOption() {
+    const value = colorInput.trim();
+    if (!value || colorOptions.includes(value)) return;
+    setColorOptions((prev) => [...prev, value]);
+    setColorInput('');
+  }
+
+  function removeColorOption(color) {
+    setColorOptions((prev) => prev.filter((c) => c !== color));
+    // A color removed from the list shouldn't linger in a similarity group.
+    setConfig((prev) => ({
+      ...prev,
+      colorGroups: (prev.colorGroups || []).map((g) => g.filter((c) => c !== color)),
+    }));
+  }
+
+  async function handleSaveColors() {
+    setSavingColors(true);
+    try {
+      await saveColorOptions(colorOptions);
+      setColorsSavedNotice(true);
+      setTimeout(() => setColorsSavedNotice(false), 2500);
+    } finally {
+      setSavingColors(false);
+    }
+  }
 
   function updateParam(index, patch) {
     setConfig((prev) => ({
@@ -92,19 +138,30 @@ export default function MatchSettingsPage() {
     setConfig(defaults);
   }
 
-  if (!config) return <p className="p-4 text-slate-500">טוען...</p>;
+  if (!config || !colorOptions) return <p className="p-4 text-slate-500">טוען...</p>;
 
   const enabledWeightSum = config.parameters.filter((p) => p.enabled).reduce((sum, p) => sum + Number(p.weight || 0), 0);
+  const aiSyncIssues = getAiSyncIssues(colorOptions);
 
   return (
     <div className="mx-auto max-w-2xl p-4 pb-24">
-      <Link to="/" className="mb-4 inline-block text-sm text-slate-500 underline">
-        ← חזרה לעמוד הראשי
+      <Link to="/settings" className="mb-4 inline-block text-sm text-slate-500 underline">
+        ← חזרה להגדרות
       </Link>
       <h1 className="mb-1 text-xl font-bold text-slate-800">הגדרות אלגוריתם ההתאמה</h1>
       <p className="mb-6 text-sm text-slate-500">
         כל פרמטר משווה שדה אחד בין תיק החיפוש לדיווח, לפי משקל ושיטת השוואה. אין צורך למלא כל שדה - שדות חסרים פשוט מדולגים.
       </p>
+
+      {aiSyncIssues.length > 0 && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-medium">נדרש עדכון קוד כדי שזיהוי ה-AI מצילומי מסך יכיר גם את: {aiSyncIssues.join(', ')}</p>
+          <p className="mt-1 text-xs text-amber-700">
+            ה-AI קורא מתוך רשימה קבועה בקוד, לא מההגדרות כאן ישירות - עד שהקוד יעודכן ויפורס מחדש, הוא ימשיך להשתמש
+            ברשימה הישנה בזיהוי אוטומטי (הדיווח הידני כאן כבר מעודכן). בקשו מקלוד לעדכן ולפרוס.
+          </p>
+        </div>
+      )}
 
       <label className="mb-4 flex items-start gap-2 rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700">
         <input
@@ -140,6 +197,59 @@ export default function MatchSettingsPage() {
         + הוספת פרמטר
       </button>
 
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת הצבעים האפשריים</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        אלו האפשרויות שמופיעות בתפריט "צבע" בכל טפסי הדיווח, וגם מה שה-AI מתבקש לבחור מתוכן כשהוא קורא צילום מסך. "אחר"
+        תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
+      </p>
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="mb-2 flex flex-wrap gap-2">
+          {colorOptions.map((color) => (
+            <span key={color} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+              {color}
+              <button
+                type="button"
+                onClick={() => removeColorOption(color)}
+                className="text-red-600"
+                aria-label={`הסרת ${color}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            value={colorInput}
+            onChange={(e) => setColorInput(e.target.value)}
+            placeholder="שם צבע חדש"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addColorOption();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={addColorOption}
+            className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
+          >
+            הוספה
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveColors}
+          disabled={savingColors}
+          className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {savingColors ? 'שומרים...' : colorsSavedNotice ? 'נשמר ✓' : 'שמירת רשימת הצבעים'}
+        </button>
+      </div>
+
       <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">קבוצות צבעים דומים</h2>
       <p className="mb-3 text-sm text-slate-500">
         צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל ביניהם
@@ -155,7 +265,7 @@ export default function MatchSettingsPage() {
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
-              {GROUPABLE_COLORS.map((color) => (
+              {colorOptions.map((color) => (
                 <label
                   key={color}
                   className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs ${

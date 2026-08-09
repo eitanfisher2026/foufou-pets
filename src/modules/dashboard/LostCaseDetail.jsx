@@ -7,12 +7,12 @@ import {
   REPORT_STATUS,
   RECORD_STATUS,
   LOST_CASE_STATUS_LABELS,
-  CAT_COLORS,
   CAT_SIZES,
   CAT_AGE_CLASSES,
   COLLAR_COLORS,
 } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
+import { useColorOptions } from '../shared/useColorOptions.js';
 import {
   getLostCase,
   updateLostCase,
@@ -76,6 +76,7 @@ export default function LostCaseDetail() {
   const [showDetails, setShowDetails] = useState(false);
   const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
+  const catColors = useColorOptions();
 
   useEffect(() => {
     load();
@@ -240,7 +241,7 @@ export default function LostCaseDetail() {
           <Field label="צבע">
             <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
               <option value="">בחר/י צבע</option>
-              {CAT_COLORS.map((c) => (
+              {catColors.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>

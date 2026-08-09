@@ -6,7 +6,8 @@ import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
-import { CAT_COLORS, CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS } from '../shared/collections.js';
+import { useColorOptions } from '../shared/useColorOptions.js';
+import { CAT_SIZES, CAT_AGE_CLASSES, COLLAR_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 
 const EMPTY_FIELDS = {
@@ -35,6 +36,7 @@ export default function LostReportForm() {
   const navigate = useNavigate();
   const { reading, error: readError, read } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
+  const catColors = useColorOptions();
 
   const [fields, setFields] = useState(EMPTY_FIELDS);
   const [photos, setPhotos] = useState([]);
@@ -154,7 +156,7 @@ export default function LostReportForm() {
       <Field label="צבע">
         <select className="input" value={fields.color} onChange={(e) => setField('color', e.target.value)}>
           <option value="">בחר/י צבע</option>
-          {CAT_COLORS.map((c) => (
+          {catColors.map((c) => (
             <option key={c} value={c}>
               {c}
             </option>

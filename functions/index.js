@@ -10,8 +10,26 @@ const MODEL = 'claude-sonnet-5';
 
 // Must match CAT_COLORS/COLLAR_COLORS in src/modules/shared/collections.js -
 // the functions package doesn't share modules with the client, so these are
-// kept in sync by hand.
-const CAT_COLORS = ['לבן', 'שחור', 'אפור', 'כתום/ג׳ינג׳י', 'חום', 'טאבי (מנומר)', 'תלת-גוני (קליקו)', 'שחור-לבן', 'אחר'];
+// kept in sync by hand. If the color list is customized in the settings
+// panel (config/colorOptions in Firestore), this static copy needs to be
+// updated and redeployed too - the settings panel flags when they've
+// drifted apart, deliberately not fetched live here (keeps this function
+// simple/fast and avoids a Firestore dependency for something that changes
+// rarely, same pattern as the static include/exclude word lists in Roy
+// News).
+const CAT_COLORS = [
+  'לבן',
+  'שחור',
+  'אפור',
+  'כתום/ג׳ינג׳י',
+  'חום',
+  'ג׳ינג׳י לבן',
+  'אפור לבן',
+  'טאבי (מנומר)',
+  'תלת-גוני (קליקו)',
+  'שחור-לבן',
+  'אחר',
+];
 const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 const EXTRACTION_SCHEMA = {

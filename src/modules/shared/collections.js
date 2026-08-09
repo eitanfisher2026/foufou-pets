@@ -3,12 +3,19 @@ export const COLLECTIONS = {
   FOUND_REPORTS: 'foundReports',
 };
 
+// Default/fallback list only - the live, editable list (which the settings
+// panel writes to Firestore at config/colorOptions) is what forms actually
+// show; see shared/colorOptionsApi.js. This constant is what a fresh
+// project starts with before anyone has customized it. "אחר" (other) is a
+// fixed catch-all, always last, never part of the editable list.
 export const CAT_COLORS = [
   'לבן',
   'שחור',
   'אפור',
   'כתום/ג׳ינג׳י',
   'חום',
+  'ג׳ינג׳י לבן',
+  'אפור לבן',
   'טאבי (מנומר)',
   'תלת-גוני (קליקו)',
   'שחור-לבן',
