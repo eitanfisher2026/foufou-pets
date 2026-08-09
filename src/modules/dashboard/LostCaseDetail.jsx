@@ -347,11 +347,14 @@ export default function LostCaseDetail() {
                 setField('lastSeenDateApprox', false);
               }}
             />
-            {fields.lastSeenDateApprox && (
-              <p className="mt-1 text-sm text-amber-700">
-                התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
-              </p>
-            )}
+            <label className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={!!fields.lastSeenDateApprox}
+                onChange={(e) => setField('lastSeenDateApprox', e.target.checked)}
+              />
+              תאריך משוער בלבד (חושב מתיאור יחסי כמו "לפני יום", לא מתאריך מפורש)
+            </label>
           </Field>
           <Field label="שם איש קשר">
             <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />

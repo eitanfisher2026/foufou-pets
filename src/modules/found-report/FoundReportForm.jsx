@@ -327,11 +327,14 @@ export default function FoundReportForm() {
             setField('seenDateApprox', false);
           }}
         />
-        {fields.seenDateApprox && (
-          <p className="mt-1 text-sm text-amber-700">
-            התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
-          </p>
-        )}
+        <label className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+          <input
+            type="checkbox"
+            checked={!!fields.seenDateApprox}
+            onChange={(e) => setField('seenDateApprox', e.target.checked)}
+          />
+          תאריך משוער בלבד (חושב מתיאור יחסי כמו "לפני יום", לא מתאריך מפורש)
+        </label>
       </Field>
 
       <Field label="שם איש קשר (אם קיים בפוסט)">
