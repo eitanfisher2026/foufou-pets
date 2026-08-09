@@ -332,8 +332,15 @@ export default function LostCaseDetail() {
         {checking ? 'בודקים התאמות...' : 'בדיקת התאמות אפשריות'}
       </button>
 
-      <h2 className="mb-3 text-lg font-semibold text-slate-700">התאמות אפשריות ({matches.length})</h2>
+      <h2 className="mb-1 text-lg font-semibold text-slate-700">התאמות אפשריות ({matches.length})</h2>
       {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין דיווחים במאגר.</p>}
+      {matches.length > 0 && (
+        <p className="mb-3 text-sm text-slate-500">
+          {matches.filter((m) => m.status === REPORT_STATUS.NEW).length > 0
+            ? `${matches.filter((m) => m.status === REPORT_STATUS.NEW).length} חדשות לבדיקה · הכי טובה ${matches[0].score}/100`
+            : `כל ההתאמות נבדקו · הכי טובה ${matches[0].score}/100`}
+        </p>
+      )}
 
       <ul className="space-y-3">
         {matches.map((m) => {

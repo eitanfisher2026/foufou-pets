@@ -87,9 +87,7 @@ export default function Dashboard() {
                   <StatusBadge status={c.status} labels={LOST_CASE_STATUS_LABELS} />
                 </span>
                 {c.matchCount > 0 ? (
-                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
-                    {c.matchCount} התאמות אפשריות
-                  </span>
+                  <MatchSummaryBadge matchCount={c.matchCount} newMatchCount={c.newMatchCount} topMatchScore={c.topMatchScore} />
                 ) : (
                   <span className="text-xs text-slate-400">{c.lastSeenLocation}</span>
                 )}
@@ -120,6 +118,21 @@ export default function Dashboard() {
         </ul>
       </section>
     </div>
+  );
+}
+
+function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
+  const hasNew = newMatchCount > 0;
+  const scoreSuffix = typeof topMatchScore === 'number' && topMatchScore > 0 ? ` · הכי טובה ${topMatchScore}/100` : '';
+  return (
+    <span
+      className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
+        hasNew ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+      }`}
+    >
+      {hasNew ? `${newMatchCount} חדשות מתוך ${matchCount}` : `${matchCount} נבדקו`}
+      {scoreSuffix}
+    </span>
   );
 }
 

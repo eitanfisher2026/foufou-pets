@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, increment, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
 import { rankMatches } from './matchingEngine.js';
@@ -24,20 +24,19 @@ export async function checkMatchesForLostCase(lostCaseId) {
 
   const ranked = rankMatches(lostCase, foundReports);
 
+  // Re-checking shouldn't reset a match the owner already triaged back to
+  // "new" - only brand-new matches (found reports that weren't compared
+  // last time) start as new.
+  const existingSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
+  const existingStatusById = Object.fromEntries(existingSnap.docs.map((d) => [d.id, d.data().status]));
+
   const batch = writeBatch(db);
+  let newMatchCount = 0;
   for (const { report, score, reasons } of ranked) {
+    const status = existingStatusById[report.id] || REPORT_STATUS.NEW;
+    if (status === REPORT_STATUS.NEW) newMatchCount += 1;
     const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', report.id);
-    batch.set(
-      matchRef,
-      {
-        foundReportId: report.id,
-        score,
-        reasons,
-        status: REPORT_STATUS.NEW,
-        checkedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
+    batch.set(matchRef, { foundReportId: report.id, score, reasons, status, checkedAt: serverTimestamp() }, { merge: true });
   }
   await batch.commit();
 
@@ -47,6 +46,7 @@ export async function checkMatchesForLostCase(lostCaseId) {
     doc(db, COLLECTIONS.LOST_CASES, lostCaseId),
     {
       matchCount: ranked.length,
+      newMatchCount,
       topMatchScore: ranked[0]?.score ?? 0,
       lastCheckedAt: serverTimestamp(),
     },
@@ -61,12 +61,23 @@ export async function getMatches(lostCaseId) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.score - a.score);
 }
 
+/**
+ * Updates one match's review status and keeps the lost case's denormalized
+ * newMatchCount (used for the dashboard summary badge) in sync.
+ */
 export async function updateMatchStatus(lostCaseId, foundReportId, status) {
-  const batch = writeBatch(db);
-  batch.set(
-    doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId),
-    { status },
-    { merge: true }
-  );
-  await batch.commit();
+  const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
+  const prevSnap = await getDoc(matchRef);
+  const wasNew = prevSnap.exists() && prevSnap.data().status === REPORT_STATUS.NEW;
+  const isNew = status === REPORT_STATUS.NEW;
+
+  await setDoc(matchRef, { status }, { merge: true });
+
+  if (wasNew !== isNew) {
+    await setDoc(
+      doc(db, COLLECTIONS.LOST_CASES, lostCaseId),
+      { newMatchCount: increment(isNew ? 1 : -1) },
+      { merge: true }
+    );
+  }
 }
