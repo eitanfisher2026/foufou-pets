@@ -24,6 +24,7 @@ const EMPTY_FIELDS = {
   lastSeenLocation: '',
   lastSeenAt: '',
   lastSeenDate: '',
+  lastSeenDateApprox: false,
   contactName: '',
   contactPhone: '',
   notes: '',
@@ -92,6 +93,7 @@ export default function LostReportForm() {
         lastSeenLocation: extracted.location || prev.lastSeenLocation,
         lastSeenAt: extracted.dateText || prev.lastSeenAt,
         lastSeenDate: extracted.computedDate || prev.lastSeenDate,
+        lastSeenDateApprox: extracted.computedDateApprox ?? prev.lastSeenDateApprox,
         contactName: extracted.contactName || prev.contactName,
         contactPhone: extracted.contactPhone || prev.contactPhone,
         notes: extracted.captionText || prev.notes,
@@ -254,8 +256,16 @@ export default function LostReportForm() {
           type="date"
           className="input"
           value={fields.lastSeenDate}
-          onChange={(e) => setField('lastSeenDate', e.target.value)}
+          onChange={(e) => {
+            setField('lastSeenDate', e.target.value);
+            setField('lastSeenDateApprox', false);
+          }}
         />
+        {fields.lastSeenDateApprox && (
+          <p className="mt-1 text-sm text-amber-700">
+            התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
+          </p>
+        )}
       </Field>
 
       <Field label="שם איש קשר">

@@ -342,8 +342,16 @@ export default function LostCaseDetail() {
               type="date"
               className="input"
               value={fields.lastSeenDate || ''}
-              onChange={(e) => setField('lastSeenDate', e.target.value)}
+              onChange={(e) => {
+                setField('lastSeenDate', e.target.value);
+                setField('lastSeenDateApprox', false);
+              }}
             />
+            {fields.lastSeenDateApprox && (
+              <p className="mt-1 text-sm text-amber-700">
+                התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
+              </p>
+            )}
           </Field>
           <Field label="שם איש קשר">
             <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
@@ -370,7 +378,13 @@ export default function LostCaseDetail() {
               fieldDefs={EXTRACTION_FIELD_DEFS}
               currentValues={fields}
               onApply={(updates) => {
-                setFields((prev) => ({ ...prev, ...updates }));
+                setFields((prev) => ({
+                  ...prev,
+                  ...updates,
+                  ...('lastSeenDate' in updates
+                    ? { lastSeenDateApprox: pendingExtraction.computedDateApprox ?? prev.lastSeenDateApprox }
+                    : {}),
+                }));
                 setPendingExtraction(null);
               }}
               onDiscard={() => setPendingExtraction(null)}
@@ -493,7 +507,12 @@ export default function LostCaseDetail() {
             { label: 'שכונה', value: lostCase.neighborhood },
             { label: 'פרטי מיקום נוספים', value: lostCase.lastSeenLocation },
             { label: 'מועד האובדן', value: lostCase.lastSeenAt },
-            { label: 'תאריך מדויק', value: formatDate(lostCase.lastSeenDate) },
+            {
+              label: 'תאריך מדויק',
+              value: lostCase.lastSeenDate
+                ? `${formatDate(lostCase.lastSeenDate)}${lostCase.lastSeenDateApprox ? ' (משוער)' : ''}`
+                : '',
+            },
             { label: 'שם איש קשר', value: lostCase.contactName },
             { label: 'טלפון', value: lostCase.contactPhone },
             { label: 'הערות נוספות', value: lostCase.notes },

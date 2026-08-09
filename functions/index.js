@@ -42,6 +42,7 @@ const EXTRACTION_SCHEMA = {
     location: { type: 'string' },
     dateText: { type: 'string' },
     computedDate: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    computedDateApprox: { type: 'boolean' },
     contactName: { type: 'string' },
     contactPhone: { type: 'string' },
     captionText: { type: 'string' },
@@ -82,6 +83,7 @@ const EXTRACTION_SCHEMA = {
     'location',
     'dateText',
     'computedDate',
+    'computedDateApprox',
     'contactName',
     'contactPhone',
     'captionText',
@@ -115,6 +117,7 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
   - A date written as DD/MM with no year (Israeli convention, day before month - "21/5" is May 21st) belongs to the current year unless that would place it in the future, in which case use the previous year instead - a lost/found post is never dated after today.
   - A relative duration ("3 days ago", "19 שעות", "לפני שבוע", "1 ימים") converts to today's date minus that duration.
   - If neither field gives you a specific, computable duration or date - a holiday name, "a while ago", or nothing at all - leave this null rather than guessing. A missing date is fine; a wrong one actively hurts matching.
+- "computedDateApprox" is true whenever computedDate was derived from a relative duration ("3 days ago", "19 שעות", postAgeText's "1 ימים") rather than an explicit date ("21/5"). A relative duration is anchored to whenever the post was actually viewed/screenshotted, which the uploader may have done well after the original sighting - today's date minus the duration is only a rough stand-in for the true date, with unknown extra drift. An explicit date has no such drift, so set this false whenever computedDate came from one (or is null).
 - "captionText" is the post's own written text, concatenated across all provided screenshots of the same post, in its original language.
 - If multiple screenshots are provided, treat them as one single post/report and merge what you find from each into one set of fields.
 - "mainPhotoRegion" locates the single clearest, most complete photo of the actual animal within the provided images, so it can be cropped out and used as the record's main photo. Getting this box right matters a lot - a bad box (cutting off the animal, or including surrounding text/background) is worse than not finding one at all, so be careful and conservative:

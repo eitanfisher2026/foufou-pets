@@ -85,12 +85,19 @@ function compareMarkList(a, b) {
 // are deliberately left uncalculated (could be "3 days ago" or a holiday
 // name) - those still display for human context but were never something
 // proximity math could safely run on.
-function compareDateProximity(a, b) {
+//
+// When either side's date was derived from a relative duration ("3 days
+// ago") rather than an explicit date, it carries unknown drift - it's
+// anchored to whenever the post was viewed/screenshotted, not necessarily
+// the real event date. Doubling the cutoff in that case avoids letting a
+// likely match get buried just because one side's date is a rough guess.
+function compareDateProximity(a, b, lenient) {
   if (!a || !b) return null;
   const diffMs = Math.abs(new Date(a) - new Date(b));
   if (Number.isNaN(diffMs)) return null;
   const diffDays = diffMs / 86400000;
-  return { ratio: Math.max(0, 1 - diffDays / DATE_PROXIMITY_CUTOFF_DAYS), diffDays: Math.round(diffDays) };
+  const cutoff = lenient ? DATE_PROXIMITY_CUTOFF_DAYS * 2 : DATE_PROXIMITY_CUTOFF_DAYS;
+  return { ratio: Math.max(0, 1 - diffDays / cutoff), diffDays: Math.round(diffDays) };
 }
 
 function comparePresence(a, b) {
@@ -187,7 +194,10 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const compare = COMPARATORS[p.comparisonType];
     if (!compare) continue;
 
-    const result = compare(lostCase[p.lostField], foundReport[p.foundField]);
+    const lenient =
+      p.comparisonType === 'dateProximity' &&
+      !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
+    const result = compare(lostCase[p.lostField], foundReport[p.foundField], lenient);
     if (!result) continue;
 
     comparableWeight += p.weight;
@@ -209,7 +219,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
         earned += points;
         const detail =
           p.comparisonType === 'dateProximity'
-            ? `הפרש של כ-${result.diffDays} ימים`
+            ? `הפרש של כ-${result.diffDays} ימים${lenient ? ' (תאריך משוער בצד אחד, ההשוואה גמישה יותר)' : ''}`
             : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
         reasons.push(`${p.label}: ${detail}`);
       }

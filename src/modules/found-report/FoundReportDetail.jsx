@@ -336,8 +336,16 @@ export default function FoundReportDetail() {
               type="date"
               className="input"
               value={fields.seenDate || ''}
-              onChange={(e) => setField('seenDate', e.target.value)}
+              onChange={(e) => {
+                setField('seenDate', e.target.value);
+                setField('seenDateApprox', false);
+              }}
             />
+            {fields.seenDateApprox && (
+              <p className="mt-1 text-sm text-amber-700">
+                התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
+              </p>
+            )}
           </Field>
           <Field label="שם איש קשר">
             <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
@@ -364,7 +372,13 @@ export default function FoundReportDetail() {
               fieldDefs={EXTRACTION_FIELD_DEFS}
               currentValues={fields}
               onApply={(updates) => {
-                setFields((prev) => ({ ...prev, ...updates }));
+                setFields((prev) => ({
+                  ...prev,
+                  ...updates,
+                  ...('seenDate' in updates
+                    ? { seenDateApprox: pendingExtraction.computedDateApprox ?? prev.seenDateApprox }
+                    : {}),
+                }));
                 setPendingExtraction(null);
               }}
               onDiscard={() => setPendingExtraction(null)}
@@ -416,7 +430,10 @@ export default function FoundReportDetail() {
             { label: 'מצב החתול', value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
             { label: 'מיקום', value: report.location },
             { label: 'מועד הראייה/המציאה', value: report.dateText },
-            { label: 'תאריך מדויק', value: formatDate(report.seenDate) },
+            {
+              label: 'תאריך מדויק',
+              value: report.seenDate ? `${formatDate(report.seenDate)}${report.seenDateApprox ? ' (משוער)' : ''}` : '',
+            },
             { label: 'מקור המידע (קבוצה)', value: report.sourceGroupName },
             { label: 'מי כתב את הפוסט', value: report.originalPosterName },
             { label: 'מי שיתף', value: report.sharedByName },

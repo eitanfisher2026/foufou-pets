@@ -25,6 +25,7 @@ const EMPTY_FIELDS = {
   location: '',
   dateText: '',
   seenDate: '',
+  seenDateApprox: false,
   condition: 'seen_only',
   contactName: '',
   contactPhone: '',
@@ -100,6 +101,7 @@ export default function FoundReportForm() {
         location: result.location || prev.location,
         dateText: result.dateText || prev.dateText,
         seenDate: result.computedDate || prev.seenDate,
+        seenDateApprox: result.computedDateApprox ?? prev.seenDateApprox,
         contactName: result.contactName || prev.contactName,
         contactPhone: result.contactPhone || prev.contactPhone,
         notes: result.captionText || prev.notes,
@@ -316,7 +318,20 @@ export default function FoundReportForm() {
       </Field>
 
       <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
-        <input type="date" className="input" value={fields.seenDate} onChange={(e) => setField('seenDate', e.target.value)} />
+        <input
+          type="date"
+          className="input"
+          value={fields.seenDate}
+          onChange={(e) => {
+            setField('seenDate', e.target.value);
+            setField('seenDateApprox', false);
+          }}
+        />
+        {fields.seenDateApprox && (
+          <p className="mt-1 text-sm text-amber-700">
+            התאריך הוערך אוטומטית מתיאור יחסי (למשל "לפני יום") ולא מתאריך מפורש, ולכן הוא לא מדויק - אפשר לתקן אותו כאן אם ידוע תאריך מדויק יותר.
+          </p>
+        )}
       </Field>
 
       <Field label="שם איש קשר (אם קיים בפוסט)">
