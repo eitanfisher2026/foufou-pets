@@ -91,6 +91,7 @@ export default function LostReportForm() {
         neighborhood: extracted.neighborhood || prev.neighborhood,
         lastSeenLocation: extracted.location || prev.lastSeenLocation,
         lastSeenAt: extracted.dateText || prev.lastSeenAt,
+        lastSeenDate: extracted.computedDate || prev.lastSeenDate,
         contactName: extracted.contactName || prev.contactName,
         contactPhone: extracted.contactPhone || prev.contactPhone,
         notes: extracted.captionText || prev.notes,

@@ -99,6 +99,7 @@ export default function FoundReportForm() {
         neighborhood: result.neighborhood || prev.neighborhood,
         location: result.location || prev.location,
         dateText: result.dateText || prev.dateText,
+        seenDate: result.computedDate || prev.seenDate,
         contactName: result.contactName || prev.contactName,
         contactPhone: result.contactPhone || prev.contactPhone,
         notes: result.captionText || prev.notes,

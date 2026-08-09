@@ -41,6 +41,7 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'neighborhood', extractedKey: 'neighborhood', label: 'שכונה' },
   { targetKey: 'location', extractedKey: 'location', label: 'מיקום' },
   { targetKey: 'dateText', extractedKey: 'dateText', label: 'מועד הראייה/המציאה' },
+  { targetKey: 'seenDate', extractedKey: 'computedDate', label: 'תאריך מדויק (מחושב)' },
   { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
   { targetKey: 'contactPhone', extractedKey: 'contactPhone', label: 'טלפון' },
   { targetKey: 'notes', extractedKey: 'captionText', label: 'הערות נוספות' },

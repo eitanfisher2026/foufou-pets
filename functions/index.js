@@ -41,6 +41,7 @@ const EXTRACTION_SCHEMA = {
     neighborhood: { type: 'string' },
     location: { type: 'string' },
     dateText: { type: 'string' },
+    computedDate: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     contactName: { type: 'string' },
     contactPhone: { type: 'string' },
     captionText: { type: 'string' },
@@ -80,6 +81,7 @@ const EXTRACTION_SCHEMA = {
     'neighborhood',
     'location',
     'dateText',
+    'computedDate',
     'contactName',
     'contactPhone',
     'captionText',
@@ -106,7 +108,11 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" as "" and put the single visible author in "originalPosterName".
 - "contactName"/"contactPhone" are only for a phone number explicitly given in the post text for contacting someone about the animal - not the poster's account name if no phone is given.
-- "dateText" and "postAgeText" are the literal text shown (e.g. "21/5" or "19 שעות" or "3 days ago") - do not calculate or convert dates yourself.
+- "dateText" and "postAgeText" are the literal text shown (e.g. "21/5" or "19 שעות" or "3 days ago") - copy them as written, do not convert them here.
+- "computedDate" is a real calendar date, YYYY-MM-DD, for when the animal was actually lost/found/seen (prefer what dateText describes over postAgeText if they conflict - postAgeText is about when the post went up, which can be later than the sighting). The user message tells you today's date - use it as your only reference point:
+  - A date written as DD/MM with no year (Israeli convention, day before month - "21/5" is May 21st) belongs to the current year unless that would place it in the future, in which case use the previous year instead - a lost/found post is never dated after today.
+  - A relative duration ("3 days ago", "19 שעות", "לפני שבוע") converts to today's date minus that duration.
+  - If the text only names a holiday, a vague timeframe with no specific number, or you're not reasonably confident in the result, leave this null rather than guessing - a missing date is fine, a wrong one actively hurts matching.
 - "captionText" is the post's own written text, concatenated across all provided screenshots of the same post, in its original language.
 - If multiple screenshots are provided, treat them as one single post/report and merge what you find from each into one set of fields.
 - "mainPhotoRegion" locates the single clearest, most complete photo of the actual animal within the provided images, so it can be cropped out and used as the record's main photo. Getting this box right matters a lot - a bad box (cutting off the animal, or including surrounding text/background) is worse than not finding one at all, so be careful and conservative:
@@ -145,6 +151,11 @@ export const extractReportFromImages = onCall(
       source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.base64 },
     }));
 
+    // Computed fresh per request, not baked into the static system prompt -
+    // a warm function instance can stay alive for hours/days between cold
+    // starts, so "today" has to come from the request, not module load time.
+    const todayIso = new Date().toISOString().slice(0, 10);
+
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
@@ -155,7 +166,7 @@ export const extractReportFromImages = onCall(
           role: 'user',
           content: [
             ...imageBlocks,
-            { type: 'text', text: 'Extract the fields from this post.' },
+            { type: 'text', text: `Today's date is ${todayIso}. Extract the fields from this post.` },
           ],
         },
       ],
