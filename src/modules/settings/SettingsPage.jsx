@@ -64,27 +64,32 @@ export default function SettingsPage() {
           <span className="text-slate-400">‹</span>
         </Link>
 
-        <div className="p-4">
-          <div className="mb-1 flex items-center justify-between">
-            <span className="font-medium text-slate-700">התקנת האפליקציה</span>
-          </div>
-          {installed ? (
-            <p className="text-sm text-slate-500">האפליקציה כבר מותקנת במכשיר הזה.</p>
-          ) : (
-            <>
+        <div className="bg-amber-50/60 p-4">
+          <div className="flex items-center gap-3">
+            <img src="/icon-192.png" alt="" className="h-12 w-12 shrink-0 rounded-xl shadow-sm" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-slate-800">התקנת האפליקציה</p>
+              <p className="text-xs text-slate-500">
+                {installed ? 'כבר מותקנת במכשיר הזה' : 'גישה מהירה ממסך הבית, כמו אפליקציה רגילה'}
+              </p>
+            </div>
+            {!installed && (canPrompt || isIOS) && (
               <button
                 type="button"
                 onClick={handleInstallClick}
-                className="mt-2 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
+                className="shrink-0 rounded-full bg-amber-600 px-4 py-2 text-sm font-medium text-white"
               >
-                {canPrompt || isIOS ? 'התקנה למסך הבית' : 'ההתקנה לא זמינה בדפדפן הזה'}
+                התקנה
               </button>
-              {showIosGuide && (
-                <p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
-                  ב-Safari: לחצו על כפתור השיתוף (הריבוע עם החץ למעלה), ואז על "הוסף למסך הבית".
-                </p>
-              )}
-            </>
+            )}
+          </div>
+          {!installed && !canPrompt && !isIOS && (
+            <p className="mt-2 text-xs text-slate-400">ההתקנה לא זמינה בדפדפן הזה</p>
+          )}
+          {showIosGuide && (
+            <p className="mt-3 rounded-lg bg-white p-3 text-xs text-slate-600">
+              ב-Safari: לחצו על כפתור השיתוף (הריבוע עם החץ למעלה), ואז על "הוסף למסך הבית".
+            </p>
           )}
         </div>
 

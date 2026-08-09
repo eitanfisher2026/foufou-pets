@@ -53,6 +53,7 @@ const EXTRACTION_FIELD_DEFS = [
 
 const MATCH_STATUS_LABELS = {
   [REPORT_STATUS.NEW]: 'חדש',
+  [REPORT_STATUS.NO_MATCH]: 'האלגוריתם קבע: אין התאמה',
   [REPORT_STATUS.REVIEWING]: 'בבדיקה',
   [REPORT_STATUS.NEEDS_FOLLOWUP]: 'דורש מעקב',
   [REPORT_STATUS.NOT_RELEVANT]: 'נבדק ולא נמצא קשר',

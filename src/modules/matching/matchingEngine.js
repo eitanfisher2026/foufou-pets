@@ -63,6 +63,19 @@ function compareBooleanTrait(a, b) {
   return { ratio: a === b ? 1 : 0 };
 }
 
+// Generalizes compareBooleanTrait to a multi-value enum with one baseline
+// "nothing distinctive here" value (e.g. an ordinary short coat, set via
+// the parameter's defaultValue) - two records both landing on that
+// baseline isn't informative, so it's treated as not comparable, same as
+// missing data. Matching on any other value is a real positive signal, and
+// any disagreement (baseline or not) is still a real mismatch, since the
+// trait itself doesn't change between a cat being lost and found.
+function compareExactSkipDefault(a, b, ctx) {
+  if (a === null || a === undefined || a === '' || b === null || b === undefined || b === '') return null;
+  if (a === ctx?.defaultValue && b === ctx?.defaultValue) return null;
+  return { ratio: a === b ? 1 : 0 };
+}
+
 // Color-aware comparison: exact match scores full, two colors placed in
 // the same configured group (config.colorGroups, defaults to
 // DEFAULT_COLOR_GROUPS) score partial credit since they could be the same
@@ -150,6 +163,7 @@ function comparePresence(a, b) {
 const COMPARATORS = {
   exact: compareExact,
   booleanTrait: compareBooleanTrait,
+  exactSkipDefault: compareExactSkipDefault,
   colorMatch: compareColor,
   textOverlap: compareTextOverlap,
   markList: compareMarkList,
@@ -177,7 +191,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
-    { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10 },
+    { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
     { key: 'fluffyTail', label: 'זנב שעיר במיוחד', weight: 5, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasFluffyTail', foundField: 'hasFluffyTail', mismatchPenalty: 5 },
     { key: 'city', label: 'עיר', weight: 10, enabled: true, comparisonType: 'textOverlap', lostField: 'city', foundField: 'city' },
     { key: 'hasCollar', label: 'קולר/רתמה', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'hasCollar', foundField: 'hasCollar', mismatchPenalty: 5 },
@@ -217,6 +231,7 @@ export const COMPARABLE_FIELDS = [
 export const COMPARISON_TYPE_LABELS = {
   exact: 'התאמה מדויקת',
   booleanTrait: 'סימן נדיר (קיים/לא קיים - "לא קיים" משני הצדדים לא נחשב כהתאמה)',
+  exactSkipDefault: 'התאמה מדויקת, מלבד ערך ברירת מחדל (התאמה על הערך הנפוץ/הרגיל לא נחשבת)',
   colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
@@ -248,13 +263,18 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const lenient =
       p.comparisonType === 'dateProximity' &&
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
-    const ctx = { lenient, colorGroups: config.colorGroups };
+    const ctx = { lenient, colorGroups: config.colorGroups, defaultValue: p.defaultValue };
     const result = compare(lostCase[p.lostField], foundReport[p.foundField], ctx);
     if (!result) continue;
 
     comparableWeight += p.weight;
 
-    if (p.comparisonType === 'exact' || p.comparisonType === 'booleanTrait' || p.comparisonType === 'colorMatch') {
+    if (
+      p.comparisonType === 'exact' ||
+      p.comparisonType === 'booleanTrait' ||
+      p.comparisonType === 'exactSkipDefault' ||
+      p.comparisonType === 'colorMatch'
+    ) {
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);

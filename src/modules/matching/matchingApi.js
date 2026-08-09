@@ -35,7 +35,12 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const batch = writeBatch(db);
   let newMatchCount = 0;
   for (const { report, score, reasons } of ranked) {
-    const status = existingStatusById[report.id] || REPORT_STATUS.NEW;
+    // A brand-new pairing that scores 0 (e.g. a disqualifying mismatch)
+    // never needs a person's attention - defaulting it to NO_MATCH instead
+    // of NEW keeps the "needs review" count meaningful. An existing status
+    // is never overwritten here, even if a later re-check now scores 0 -
+    // a person's own triage always outranks the automatic default.
+    const status = existingStatusById[report.id] || (score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW);
     if (status === REPORT_STATUS.NEW) newMatchCount += 1;
     const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', report.id);
     batch.set(matchRef, { foundReportId: report.id, score, reasons, status, checkedAt: serverTimestamp() }, { merge: true });

@@ -40,14 +40,13 @@ export const CAT_AGE_CLASSES = [
 
 // Real cat coat taxonomy has more nuance (length/texture/density/double
 // coat), but for reliable classification from a photo by a non-expert (or
-// by AI), 5 buckets covering length + the one texture that's visually
+// by AI), 4 buckets covering length + the one texture that's visually
 // unmistakable (curly/wavy) is the practical limit - a fluffy/bushy tail
 // is tracked as its own separate trait below since it can stand out even
 // on an otherwise short-haired cat.
 export const CAT_FUR_TYPES = [
   { value: 'hairless', label: 'ללא פרווה / כמעט ללא פרווה' },
-  { value: 'short', label: 'שיער קצר' },
-  { value: 'medium', label: 'שיער בינוני / חצי-ארוך' },
+  { value: 'short', label: 'רגיל' },
   { value: 'long', label: 'שיער ארוך' },
   { value: 'curly', label: 'מתולתל / גלי' },
 ];
@@ -89,6 +88,11 @@ export const FOUND_REPORT_STATUS_LABELS = {
 
 export const REPORT_STATUS = {
   NEW: 'new',
+  // Set automatically (never by a person) when a fresh match scores 0/100 -
+  // distinct from NOT_RELEVANT, which means a person looked at it and ruled
+  // it out. Keeps a hard-disqualified pair out of the "needs review" count
+  // without pretending someone actually reviewed it.
+  NO_MATCH: 'no_match',
   REVIEWING: 'reviewing',
   NEEDS_FOLLOWUP: 'needs_followup',
   NOT_RELEVANT: 'not_relevant',

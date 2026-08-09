@@ -384,6 +384,7 @@ function ParameterRow({ param, onChange, onRemove }) {
           </label>
           {(param.comparisonType === 'exact' ||
             param.comparisonType === 'booleanTrait' ||
+            param.comparisonType === 'exactSkipDefault' ||
             param.comparisonType === 'colorMatch') && (
             <>
               <label className="block">
