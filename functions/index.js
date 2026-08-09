@@ -36,6 +36,7 @@ const EXTRACTION_SCHEMA = {
     hasCollar: { type: ['boolean', 'null'] },
     collarColor: { anyOf: [{ type: 'string', enum: COLLAR_COLORS }, { type: 'null' }] },
     collarHasBell: { type: ['boolean', 'null'] },
+    hasClippedEar: { type: ['boolean', 'null'] },
     city: { type: 'string' },
     neighborhood: { type: 'string' },
     location: { type: 'string' },
@@ -74,6 +75,7 @@ const EXTRACTION_SCHEMA = {
     'hasCollar',
     'collarColor',
     'collarHasBell',
+    'hasClippedEar',
     'city',
     'neighborhood',
     'location',
@@ -98,6 +100,8 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
 - "ageClass" is separate from size - "kitten" only if the animal is clearly a young kitten, "adult" otherwise, or null if unclear. A small adult cat is "adult", not "kitten".
 - "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).
+- "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.
+- "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature (a spot, a scar, an asymmetry, a missing limb, etc.) - not a general coat description, which belongs in colorDescription instead. Leave "" if nothing distinctive beyond basic coloring is visible or mentioned.
 - "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" as "" and put the single visible author in "originalPosterName".

@@ -34,6 +34,7 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
+  { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
   { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
   { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
@@ -217,7 +218,7 @@ export default function LostCaseDetail() {
             onMakeMain={handleMakeMainPhoto}
             confirm={confirm}
           />
-          {lostCase.markings && <p className="mb-2 text-sm text-slate-600">{lostCase.markings}</p>}
+          {lostCase.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{lostCase.markings}</p>}
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
           )}
@@ -264,9 +265,22 @@ export default function LostCaseDetail() {
               ))}
             </select>
           </Field>
-          <Field label="סימנים מיוחדים">
-            <textarea className="input" value={fields.markings || ''} onChange={(e) => setField('markings', e.target.value)} />
+          <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
+            <textarea
+              className="input"
+              rows={3}
+              value={fields.markings || ''}
+              onChange={(e) => setField('markings', e.target.value)}
+            />
           </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={!!fields.hasClippedEar}
+              onChange={(e) => setField('hasClippedEar', e.target.checked)}
+            />
+            אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+          </label>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input
               type="checkbox"
@@ -469,6 +483,7 @@ export default function LostCaseDetail() {
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
             { label: 'סימנים מיוחדים', value: lostCase.markings },
+            { label: 'אוזן קטומה', value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '' },
             { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
             { label: 'צבע הקולר', value: lostCase.collarColor },
             { label: 'פעמון על הקולר', value: lostCase.collarHasBell === true ? 'כן' : lostCase.collarHasBell === false ? 'לא' : '' },

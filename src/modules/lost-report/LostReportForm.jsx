@@ -18,6 +18,7 @@ const EMPTY_FIELDS = {
   hasCollar: false,
   collarColor: '',
   collarHasBell: false,
+  hasClippedEar: false,
   city: '',
   neighborhood: '',
   lastSeenLocation: '',
@@ -85,6 +86,7 @@ export default function LostReportForm() {
         hasCollar: extracted.hasCollar ?? prev.hasCollar,
         collarColor: extracted.collarColor || prev.collarColor,
         collarHasBell: extracted.collarHasBell ?? prev.collarHasBell,
+        hasClippedEar: extracted.hasClippedEar ?? prev.hasClippedEar,
         city: extracted.city || prev.city,
         neighborhood: extracted.neighborhood || prev.neighborhood,
         lastSeenLocation: extracted.location || prev.lastSeenLocation,
@@ -179,9 +181,24 @@ export default function LostReportForm() {
         </select>
       </Field>
 
-      <Field label="סימנים מיוחדים (כתם, אוזן חתוכה, עיוורת בעין, חסרה רגל וכו')">
-        <textarea className="input" value={fields.markings} onChange={(e) => setField('markings', e.target.value)} />
+      <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
+        <textarea
+          className="input"
+          rows={3}
+          placeholder={'לדוגמה:\nנקודה שחורה ליד האף\nאוזניים קצרות מהרגיל'}
+          value={fields.markings}
+          onChange={(e) => setField('markings', e.target.value)}
+        />
       </Field>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={fields.hasClippedEar}
+          onChange={(e) => setField('hasClippedEar', e.target.checked)}
+        />
+        אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+      </label>
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />

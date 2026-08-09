@@ -34,6 +34,7 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
+  { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
   { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
   { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
   { targetKey: 'city', extractedKey: 'city', label: 'עיר' },
@@ -165,7 +166,7 @@ export default function FoundReportDetail() {
           <p className="mb-2 text-sm text-slate-500">
             {report.color} · {report.location} · {report.dateText}
           </p>
-          {report.markings && <p className="mb-2 text-sm text-slate-600">{report.markings}</p>}
+          {report.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
           <PhotoGallery
@@ -266,9 +267,22 @@ export default function FoundReportDetail() {
               onChange={(e) => setField('colorDescription', e.target.value)}
             />
           </Field>
-          <Field label="סימנים מיוחדים">
-            <textarea className="input" value={fields.markings || ''} onChange={(e) => setField('markings', e.target.value)} />
+          <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
+            <textarea
+              className="input"
+              rows={3}
+              value={fields.markings || ''}
+              onChange={(e) => setField('markings', e.target.value)}
+            />
           </Field>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={!!fields.hasClippedEar}
+              onChange={(e) => setField('hasClippedEar', e.target.checked)}
+            />
+            אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+          </label>
           <label className="flex items-center gap-2 text-sm text-slate-700">
             <input type="checkbox" checked={!!fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />
             לובשת קולר/רתמה
@@ -391,6 +405,7 @@ export default function FoundReportDetail() {
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },
             { label: 'תיאור נוסף לצבע', value: report.colorDescription },
             { label: 'סימנים מיוחדים', value: report.markings },
+            { label: 'אוזן קטומה', value: report.hasClippedEar === true ? 'כן' : report.hasClippedEar === false ? 'לא' : '' },
             { label: 'קולר/רתמה', value: report.hasCollar === true ? 'כן' : report.hasCollar === false ? 'לא' : '' },
             { label: 'צבע הקולר', value: report.collarColor },
             { label: 'פעמון על הקולר', value: report.collarHasBell === true ? 'כן' : report.collarHasBell === false ? 'לא' : '' },

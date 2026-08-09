@@ -19,6 +19,7 @@ const EMPTY_FIELDS = {
   hasCollar: null,
   collarColor: '',
   collarHasBell: null,
+  hasClippedEar: null,
   city: '',
   neighborhood: '',
   location: '',
@@ -93,6 +94,7 @@ export default function FoundReportForm() {
         hasCollar: result.hasCollar ?? prev.hasCollar,
         collarColor: result.collarColor || prev.collarColor,
         collarHasBell: result.collarHasBell ?? prev.collarHasBell,
+        hasClippedEar: result.hasClippedEar ?? prev.hasClippedEar,
         city: result.city || prev.city,
         neighborhood: result.neighborhood || prev.neighborhood,
         location: result.location || prev.location,
@@ -249,9 +251,24 @@ export default function FoundReportForm() {
         />
       </Field>
 
-      <Field label="סימנים מיוחדים (כתם, אוזן חתוכה, עיוורת בעין, חסרה רגל וכו')">
-        <textarea className="input" value={fields.markings} onChange={(e) => setField('markings', e.target.value)} />
+      <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
+        <textarea
+          className="input"
+          rows={3}
+          placeholder={'לדוגמה:\nנקודה שחורה ליד האף\nאוזניים קצרות מהרגיל'}
+          value={fields.markings}
+          onChange={(e) => setField('markings', e.target.value)}
+        />
       </Field>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={!!fields.hasClippedEar}
+          onChange={(e) => setField('hasClippedEar', e.target.checked)}
+        />
+        אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+      </label>
 
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input type="checkbox" checked={!!fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />

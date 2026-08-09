@@ -48,6 +48,38 @@ function compareTextOverlap(a, b) {
   return { ratio: shared / Math.max(wordsA.size, wordsB.size) };
 }
 
+function splitMarks(text) {
+  if (!text) return [];
+  return text
+    .split(/\r?\n|[,;]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Treats a marks field as a list of distinct marks (one per line, or comma-
+// separated) instead of one bag of words. A field with two unrelated marks
+// concatenated - "black spot near the nose, short ears" - shouldn't get
+// word-overlap credit for one mark just because the other happens to share
+// a word with something unrelated on the other side. Each mark on the lost
+// side is matched against its single best-matching mark on the found side,
+// and the score is the average of those best-match ratios.
+function compareMarkList(a, b) {
+  const marksA = splitMarks(a);
+  const marksB = splitMarks(b);
+  if (marksA.length === 0 || marksB.length === 0) return null;
+
+  let total = 0;
+  for (const markA of marksA) {
+    let best = 0;
+    for (const markB of marksB) {
+      const overlap = compareTextOverlap(markA, markB);
+      if (overlap && overlap.ratio > best) best = overlap.ratio;
+    }
+    total += best;
+  }
+  return { ratio: total / marksA.length };
+}
+
 // Needs real calendar dates (e.g. an <input type="date"> value), not the
 // literal "as written in the post" text fields (lastSeenAt/dateText), which
 // are deliberately left uncalculated (could be "3 days ago" or a holiday
@@ -70,6 +102,7 @@ function comparePresence(a, b) {
 const COMPARATORS = {
   exact: compareExact,
   textOverlap: compareTextOverlap,
+  markList: compareMarkList,
   dateProximity: compareDateProximity,
   presence: comparePresence,
 };
@@ -88,7 +121,8 @@ export const DEFAULT_MATCH_CONFIG = {
   // a fully-filled-in pair would.
   relativeScoring: true,
   parameters: [
-    { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'textOverlap', lostField: 'markings', foundField: 'markings' },
+    { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
+    { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10 },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'exact', lostField: 'color', foundField: 'color' },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
@@ -114,6 +148,7 @@ export const COMPARABLE_FIELDS = [
   { field: 'size', label: 'גודל' },
   { field: 'ageClass', label: 'גור/מבוגר' },
   { field: 'hasCollar', label: 'קולר/רתמה (יש/אין)' },
+  { field: 'hasClippedEar', label: 'אוזן קטומה (סימון עיקור)' },
   { field: 'collarColor', label: 'צבע הקולר' },
   { field: 'collarHasBell', label: 'פעמון על הקולר' },
   { field: 'city', label: 'עיר' },
@@ -127,6 +162,7 @@ export const COMPARABLE_FIELDS = [
 export const COMPARISON_TYPE_LABELS = {
   exact: 'התאמה מדויקת',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
+  markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
   presence: 'קיים משני הצדדים',
 };
@@ -174,7 +210,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
         const detail =
           p.comparisonType === 'dateProximity'
             ? `הפרש של כ-${result.diffDays} ימים`
-            : `חפיפה של כ-${Math.round(result.ratio * 100)}%`;
+            : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
         reasons.push(`${p.label}: ${detail}`);
       }
     }
