@@ -31,7 +31,7 @@ export const CAT_AGE_CLASSES = [
   { value: 'adult', label: 'מבוגר' },
 ];
 
-export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'אחר'];
+export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 export const CAT_CONDITIONS = [
   { value: 'seen_only', label: 'נראה בלבד (לא נתפס)' },

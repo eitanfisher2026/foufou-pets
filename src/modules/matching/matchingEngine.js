@@ -131,6 +131,10 @@ export const COMPARISON_TYPE_LABELS = {
   presence: 'קיים משני הצדדים',
 };
 
+export function fieldLabel(field) {
+  return COMPARABLE_FIELDS.find((f) => f.field === field)?.label || field;
+}
+
 /**
  * Scores one lost case against one found/seen report using the given rule
  * config (defaults to DEFAULT_MATCH_CONFIG). Returns { score: 0-100,

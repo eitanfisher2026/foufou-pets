@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMatchConfig, saveMatchConfig, resetMatchConfig } from '../matching/matchConfigApi.js';
-import { COMPARABLE_FIELDS, COMPARISON_TYPE_LABELS } from '../matching/matchingEngine.js';
+import { COMPARABLE_FIELDS, COMPARISON_TYPE_LABELS, fieldLabel } from '../matching/matchingEngine.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 
 /**
@@ -144,6 +144,8 @@ export default function MatchSettingsPage() {
 }
 
 function ParameterRow({ param, onChange, onRemove }) {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
     <div className={`rounded-xl border border-slate-200 bg-white p-3 ${param.enabled ? '' : 'opacity-50'}`}>
       <div className="mb-2 flex items-center gap-2">
@@ -159,69 +161,79 @@ function ParameterRow({ param, onChange, onRemove }) {
           onChange={(e) => onChange({ label: e.target.value })}
           placeholder="שם הפרמטר"
         />
+        <label className="whitespace-nowrap text-xs text-slate-500">
+          משקל
+          <input
+            type="number"
+            min="0"
+            className="input mr-1 inline-block w-16"
+            value={param.weight}
+            onChange={(e) => onChange({ weight: Number(e.target.value) })}
+          />
+        </label>
         <button type="button" onClick={onRemove} className="text-sm text-red-600" aria-label="הסרת פרמטר">
           ✕
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <label className="block">
-          <span className="mb-1 block text-slate-500">שדה בתיק החיפוש</span>
-          <select className="input" value={param.lostField} onChange={(e) => onChange({ lostField: e.target.value })}>
-            {COMPARABLE_FIELDS.map((f) => (
-              <option key={f.field} value={f.field}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-slate-500">שדה בדיווח</span>
-          <select className="input" value={param.foundField} onChange={(e) => onChange({ foundField: e.target.value })}>
-            {COMPARABLE_FIELDS.map((f) => (
-              <option key={f.field} value={f.field}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-slate-500">שיטת השוואה</span>
-          <select
-            className="input"
-            value={param.comparisonType}
-            onChange={(e) => onChange({ comparisonType: e.target.value })}
-          >
-            {Object.entries(COMPARISON_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-slate-500">משקל</span>
-          <input
-            type="number"
-            min="0"
-            className="input"
-            value={param.weight}
-            onChange={(e) => onChange({ weight: Number(e.target.value) })}
-          />
-        </label>
-        {param.comparisonType === 'exact' && (
-          <label className="col-span-2 block">
-            <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס, רק לא מקבל בונוס)</span>
-            <input
-              type="number"
-              min="0"
-              className="input"
-              value={param.mismatchPenalty || 0}
-              onChange={(e) => onChange({ mismatchPenalty: Number(e.target.value) })}
-            />
+      <p className="mb-2 text-xs text-slate-400">
+        משווה {fieldLabel(param.lostField)} מול {fieldLabel(param.foundField)} · {COMPARISON_TYPE_LABELS[param.comparisonType]}
+      </p>
+
+      <button type="button" onClick={() => setShowAdvanced((v) => !v)} className="text-xs text-slate-500 underline">
+        {showAdvanced ? 'הסתרת שדות מתקדמים' : 'שינוי אילו שדות מושווים'}
+      </button>
+
+      {showAdvanced && (
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <label className="block">
+            <span className="mb-1 block text-slate-500">שדה בתיק החיפוש</span>
+            <select className="input" value={param.lostField} onChange={(e) => onChange({ lostField: e.target.value })}>
+              {COMPARABLE_FIELDS.map((f) => (
+                <option key={f.field} value={f.field}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
           </label>
-        )}
-      </div>
+          <label className="block">
+            <span className="mb-1 block text-slate-500">שדה בדיווח</span>
+            <select className="input" value={param.foundField} onChange={(e) => onChange({ foundField: e.target.value })}>
+              {COMPARABLE_FIELDS.map((f) => (
+                <option key={f.field} value={f.field}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-slate-500">שיטת השוואה</span>
+            <select
+              className="input"
+              value={param.comparisonType}
+              onChange={(e) => onChange({ comparisonType: e.target.value })}
+            >
+              {Object.entries(COMPARISON_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {param.comparisonType === 'exact' && (
+            <label className="block">
+              <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס)</span>
+              <input
+                type="number"
+                min="0"
+                className="input"
+                value={param.mismatchPenalty || 0}
+                onChange={(e) => onChange({ mismatchPenalty: Number(e.target.value) })}
+              />
+            </label>
+          )}
+        </div>
+      )}
     </div>
   );
 }
