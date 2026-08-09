@@ -40,6 +40,7 @@ const EXTRACTION_SCHEMA = {
     city: { type: 'string' },
     neighborhood: { type: 'string' },
     location: { type: 'string' },
+    condition: { type: 'string', enum: ['seen_only', 'held_by_finder', 'at_vet'] },
     dateText: { type: 'string' },
     computedDate: { anyOf: [{ type: 'string' }, { type: 'null' }] },
     computedDateApprox: { type: 'boolean' },
@@ -81,6 +82,7 @@ const EXTRACTION_SCHEMA = {
     'city',
     'neighborhood',
     'location',
+    'condition',
     'dateText',
     'computedDate',
     'computedDateApprox',
@@ -107,6 +109,7 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.
 - "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
 - "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.
+- "condition" is the animal's current physical custody, based on what the post text actually says happened to it - not just that it was photographed: "held_by_finder" if the poster currently has the animal in their own possession/care/home (e.g. "אצלי", "ביניתיים אצלי", "לקחתי אותה הביתה", "טיפלתי בו"), including when the post also mentions a vet visit but the animal is back with the poster or still in the poster's short-term care afterward - a vet visit alone doesn't change this if the animal ends up with the finder. "at_vet" only if the animal was left at / transferred to a clinic or shelter and is not with the poster anymore (e.g. "הועבר למרפאה ונשאר שם", "בטיפול הוטרינר"). "seen_only" is the default and by far the most common case - the animal was merely sighted/photographed in public, was not caught, and nobody claims to be holding it.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
 - Facebook posts are sometimes shown as "shared" from another group by one person, originally written by a different person. In that case, "originalPosterName" is whoever wrote the original post/caption, and "sharedByName" is the person who re-shared it into the group visible in the screenshot. If there is no sharing chain, leave "sharedByName" as "" and put the single visible author in "originalPosterName".
 - "contactName"/"contactPhone" are only for a phone number explicitly given in the post text for contacting someone about the animal - not the poster's account name if no phone is given.
