@@ -56,13 +56,17 @@ export default function ShareTargetIntake() {
       {status === 'no-photo' && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
-            השיתוף לא כלל תמונה - כנראה שיתוף של קישור לפוסט בלבד. כדי לזהות פרטים על החתולה אנחנו צריכים תמונה,
-            למשל צילום מסך של הפוסט.
+            השיתוף העביר רק את הקישור/הטקסט של הפוסט, בלי תמונה - וזה בסדר: שימושי בדיוק כשלפוסט יש טקסט ארוך
+            שנחתך בצילום מסך ("...עוד"), כי כך מגיע הטקסט המלא.
+          </p>
+          <p className="mt-2 text-sm text-amber-800">
+            טיפ: אם הפוסט כולו (טקסט ותמונה) נכנס בצילום מסך אחד, אפשר לדלג על שיתוף הפוסט בפעם הבאה ופשוט לשתף
+            ישירות את צילום המסך מהגלריה - זה מגיע עם התמונה בלי שלב נוסף.
           </p>
           {sharedText && (
             <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-xs text-slate-600">{sharedText}</p>
           )}
-          <label className="mt-3 block text-sm font-medium text-slate-600">העלאת צילום מסך של הפוסט</label>
+          <label className="mt-3 block text-sm font-medium text-slate-600">כדי לזהות את החתולה, נשאר רק לצרף גם צילום מסך של הפוסט</label>
           <input type="file" accept="image/*" multiple onChange={handleManualUpload} disabled={busy} className="mt-1" />
         </div>
       )}
