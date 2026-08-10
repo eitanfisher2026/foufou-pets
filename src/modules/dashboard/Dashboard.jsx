@@ -81,7 +81,12 @@ export default function Dashboard() {
       )}
 
       <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">תיקי חיפוש</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-700">
+          תיקי חיפוש{' '}
+          {visibleLostCases.length > 0 && (
+            <span className="text-sm font-normal text-slate-400">({visibleLostCases.length})</span>
+          )}
+        </h2>
         {visibleLostCases.length === 0 && !loading && <p className="text-sm text-slate-400">אין תיקים פתוחים עדיין.</p>}
         <ul className="space-y-2">
           {visibleLostCases.map((c) => (
@@ -107,7 +112,12 @@ export default function Dashboard() {
       </section>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">דיווחים על חתולים שנראו/נמצאו</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-700">
+          דיווחים על חתולים שנראו/נמצאו{' '}
+          {visibleFoundReports.length > 0 && (
+            <span className="text-sm font-normal text-slate-400">({visibleFoundReports.length})</span>
+          )}
+        </h2>
         {visibleFoundReports.length === 0 && !loading && <p className="text-sm text-slate-400">אין דיווחים עדיין.</p>}
         <ul className="space-y-2">
           {visibleFoundReports.map((r) => (
@@ -130,26 +140,22 @@ export default function Dashboard() {
   );
 }
 
-// A raw 0-100 score means nothing to someone who isn't the one who built the
-// matching engine - a plain-language quality word reads at a glance instead.
+// The total candidate count (matchCount) is shown once, in the section
+// header - repeating it on every single row added nothing. Each row just
+// needs its own best score and how many of its matches are still unseen.
 function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
   const hasNew = newMatchCount > 0;
+  const reviewedCount = matchCount - newMatchCount;
   const hasScore = typeof topMatchScore === 'number' && topMatchScore > 0;
-  const countLabel = hasNew
-    ? newMatchCount === 1
-      ? 'התאמה חדשה'
-      : `${newMatchCount} התאמות חדשות`
-    : matchCount === 1
-      ? 'נבדקה התאמה אחת'
-      : `${matchCount} נבדקו`;
   return (
     <span
       className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
         hasNew ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
       }`}
     >
-      {countLabel}
-      {hasScore && ` · ${topMatchScore}%`}
+      {hasScore && `${topMatchScore}% - `}
+      {reviewedCount}
+      {hasNew && `, חדש - ${newMatchCount}`}
     </span>
   );
 }
