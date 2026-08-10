@@ -149,6 +149,14 @@ export default function LostReportForm() {
         </select>
       </Field>
 
+      <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
+        <input
+          className="input"
+          value={fields.colorDescription}
+          onChange={(e) => setField('colorDescription', e.target.value)}
+        />
+      </Field>
+
       <Field label="גודל">
         <select className="input" value={fields.size} onChange={(e) => setField('size', e.target.value)}>
           <option value="">בחר/י</option>

@@ -22,6 +22,7 @@ import {
   makeLostCasePhotoMain,
   deleteLostCase,
 } from '../lost-report/lostReportApi.js';
+import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { checkMatchesForLostCase, clearMatches, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
@@ -35,6 +36,7 @@ import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
+  { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
   { targetKey: 'hasFluffyTail', extractedKey: 'hasFluffyTail', label: 'זנב שעיר במיוחד' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
@@ -223,7 +225,7 @@ export default function LostCaseDetail() {
         <>
           <div className="mb-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">{lostCase.name || 'חתול ללא שם'}</h1>
+              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">{displayLostCaseName(lostCase)}</h1>
               <RecordStatusSelect
                 status={lostCase.status || RECORD_STATUS.ACTIVE}
                 labels={LOST_CASE_STATUS_LABELS}
@@ -306,6 +308,13 @@ export default function LostCaseDetail() {
                 </option>
               ))}
             </select>
+          </Field>
+          <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
+            <input
+              className="input"
+              value={fields.colorDescription || ''}
+              onChange={(e) => setField('colorDescription', e.target.value)}
+            />
           </Field>
           <Field label="גודל">
             <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
@@ -564,12 +573,13 @@ export default function LostCaseDetail() {
       {dialog}
       {showDetails && (
         <RecordDetailsDialog
-          title={lostCase.name || 'חתול ללא שם'}
+          title={displayLostCaseName(lostCase)}
           onClose={() => setShowDetails(false)}
           photos={lostCase.photos}
           onViewPhoto={setLightboxUrl}
           rows={[
             { label: 'שם', value: lostCase.name },
+            { label: 'תיאור נוסף לצבע', value: lostCase.colorDescription },
             { label: 'צבע', value: lostCase.color },
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },

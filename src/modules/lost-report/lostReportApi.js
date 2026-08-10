@@ -13,6 +13,7 @@ export async function createLostCase(fields, photoFiles, ownerId) {
     species: 'cat',
     name: fields.name || '',
     color: fields.color || '',
+    colorDescription: fields.colorDescription || '',
     size: fields.size || '',
     ageClass: fields.ageClass || '',
     furType: fields.furType || '',
@@ -66,6 +67,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
     {
       name: fields.name || '',
       color: fields.color || '',
+      colorDescription: fields.colorDescription || '',
       size: fields.size || '',
       ageClass: fields.ageClass || '',
       furType: fields.furType || '',

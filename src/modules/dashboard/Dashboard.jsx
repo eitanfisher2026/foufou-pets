@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { APP_VERSION } from '../../version.js';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { listFoundReports, listLostCases } from './dashboardApi.js';
+import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 
 const STATUS_BADGE_COLORS = {
   [RECORD_STATUS.SUSPENDED]: 'bg-amber-100 text-amber-800',
@@ -90,7 +91,7 @@ export default function Dashboard() {
                 className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50"
               >
                 <span className="flex items-center gap-2">
-                  <span className="font-medium text-slate-800">{c.name || 'חתול ללא שם'}</span>
+                  <span className="font-medium text-slate-800">{displayLostCaseName(c)}</span>
                   <StatusBadge status={c.status} labels={LOST_CASE_STATUS_LABELS} />
                 </span>
                 {c.matchCount > 0 ? (

@@ -1,6 +1,7 @@
 export const EMPTY_LOST_FIELDS = {
   name: '',
   color: '',
+  colorDescription: '',
   size: '',
   ageClass: '',
   furType: '',
@@ -44,6 +45,7 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     ...prev,
     name: extracted.petName || prev.name,
     color: extracted.color || prev.color,
+    colorDescription: extracted.colorDescription || prev.colorDescription,
     size: extracted.size || prev.size,
     ageClass: extracted.ageClass || prev.ageClass,
     furType: extracted.furType || prev.furType,
@@ -68,4 +70,14 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     postAgeText: extracted.postAgeText || prev.postAgeText,
     aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
+}
+
+/**
+ * A nameless lost cat (the common case - most posts never give a street cat
+ * a name) shouldn't just read "חתול ללא שם" everywhere when there's a
+ * perfectly good description to show instead - same fallback idea as found
+ * reports falling back from title to colorDescription.
+ */
+export function displayLostCaseName(lostCase) {
+  return lostCase?.name || lostCase?.colorDescription || lostCase?.markings || 'חתול ללא שם';
 }
