@@ -14,7 +14,7 @@ import { useSmartIntake } from './useSmartIntake.js';
 export default function ShareTargetIntake() {
   const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
     useSmartIntake();
-  const [status, setStatus] = useState('loading'); // loading | no-photo | done
+  const [status, setStatus] = useState('loading'); // loading | empty | no-photo | done
   const [sharedText, setSharedText] = useState('');
   const started = useRef(false);
 
@@ -23,8 +23,13 @@ export default function ShareTargetIntake() {
     started.current = true;
 
     takePendingShare().then((share) => {
+      // Genuinely nothing came through - either this page was opened
+      // directly (not via a share), or the pending share was already
+      // consumed by an earlier load of this same page (e.g. a service
+      // worker update reloading mid-share). Worth telling apart from "we
+      // got a link/text but no photo", which is a normal, expected case.
       if (!share || (share.photos.length === 0 && !share.text && !share.url)) {
-        setStatus('no-photo');
+        setStatus('empty');
         return;
       }
       if (share.photos.length === 0) {
@@ -54,6 +59,15 @@ export default function ShareTargetIntake() {
 
       {status === 'loading' && <AnalyzingIndicator />}
 
+      {status === 'empty' && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
+          <p className="text-sm text-amber-800">
+            לא זיהינו תוכן ששותף לכאן. זה יכול לקרות אם הדף נפתח ישירות (לא דרך "שיתוף"), או אם משהו השתבש באמצע -
+            נסו שוב מהאפליקציה של פייסבוק: שיתוף ← חיות אבודות.
+          </p>
+        </div>
+      )}
+
       {status === 'no-photo' && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
@@ -77,7 +91,7 @@ export default function ShareTargetIntake() {
       {status !== 'loading' && !creating && (
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">
-            {status === 'no-photo' ? 'צירוף תמונה/ות' : 'רוצה לנסות תמונה אחרת?'}
+            {status === 'empty' || status === 'no-photo' ? 'צירוף תמונה/ות' : 'רוצה לנסות תמונה אחרת?'}
           </label>
           <input type="file" accept="image/*" multiple onChange={handleManualUpload} disabled={busy} />
         </div>

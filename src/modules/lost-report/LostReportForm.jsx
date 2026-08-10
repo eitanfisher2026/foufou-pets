@@ -158,6 +158,10 @@ export default function LostReportForm() {
         />
       </Field>
 
+      <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
+        <input className="input" value={fields.breed} onChange={(e) => setField('breed', e.target.value)} />
+      </Field>
+
       <Field label="גודל">
         <select className="input" value={fields.size} onChange={(e) => setField('size', e.target.value)}>
           <option value="">בחר/י</option>

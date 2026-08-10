@@ -38,6 +38,7 @@ export default function MatchSettingsPage() {
   const [savedNotice, setSavedNotice] = useState(false);
   const [colorOptions, setColorOptions] = useState(null);
   const [colorInput, setColorInput] = useState('');
+  const [saveError, setSaveError] = useState('');
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
@@ -115,10 +116,17 @@ export default function MatchSettingsPage() {
   // together, every time.
   async function handleSave() {
     setSaving(true);
+    setSaveError('');
     try {
       await Promise.all([saveMatchConfig(config), saveColorOptions(colorOptions)]);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
+    } catch (err) {
+      // A failed save used to fail completely silently - the button just
+      // went back to normal with no explanation, so a real failure looked
+      // identical to a successful save unless you specifically noticed the
+      // checkmark never appeared. Now it's impossible to miss.
+      setSaveError(`השמירה נכשלה: ${err.message || 'שגיאה לא ידועה'}. השינויים לא נשמרו - נסו שוב.`);
     } finally {
       setSaving(false);
     }
@@ -281,6 +289,7 @@ export default function MatchSettingsPage() {
       </button>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white p-3">
+        {saveError && <p className="mx-auto mb-2 max-w-2xl text-sm font-medium text-red-600">{saveError}</p>}
         <div className="mx-auto flex max-w-2xl items-center gap-3">
           <button
             type="button"

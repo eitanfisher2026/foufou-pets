@@ -37,6 +37,7 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
+  { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
   { targetKey: 'hasFluffyTail', extractedKey: 'hasFluffyTail', label: 'זנב שעיר במיוחד' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
@@ -351,6 +352,9 @@ export default function LostCaseDetail() {
               onChange={(e) => setField('colorDescription', e.target.value)}
             />
           </Field>
+          <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
+            <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
+          </Field>
           <Field label="גודל">
             <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
               <option value="">בחר/י</option>
@@ -616,6 +620,7 @@ export default function LostCaseDetail() {
           rows={[
             { label: 'שם', value: lostCase.name },
             { label: 'תיאור נוסף לצבע', value: lostCase.colorDescription },
+            { label: 'גזע', value: lostCase.breed },
             { label: 'צבע', value: lostCase.color },
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },

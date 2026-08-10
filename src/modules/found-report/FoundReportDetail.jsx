@@ -35,6 +35,7 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'postAgeText', extractedKey: 'postAgeText', label: 'מתי פורסם' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
+  { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
   { targetKey: 'hasFluffyTail', extractedKey: 'hasFluffyTail', label: 'זנב שעיר במיוחד' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
@@ -308,6 +309,9 @@ export default function FoundReportDetail() {
               onChange={(e) => setField('colorDescription', e.target.value)}
             />
           </Field>
+          <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
+            <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
+          </Field>
           <Field label="סוג פרווה">
             <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
               <option value="">בחר/י</option>
@@ -483,6 +487,7 @@ export default function FoundReportDetail() {
             { label: 'גודל', value: CAT_SIZES.find((s) => s.value === report.size)?.label },
             { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },
             { label: 'תיאור נוסף לצבע', value: report.colorDescription },
+            { label: 'גזע', value: report.breed },
             { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === report.furType)?.label },
             { label: 'זנב שעיר במיוחד', value: report.hasFluffyTail === true ? 'כן' : report.hasFluffyTail === false ? 'לא' : '' },
             { label: 'סימנים מיוחדים', value: report.markings },

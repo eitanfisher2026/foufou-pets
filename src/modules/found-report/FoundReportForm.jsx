@@ -206,6 +206,10 @@ export default function FoundReportForm() {
         />
       </Field>
 
+      <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
+        <input className="input" value={fields.breed} onChange={(e) => setField('breed', e.target.value)} />
+      </Field>
+
       <Field label="סוג פרווה">
         <select className="input" value={fields.furType} onChange={(e) => setField('furType', e.target.value)}>
           <option value="">בחר/י</option>

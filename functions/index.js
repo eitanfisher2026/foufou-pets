@@ -75,6 +75,7 @@ const EXTRACTION_SCHEMA = {
     petName: { type: 'string' },
     color: { type: 'string', enum: CAT_COLORS },
     colorDescription: { type: 'string' },
+    breed: { type: 'string' },
     // anyOf, not type:['string','null']+enum - Anthropic rejects an enum
     // combined with an array-form type ("Enum value 'small' does not match
     // declared type '['string', 'null']'").
@@ -123,6 +124,7 @@ const EXTRACTION_SCHEMA = {
     'petName',
     'color',
     'colorDescription',
+    'breed',
     'size',
     'ageClass',
     'furType',
@@ -157,6 +159,7 @@ const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about los
 - "reportType" is whether the post itself is framed as an animal being lost, or as one being found/seen/held - "lost" for a post from or on behalf of an owner looking for their own missing animal (e.g. "איבדתי", "מישהו ראה את החתולה שלי?", "נעדרת מאתמול", a flyer with the animal's name and "בואי הביתה"), "found" for a post about an animal that isn't the poster's own - sighted, caught, or being cared for pending the owner being found (e.g. "מצאתי", "נמצא/נמצאה", "מישהו מזהה?", "ראיתי חתול משוטט"). Base this on the post's actual wording and framing, not just on whether contact info is present. Null only if the text truly gives no usable signal either way (e.g. a bare photo with no caption and no other context).
 - "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
 - "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
+- "breed" is only for a specific, named breed - either stated explicitly in the post text (e.g. "פרסי", "מיין קון", "בן-גל"), or visually unmistakable from the photos (e.g. a clearly hairless Sphynx, a clearly flat-faced Persian). The overwhelming majority of street cats in these posts are ordinary mixed-breed cats with no identifiable breed - leave "" in that default case rather than guessing a breed from a generic coat/body type. A wrong guess here is actively misleading, not a harmless default.
 - "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
 - "ageClass" is separate from size - "kitten" only if the animal is clearly a young kitten, "adult" otherwise, or null if unclear. A small adult cat is "adult", not "kitten".
 - "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur, e.g. Sphynx), "short" (an ordinary coat that lies close to the body - the large majority of house cats, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond a typical house cat, e.g. Persian or Maine Coon), "curly" (fur is wavy or curly rather than straight, regardless of length, e.g. Devon Rex/Cornish Rex). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-haired cat), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.
