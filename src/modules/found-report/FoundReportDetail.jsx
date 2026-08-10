@@ -146,7 +146,7 @@ export default function FoundReportDetail() {
   if (!report) return <p className="p-4 text-slate-500">טוען...</p>;
 
   return (
-    <div className="mx-auto max-w-lg p-4">
+    <div className="p-4">
       <Link to="/" className="mb-4 inline-block text-sm text-slate-500 underline">
         ← חזרה לעמוד הראשי
       </Link>
@@ -180,13 +180,7 @@ export default function FoundReportDetail() {
           {report.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
-          <PhotoGallery
-            photos={report.photos}
-            onView={setLightboxUrl}
-            onRemove={handleRemoveExistingPhoto}
-            onMakeMain={handleMakeMainPhoto}
-            confirm={confirm}
-          />
+          <MainPhoto photo={report.photos?.[0]} onView={setLightboxUrl} />
 
           <div className="rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
             {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
@@ -444,6 +438,8 @@ export default function FoundReportDetail() {
         <RecordDetailsDialog
           title={report.title || report.colorDescription || 'חתול'}
           onClose={() => setShowDetails(false)}
+          photos={report.photos}
+          onViewPhoto={setLightboxUrl}
           rows={[
             { label: 'כותרת', value: report.title },
             { label: 'צבע', value: report.color },
@@ -489,53 +485,20 @@ function Field({ label, children }) {
   );
 }
 
-function PhotoGallery({ photos, onView, onRemove, onMakeMain, confirm }) {
-  if (!photos || photos.length === 0) return null;
-
-  async function handleRemove(photo) {
-    if (await confirm('להסיר את התמונה?')) onRemove(photo);
-  }
-
+// View mode shows only the main photo - the rest (extra angles, raw
+// screenshots) are still there, just tucked behind "עריכה" and "פרטים
+// מלאים" instead of stretching the summary view. Width always fills its
+// container (never wider), so a wide/landscape source image can't overflow
+// the page the way a fixed-height/auto-width image could.
+function MainPhoto({ photo, onView }) {
+  if (!photo) return null;
   return (
-    <div className="mb-4 flex flex-wrap gap-3">
-      {photos.map((p, i) => (
-        <div key={i} className="relative">
-          <button type="button" onClick={() => onView(p.url)}>
-            <img
-              src={p.url}
-              alt=""
-              className={`h-56 w-auto max-w-full rounded-lg object-contain bg-slate-50 ${
-                i === 0 ? 'ring-4 ring-amber-400' : 'border border-slate-200'
-              }`}
-            />
-          </button>
-          {i === 0 ? (
-            <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              תמונה ראשית
-            </span>
-          ) : (
-            onMakeMain && (
-              <button
-                type="button"
-                onClick={() => onMakeMain(p)}
-                className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-medium text-white"
-              >
-                הפוך לראשית
-              </button>
-            )
-          )}
-          {onRemove && (
-            <button
-              type="button"
-              onClick={() => handleRemove(p)}
-              className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-sm font-bold text-white shadow"
-              aria-label="הסרת תמונה"
-            >
-              ✕
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
+    <button type="button" onClick={() => onView(photo.url)} className="mb-4 block w-full">
+      <img
+        src={photo.url}
+        alt=""
+        className="h-64 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400 sm:h-80"
+      />
+    </button>
   );
 }

@@ -83,7 +83,7 @@ export default function LostReportForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-lg space-y-5 p-4">
+    <form onSubmit={handleSubmit} className="space-y-5 p-4">
       <Link to="/" className="inline-block text-sm text-slate-500 underline">
         ← ביטול וחזרה לעמוד הראשי
       </Link>

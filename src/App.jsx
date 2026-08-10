@@ -17,18 +17,24 @@ function AppRoutes() {
   if (loading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
   if (!user) return <LoginScreen />;
 
+  // One responsive width cap for the whole app, same pattern as Buli: pages
+  // themselves stay full-width and just fill this container, so the app
+  // reads as a phone-width column on mobile but actually uses the extra
+  // space on tablet/laptop screens instead of sitting in a narrow strip.
   return (
-    <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/lost/new" element={<LostReportForm />} />
-      <Route path="/lost/:caseId" element={<LostCaseDetail />} />
-      <Route path="/found/new" element={<FoundReportForm />} />
-      <Route path="/report/new" element={<SmartIntakeForm />} />
-      <Route path="/found/:reportId" element={<FoundReportDetail />} />
-      <Route path="/settings" element={<SettingsPage />} />
-      <Route path="/settings/matching" element={<MatchSettingsPage />} />
-      <Route path="/settings/cost" element={<CostSettingsPage />} />
-    </Routes>
+    <div className="mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/lost/new" element={<LostReportForm />} />
+        <Route path="/lost/:caseId" element={<LostCaseDetail />} />
+        <Route path="/found/new" element={<FoundReportForm />} />
+        <Route path="/report/new" element={<SmartIntakeForm />} />
+        <Route path="/found/:reportId" element={<FoundReportDetail />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/settings/matching" element={<MatchSettingsPage />} />
+        <Route path="/settings/cost" element={<CostSettingsPage />} />
+      </Routes>
+    </div>
   );
 }
 

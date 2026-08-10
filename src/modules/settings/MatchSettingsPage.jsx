@@ -140,7 +140,7 @@ export default function MatchSettingsPage() {
   const aiSyncIssues = getAiSyncIssues(colorOptions);
 
   return (
-    <div className="mx-auto max-w-2xl p-4 pb-24">
+    <div className="p-4 pb-24">
       <Link to="/settings" className="mb-4 inline-block text-sm text-slate-500 underline">
         ← חזרה להגדרות
       </Link>

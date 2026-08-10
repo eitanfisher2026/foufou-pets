@@ -39,7 +39,7 @@ export default function Dashboard() {
     foundReports.filter((r) => r.status === RECORD_STATUS.ARCHIVED).length;
 
   return (
-    <div className="mx-auto max-w-2xl p-4">
+    <div className="p-4">
       <header className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-slate-800">

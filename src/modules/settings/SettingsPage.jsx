@@ -42,7 +42,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-10">
+    <div className="p-4 pb-10">
       <Link to="/" className="mb-4 inline-block text-sm text-slate-500 underline">
         ← חזרה לעמוד הראשי
       </Link>

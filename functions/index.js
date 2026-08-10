@@ -222,6 +222,12 @@ export const extractReportFromImages = onCall(
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
+      // Claude Sonnet 5 runs adaptive thinking by default when this is
+      // omitted - real reasoning time that this task doesn't need, since
+      // it's bounded visual classification into a fixed schema, not
+      // open-ended judgment. Disabling it is the single biggest lever on
+      // the ~1-minute latency this call was taking.
+      thinking: { type: 'disabled' },
       system: SYSTEM_PROMPT,
       output_config: { format: { type: 'json_schema', schema: EXTRACTION_SCHEMA } },
       messages: [

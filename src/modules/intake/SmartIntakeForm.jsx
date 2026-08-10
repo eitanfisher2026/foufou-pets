@@ -66,7 +66,7 @@ export default function SmartIntakeForm() {
   const busy = reading || creating;
 
   return (
-    <div className="mx-auto max-w-lg space-y-5 p-4">
+    <div className="space-y-5 p-4">
       <Link to="/" className="inline-block text-sm text-slate-500 underline">
         ← ביטול וחזרה לעמוד הראשי
       </Link>

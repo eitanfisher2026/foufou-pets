@@ -42,7 +42,7 @@ export default function CostSettingsPage() {
   const estimatedStorageCost = storageOverageGB * STORAGE_PRICE_PER_GB_MONTH;
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-10">
+    <div className="p-4 pb-10">
       <Link to="/settings" className="mb-4 inline-block text-sm text-slate-500 underline">
         ← חזרה להגדרות
       </Link>

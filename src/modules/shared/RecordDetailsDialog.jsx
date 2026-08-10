@@ -3,8 +3,12 @@
  * can see the full picture without switching into the editable form (which
  * implies "I might change something" rather than "let me just look").
  * `rows` is [{ label, value }] - falsy values are skipped automatically.
+ * `photos`, if given, renders every photo (not just the main one shown on
+ * the record's summary view) as a horizontally-scrollable thumbnail strip -
+ * this is the one place besides the edit form where the extra photos are
+ * visible.
  */
-export default function RecordDetailsDialog({ title, rows, onClose }) {
+export default function RecordDetailsDialog({ title, rows, photos, onViewPhoto, onClose }) {
   const visibleRows = rows.filter((r) => r.value);
 
   return (
@@ -24,6 +28,28 @@ export default function RecordDetailsDialog({ title, rows, onClose }) {
             ✕
           </button>
         </div>
+
+        {photos && photos.length > 0 && (
+          <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+            {photos.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onViewPhoto?.(p.url)}
+                className="shrink-0"
+                aria-label="הצגת תמונה"
+              >
+                <img
+                  src={p.url}
+                  alt=""
+                  className={`h-20 w-20 rounded-lg object-cover bg-slate-50 ${
+                    i === 0 ? 'ring-2 ring-amber-400' : 'border border-slate-200'
+                  }`}
+                />
+              </button>
+            ))}
+          </div>
+        )}
 
         {visibleRows.length === 0 ? (
           <p className="text-sm text-slate-400">אין פרטים נוספים.</p>
