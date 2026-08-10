@@ -222,6 +222,11 @@ export const extractReportFromImages = onCall(
     const response = await client.messages.create({
       model: MODEL,
       max_tokens: 4096,
+      // This is a bounded visual-classification task, not open-ended writing -
+      // pin sampling to its most deterministic setting so the same screenshot
+      // (e.g. a mainPhotoRegion crop box) doesn't come out differently across
+      // separate calls.
+      temperature: 0,
       // Claude Sonnet 5 runs adaptive thinking by default when this is
       // omitted - real reasoning time that this task doesn't need, since
       // it's bounded visual classification into a fixed schema, not
