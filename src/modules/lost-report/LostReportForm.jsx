@@ -109,6 +109,31 @@ export default function LostReportForm() {
         </div>
       </div>
 
+      <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
+        <input
+          className="input"
+          value={fields.sourceGroupName}
+          onChange={(e) => setField('sourceGroupName', e.target.value)}
+          placeholder='למשל "חתולים אבודים ונמצאים - תל אביב"'
+        />
+      </Field>
+
+      <Field label="מי כתב את הפוסט המקורי (אם לא הבעלים עצמם)">
+        <input
+          className="input"
+          value={fields.originalPosterName}
+          onChange={(e) => setField('originalPosterName', e.target.value)}
+        />
+      </Field>
+
+      <Field label="מי שיתף את הפוסט לקבוצה הזו (אם שונה מהכותב)">
+        <input className="input" value={fields.sharedByName} onChange={(e) => setField('sharedByName', e.target.value)} />
+      </Field>
+
+      <Field label="מתי פורסם (כפי שכתוב בפוסט)">
+        <input className="input" value={fields.postAgeText} onChange={(e) => setField('postAgeText', e.target.value)} />
+      </Field>
+
       <Field label="שם החתולה">
         <input className="input" value={fields.name} onChange={(e) => setField('name', e.target.value)} />
       </Field>

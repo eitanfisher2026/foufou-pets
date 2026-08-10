@@ -49,6 +49,10 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
   { targetKey: 'contactPhone', extractedKey: 'contactPhone', label: 'טלפון' },
   { targetKey: 'notes', extractedKey: 'captionText', label: 'הערות נוספות' },
+  { targetKey: 'sourceGroupName', extractedKey: 'sourceGroupName', label: 'מקור המידע (קבוצה)' },
+  { targetKey: 'originalPosterName', extractedKey: 'originalPosterName', label: 'מי כתב את הפוסט' },
+  { targetKey: 'sharedByName', extractedKey: 'sharedByName', label: 'מי שיתף' },
+  { targetKey: 'postAgeText', extractedKey: 'postAgeText', label: 'מתי פורסם' },
 ];
 
 const MATCH_STATUS_LABELS = {
@@ -248,6 +252,12 @@ export default function LostCaseDetail() {
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
           )}
+          {(lostCase.sourceGroupName || lostCase.originalPosterName) && (
+            <div className="mb-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+              {lostCase.sourceGroupName && <p>מקור: {lostCase.sourceGroupName}</p>}
+              {lostCase.originalPosterName && <p>פורסם ע"י: {lostCase.originalPosterName}</p>}
+            </div>
+          )}
         </>
       ) : (
         <div className="mb-6 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
@@ -258,6 +268,34 @@ export default function LostCaseDetail() {
             newPhotos={newPhotos}
             onNewPhotosChange={setNewPhotos}
           />
+          <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
+            <input
+              className="input"
+              value={fields.sourceGroupName || ''}
+              onChange={(e) => setField('sourceGroupName', e.target.value)}
+            />
+          </Field>
+          <Field label="מי כתב את הפוסט המקורי (אם לא הבעלים עצמם)">
+            <input
+              className="input"
+              value={fields.originalPosterName || ''}
+              onChange={(e) => setField('originalPosterName', e.target.value)}
+            />
+          </Field>
+          <Field label="מי שיתף את הפוסט לקבוצה הזו (אם שונה מהכותב)">
+            <input
+              className="input"
+              value={fields.sharedByName || ''}
+              onChange={(e) => setField('sharedByName', e.target.value)}
+            />
+          </Field>
+          <Field label="מתי פורסם (כפי שכתוב בפוסט)">
+            <input
+              className="input"
+              value={fields.postAgeText || ''}
+              onChange={(e) => setField('postAgeText', e.target.value)}
+            />
+          </Field>
           <Field label="שם החתולה">
             <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
           </Field>
@@ -555,6 +593,10 @@ export default function LostCaseDetail() {
             { label: 'שם איש קשר', value: lostCase.contactName },
             { label: 'טלפון', value: lostCase.contactPhone },
             { label: 'הערות נוספות', value: lostCase.notes },
+            { label: 'מקור המידע (קבוצה)', value: lostCase.sourceGroupName },
+            { label: 'מי כתב את הפוסט', value: lostCase.originalPosterName },
+            { label: 'מי שיתף', value: lostCase.sharedByName },
+            { label: 'מתי פורסם', value: lostCase.postAgeText },
           ]}
         />
       )}

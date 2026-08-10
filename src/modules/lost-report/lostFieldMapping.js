@@ -19,6 +19,14 @@ export const EMPTY_LOST_FIELDS = {
   contactName: '',
   contactPhone: '',
   notes: '',
+  // A lost-cat post can rely on the Facebook poster's name/group just as
+  // much as a found post can - no phone number in the caption means this
+  // is the only way back to whoever's actually looking for the cat, same
+  // reasoning as the found-report source fields.
+  sourceGroupName: '',
+  originalPosterName: '',
+  sharedByName: '',
+  postAgeText: '',
 };
 
 /**
@@ -51,5 +59,9 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     contactName: extracted.contactName || prev.contactName,
     contactPhone: extracted.contactPhone || prev.contactPhone,
     notes: extracted.captionText || prev.notes,
+    sourceGroupName: extracted.sourceGroupName || prev.sourceGroupName,
+    originalPosterName: extracted.originalPosterName || prev.originalPosterName,
+    sharedByName: extracted.sharedByName || prev.sharedByName,
+    postAgeText: extracted.postAgeText || prev.postAgeText,
   };
 }
