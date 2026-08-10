@@ -10,6 +10,7 @@ import MatchSettingsPage from './modules/settings/MatchSettingsPage.jsx';
 import SettingsPage from './modules/settings/SettingsPage.jsx';
 import CostSettingsPage from './modules/settings/CostSettingsPage.jsx';
 import SmartIntakeForm from './modules/intake/SmartIntakeForm.jsx';
+import ShareTargetIntake from './modules/intake/ShareTargetIntake.jsx';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -29,6 +30,7 @@ function AppRoutes() {
         <Route path="/lost/:caseId" element={<LostCaseDetail />} />
         <Route path="/found/new" element={<FoundReportForm />} />
         <Route path="/report/new" element={<SmartIntakeForm />} />
+        <Route path="/share-target" element={<ShareTargetIntake />} />
         <Route path="/found/:reportId" element={<FoundReportDetail />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/settings/matching" element={<MatchSettingsPage />} />

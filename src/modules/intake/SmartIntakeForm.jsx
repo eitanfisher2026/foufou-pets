@@ -1,13 +1,6 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../auth/AuthProvider.jsx';
-import { useScreenshotReader } from '../shared/useScreenshotReader.js';
+import { Link } from 'react-router-dom';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
-import { extractMainPhoto } from '../shared/cropPhoto.js';
-import { createLostCase } from '../lost-report/lostReportApi.js';
-import { mergeExtractedLostFields } from '../lost-report/lostFieldMapping.js';
-import { createFoundReport } from '../found-report/foundReportApi.js';
-import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js';
+import { useSmartIntake } from './useSmartIntake.js';
 
 /**
  * One upload button that doesn't ask the user to pre-decide lost vs. found -
@@ -18,52 +11,13 @@ import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js'
  * full edit view for reviewing/correcting fields - no second form to build.
  */
 export default function SmartIntakeForm() {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { reading, error: readError, read } = useScreenshotReader();
-  const [files, setFiles] = useState([]);
-  const [extracted, setExtracted] = useState(null);
-  const [creating, setCreating] = useState(false);
+  const { files, extracted, busy, readError, handleFiles, createFromType, creating } = useSmartIntake();
 
   async function handleUpload(e) {
     const newFiles = Array.from(e.target.files || []);
     e.target.value = '';
-    if (newFiles.length === 0) return;
-    setFiles(newFiles);
-    setExtracted(null);
-
-    try {
-      const result = await read(newFiles);
-      setExtracted(result);
-      if (result.reportType === 'lost' || result.reportType === 'found') {
-        await createFromType(result, result.reportType, newFiles);
-      }
-    } catch {
-      // error already surfaced via readError
-    }
+    await handleFiles(newFiles);
   }
-
-  async function createFromType(result, type, uploadedFiles) {
-    setCreating(true);
-    try {
-      const mainPhoto = await extractMainPhoto(uploadedFiles, result.mainPhotoRegion);
-      const photos = mainPhoto ? [mainPhoto, ...uploadedFiles] : uploadedFiles;
-
-      if (type === 'lost') {
-        const fields = mergeExtractedLostFields(result);
-        const caseId = await createLostCase({ ...fields, source: 'screenshot' }, photos, user.uid);
-        navigate(`/lost/${caseId}`);
-      } else {
-        const fields = mergeExtractedFoundFields(result);
-        const reportId = await createFoundReport({ ...fields, source: 'screenshot' }, photos, user.uid);
-        navigate(`/found/${reportId}`);
-      }
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  const busy = reading || creating;
 
   return (
     <div className="space-y-5 p-4">
