@@ -27,7 +27,8 @@ export default function SmartIntakeForm() {
       <h1 className="text-xl font-bold text-slate-800">הוספה חכמה</h1>
       <p className="text-sm text-slate-500">
         העלה/י צילום מסך של פוסט על חתול - נזהה אוטומטית אם זה דיווח על חתול שאבד או שנמצא/נראה, ונפתח את הרשומה
-        המתאימה כדי שתוכל/י לבדוק ולתקן את הפרטים.
+        המתאימה כדי שתוכל/י לבדוק ולתקן את הפרטים. אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת
+        שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
       </p>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">

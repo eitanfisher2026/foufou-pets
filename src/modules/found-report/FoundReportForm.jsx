@@ -105,7 +105,8 @@ export default function FoundReportForm() {
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <label className="mb-2 block text-sm font-medium text-slate-600">
-          צילום/י מסך של הפוסט (אפשר כמה תמונות, כולל אם הכיתוב נמשך ב"עוד")
+          צילום/י מסך של הפוסט (אפשר כמה תמונות, כולל אם הכיתוב נמשך ב"עוד"). אם בפוסט כמה תמונות של החתולה, כדאי
+          לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}

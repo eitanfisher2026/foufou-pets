@@ -91,7 +91,8 @@ export default function LostReportForm() {
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <label className="mb-2 block text-sm font-medium text-slate-600">
-          יש לך צילום מסך של פוסט מפייסבוק על החתולה? אפשר להעלות אותו וחלק מהשדות יתמלאו אוטומטית.
+          יש לך צילום מסך של פוסט מפייסבוק על החתולה? אפשר להעלות אותו וחלק מהשדות יתמלאו אוטומטית. אם בפוסט כמה
+          תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator />}
