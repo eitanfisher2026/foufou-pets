@@ -36,6 +36,11 @@ const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
     species: { type: 'string', enum: ['cat', 'dog', 'other', 'unknown'] },
+    // Lets one shared extraction call serve both the lost-report and
+    // found-report intake flows (and a single unified upload button that
+    // doesn't ask the user to pre-pick a flow) - null when the post's own
+    // framing genuinely doesn't say which it is.
+    reportType: { anyOf: [{ type: 'string', enum: ['lost', 'found'] }, { type: 'null' }] },
     // Text fields use "" as the not-found sentinel rather than null: Anthropic
     // caps schemas at 16 nullable/union-typed parameters, and the client
     // already treats "" the same as null via `||` fallbacks, so there's no
@@ -89,6 +94,7 @@ const EXTRACTION_SCHEMA = {
   },
   required: [
     'species',
+    'reportType',
     'petName',
     'color',
     'colorDescription',
@@ -123,6 +129,7 @@ const EXTRACTION_SCHEMA = {
 const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about lost, found, or sighted pets, in Hebrew, Russian, English, or a mix, and extract structured facts. Follow these rules strictly:
 
 - Never invent information. If a text field is not visible or not stated, return an empty string "" for it (not null). For "hasCollar", use null specifically to mean not stated/unclear - true and false are only for when the post clearly shows or says so.
+- "reportType" is whether the post itself is framed as an animal being lost, or as one being found/seen/held - "lost" for a post from or on behalf of an owner looking for their own missing animal (e.g. "איבדתי", "מישהו ראה את החתולה שלי?", "נעדרת מאתמול", a flyer with the animal's name and "בואי הביתה"), "found" for a post about an animal that isn't the poster's own - sighted, caught, or being cared for pending the owner being found (e.g. "מצאתי", "נמצא/נמצאה", "מישהו מזהה?", "ראיתי חתול משוטט"). Base this on the post's actual wording and framing, not just on whether contact info is present. Null only if the text truly gives no usable signal either way (e.g. a bare photo with no caption and no other context).
 - "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
 - "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
 - "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.

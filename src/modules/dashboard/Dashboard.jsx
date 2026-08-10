@@ -52,7 +52,7 @@ export default function Dashboard() {
         </Link>
       </header>
 
-      <div className="mb-6 flex gap-3">
+      <div className="mb-3 flex gap-3">
         <Link to="/lost/new" className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-center font-medium text-white">
           חתול שלי אבד
         </Link>
@@ -60,6 +60,13 @@ export default function Dashboard() {
           ראיתי/מצאתי חתול
         </Link>
       </div>
+
+      <Link
+        to="/report/new"
+        className="mb-6 block rounded-xl border border-dashed border-slate-300 px-4 py-2 text-center text-sm font-medium text-slate-600"
+      >
+        או: הוספה חכמה - נזהה אוטומטית אם זה אבד או נמצא
+      </Link>
 
       {loading && <p className="text-slate-500">טוען...</p>}
 

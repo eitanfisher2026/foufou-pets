@@ -9,35 +9,7 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
-
-const EMPTY_FIELDS = {
-  title: '',
-  color: '',
-  colorDescription: '',
-  size: '',
-  ageClass: '',
-  furType: '',
-  hasFluffyTail: null,
-  markings: '',
-  hasCollar: null,
-  collarColor: '',
-  collarHasBell: null,
-  hasClippedEar: null,
-  city: '',
-  neighborhood: '',
-  location: '',
-  dateText: '',
-  seenDate: '',
-  seenDateApprox: false,
-  condition: 'seen_only',
-  contactName: '',
-  contactPhone: '',
-  notes: '',
-  sourceGroupName: '',
-  originalPosterName: '',
-  sharedByName: '',
-  postAgeText: '',
-};
+import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
 
 export default function FoundReportForm() {
   const { user } = useAuth();
@@ -46,7 +18,7 @@ export default function FoundReportForm() {
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
-  const [fields, setFields] = useState(EMPTY_FIELDS);
+  const [fields, setFields] = useState(EMPTY_FOUND_FIELDS);
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
@@ -88,35 +60,7 @@ export default function FoundReportForm() {
 
     try {
       const result = await read(allScreenshots);
-      setFields((prev) => ({
-        ...prev,
-        title: prev.title || result.colorDescription || prev.title,
-        color: result.color || prev.color,
-        colorDescription: result.colorDescription || prev.colorDescription,
-        size: result.size || prev.size,
-        ageClass: result.ageClass || prev.ageClass,
-        furType: result.furType || prev.furType,
-        hasFluffyTail: result.hasFluffyTail ?? prev.hasFluffyTail,
-        markings: result.markings || prev.markings,
-        hasCollar: result.hasCollar ?? prev.hasCollar,
-        collarColor: result.collarColor || prev.collarColor,
-        collarHasBell: result.collarHasBell ?? prev.collarHasBell,
-        hasClippedEar: result.hasClippedEar ?? prev.hasClippedEar,
-        city: result.city || prev.city,
-        neighborhood: result.neighborhood || prev.neighborhood,
-        location: result.location || prev.location,
-        condition: result.condition || prev.condition,
-        dateText: result.dateText || prev.dateText,
-        seenDate: result.computedDate || prev.seenDate,
-        seenDateApprox: result.computedDateApprox ?? prev.seenDateApprox,
-        contactName: result.contactName || prev.contactName,
-        contactPhone: result.contactPhone || prev.contactPhone,
-        notes: result.captionText || prev.notes,
-        sourceGroupName: result.sourceGroupName || prev.sourceGroupName,
-        originalPosterName: result.originalPosterName || prev.originalPosterName,
-        sharedByName: result.sharedByName || prev.sharedByName,
-        postAgeText: result.postAgeText || prev.postAgeText,
-      }));
+      setFields((prev) => mergeExtractedFoundFields(result, prev));
       setExtracted(true);
 
       const mainPhoto = await extractMainPhoto(allScreenshots, result.mainPhotoRegion);

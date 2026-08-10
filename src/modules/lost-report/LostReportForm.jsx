@@ -9,29 +9,7 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
-
-const EMPTY_FIELDS = {
-  name: '',
-  color: '',
-  size: '',
-  ageClass: '',
-  furType: '',
-  hasFluffyTail: false,
-  markings: '',
-  hasCollar: false,
-  collarColor: '',
-  collarHasBell: false,
-  hasClippedEar: false,
-  city: '',
-  neighborhood: '',
-  lastSeenLocation: '',
-  lastSeenAt: '',
-  lastSeenDate: '',
-  lastSeenDateApprox: false,
-  contactName: '',
-  contactPhone: '',
-  notes: '',
-};
+import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
 
 export default function LostReportForm() {
   const { user } = useAuth();
@@ -40,7 +18,7 @@ export default function LostReportForm() {
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
-  const [fields, setFields] = useState(EMPTY_FIELDS);
+  const [fields, setFields] = useState(EMPTY_LOST_FIELDS);
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
@@ -81,29 +59,7 @@ export default function LostReportForm() {
 
     try {
       const extracted = await read(allScreenshots);
-      setFields((prev) => ({
-        ...prev,
-        name: extracted.petName || prev.name,
-        color: extracted.color || prev.color,
-        size: extracted.size || prev.size,
-        ageClass: extracted.ageClass || prev.ageClass,
-        furType: extracted.furType || prev.furType,
-        hasFluffyTail: extracted.hasFluffyTail ?? prev.hasFluffyTail,
-        markings: extracted.markings || prev.markings,
-        hasCollar: extracted.hasCollar ?? prev.hasCollar,
-        collarColor: extracted.collarColor || prev.collarColor,
-        collarHasBell: extracted.collarHasBell ?? prev.collarHasBell,
-        hasClippedEar: extracted.hasClippedEar ?? prev.hasClippedEar,
-        city: extracted.city || prev.city,
-        neighborhood: extracted.neighborhood || prev.neighborhood,
-        lastSeenLocation: extracted.location || prev.lastSeenLocation,
-        lastSeenAt: extracted.dateText || prev.lastSeenAt,
-        lastSeenDate: extracted.computedDate || prev.lastSeenDate,
-        lastSeenDateApprox: extracted.computedDateApprox ?? prev.lastSeenDateApprox,
-        contactName: extracted.contactName || prev.contactName,
-        contactPhone: extracted.contactPhone || prev.contactPhone,
-        notes: extracted.captionText || prev.notes,
-      }));
+      setFields((prev) => mergeExtractedLostFields(extracted, prev));
 
       const mainPhoto = await extractMainPhoto(allScreenshots, extracted.mainPhotoRegion);
       if (mainPhoto) {
