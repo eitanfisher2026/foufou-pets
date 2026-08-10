@@ -88,17 +88,18 @@ export default function Dashboard() {
             <li key={c.id}>
               <Link
                 to={`/lost/${c.id}`}
-                className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50"
+                className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50"
               >
-                <span className="flex items-center gap-2">
-                  <span className="font-medium text-slate-800">{displayLostCaseName(c)}</span>
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{displayLostCaseName(c)}</span>
                   <StatusBadge status={c.status} labels={LOST_CASE_STATUS_LABELS} />
-                </span>
-                {c.matchCount > 0 ? (
-                  <MatchSummaryBadge matchCount={c.matchCount} newMatchCount={c.newMatchCount} topMatchScore={c.topMatchScore} />
-                ) : (
-                  <span className="text-xs text-slate-400">{c.lastSeenLocation}</span>
-                )}
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <span className="truncate text-xs text-slate-400">{c.lastSeenLocation}</span>
+                  {c.matchCount > 0 && (
+                    <MatchSummaryBadge matchCount={c.matchCount} newMatchCount={c.newMatchCount} topMatchScore={c.topMatchScore} />
+                  )}
+                </div>
               </Link>
             </li>
           ))}
@@ -112,13 +113,13 @@ export default function Dashboard() {
           {visibleFoundReports.map((r) => (
             <li key={r.id}>
               <Link to={`/found/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2">
-                    <span className="font-medium text-slate-800">{r.title || r.colorDescription || 'חתול'}</span>
-                    <StatusBadge status={r.status} labels={FOUND_REPORT_STATUS_LABELS} />
+                <div className="flex items-center gap-2">
+                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
+                    {r.title || r.colorDescription || 'חתול'}
                   </span>
-                  <span className="text-xs text-slate-400">{r.location}</span>
+                  <StatusBadge status={r.status} labels={FOUND_REPORT_STATUS_LABELS} />
                 </div>
+                <p className="mt-1 truncate text-xs text-slate-400">{r.location}</p>
                 {r.sourceGroupName && <p className="mt-1 text-xs text-slate-400">מקור: {r.sourceGroupName}</p>}
               </Link>
             </li>
@@ -129,17 +130,25 @@ export default function Dashboard() {
   );
 }
 
+// A raw 0-100 score means nothing to someone who isn't the one who built the
+// matching engine - a plain-language quality word reads at a glance instead.
+function scoreLabel(score) {
+  if (score >= 70) return 'התאמה גבוהה';
+  if (score >= 40) return 'התאמה בינונית';
+  return 'התאמה חלשה';
+}
+
 function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
   const hasNew = newMatchCount > 0;
-  const scoreSuffix = typeof topMatchScore === 'number' && topMatchScore > 0 ? ` · הכי טובה ${topMatchScore}/100` : '';
+  const hasScore = typeof topMatchScore === 'number' && topMatchScore > 0;
   return (
     <span
       className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
         hasNew ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
       }`}
     >
-      {hasNew ? `${newMatchCount} חדשות מתוך ${matchCount}` : `${matchCount} נבדקו`}
-      {scoreSuffix}
+      {hasNew ? `${newMatchCount} התאמות חדשות` : `${matchCount} נבדקו`}
+      {hasScore && ` · ${scoreLabel(topMatchScore)}`}
     </span>
   );
 }
