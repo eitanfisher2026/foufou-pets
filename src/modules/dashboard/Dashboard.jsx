@@ -40,14 +40,14 @@ export default function Dashboard() {
 
   return (
     <div className="p-4">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-slate-800">
             איתור חיות מחמד <span className="text-xs font-normal text-slate-400">{APP_VERSION}</span>
           </h1>
-          <p className="text-sm text-slate-500">{user?.displayName}</p>
+          <p className="truncate text-sm text-slate-500">{user?.displayName}</p>
         </div>
-        <Link to="/settings" className="text-sm text-slate-500 underline">
+        <Link to="/settings" className="shrink-0 text-sm text-slate-500 underline">
           הגדרות ⚙
         </Link>
       </header>

@@ -153,16 +153,21 @@ export default function FoundReportDetail() {
 
       {!editing ? (
         <>
-          <div className="mb-4 flex items-start justify-between">
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-slate-800">{report.title || report.colorDescription || 'חתול'}</h1>
+          <div className="mb-4">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">
+                {report.title || report.colorDescription || 'חתול'}
+              </h1>
               <RecordStatusSelect
                 status={report.status || RECORD_STATUS.ACTIVE}
                 labels={FOUND_REPORT_STATUS_LABELS}
                 onChange={handleRecordStatusChange}
               />
             </div>
-            <div className="flex shrink-0 gap-3">
+            <p className="mb-2 text-sm text-slate-500">
+              {report.color} · {report.location} · {report.dateText}
+            </p>
+            <div className="flex flex-wrap gap-3">
               <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
                 פרטים מלאים
               </button>
@@ -174,9 +179,6 @@ export default function FoundReportDetail() {
               </button>
             </div>
           </div>
-          <p className="mb-2 text-sm text-slate-500">
-            {report.color} · {report.location} · {report.dateText}
-          </p>
           {report.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 

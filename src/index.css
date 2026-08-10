@@ -4,6 +4,12 @@
 
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  /* Safety net: a single unyielding flex/image child (long title, forced-
+     width action row, oversized photo) has twice caused the whole page to
+     scroll sideways instead of wrapping. This doesn't fix the underlying
+     layout - it just stops that failure mode from ever spilling outside
+     the viewport again. */
+  overflow-x: hidden;
 }
 
 @layer components {

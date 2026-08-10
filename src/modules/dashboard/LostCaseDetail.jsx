@@ -221,21 +221,19 @@ export default function LostCaseDetail() {
 
       {!editing ? (
         <>
-          <div className="mb-4 flex items-start justify-between">
-            <div>
-              <div className="mb-1 flex items-center gap-2">
-                <h1 className="text-xl font-bold text-slate-800">{lostCase.name || 'חתול ללא שם'}</h1>
-                <RecordStatusSelect
-                  status={lostCase.status || RECORD_STATUS.ACTIVE}
-                  labels={LOST_CASE_STATUS_LABELS}
-                  onChange={handleRecordStatusChange}
-                />
-              </div>
-              <p className="text-sm text-slate-500">
-                {lostCase.color} · {lostCase.lastSeenLocation} · {lostCase.lastSeenAt}
-              </p>
+          <div className="mb-4">
+            <div className="mb-1 flex flex-wrap items-center gap-2">
+              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">{lostCase.name || 'חתול ללא שם'}</h1>
+              <RecordStatusSelect
+                status={lostCase.status || RECORD_STATUS.ACTIVE}
+                labels={LOST_CASE_STATUS_LABELS}
+                onChange={handleRecordStatusChange}
+              />
             </div>
-            <div className="flex shrink-0 gap-3">
+            <p className="mb-2 text-sm text-slate-500">
+              {lostCase.color} · {lostCase.lastSeenLocation} · {lostCase.lastSeenAt}
+            </p>
+            <div className="flex flex-wrap gap-3">
               <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
                 פרטים מלאים
               </button>
