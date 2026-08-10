@@ -154,7 +154,7 @@ function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
       }`}
     >
       {hasScore && `${topMatchScore}% - `}
-      {reviewedCount}
+      {reviewedCount} נבדקו
       {hasNew && `, חדש - ${newMatchCount}`}
     </span>
   );
