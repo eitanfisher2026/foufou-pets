@@ -78,6 +78,7 @@ export default function LostCaseDetail() {
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
+  const [newPhotosFirst, setNewPhotosFirst] = useState(false);
   const [pendingExtraction, setPendingExtraction] = useState(null);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -200,8 +201,15 @@ export default function LostCaseDetail() {
   async function handleSave() {
     setSaving(true);
     try {
+      const existingCountBeforeSave = (fields.photos || []).length;
       await updateLostCase(caseId, fields, newPhotos);
+      if (newPhotosFirst && newPhotos.length > 0) {
+        const fresh = await getLostCase(caseId);
+        const promoted = fresh.photos?.[existingCountBeforeSave];
+        if (promoted) await makeLostCasePhotoMain(caseId, promoted, fresh.photos);
+      }
       setNewPhotos([]);
+      setNewPhotosFirst(false);
       setPendingExtraction(null);
       setEditing(false);
       await load();
@@ -267,6 +275,8 @@ export default function LostCaseDetail() {
             onMakeMainExisting={handleMakeMainPhoto}
             newPhotos={newPhotos}
             onNewPhotosChange={setNewPhotos}
+            newPhotosFirst={newPhotosFirst}
+            onNewPhotosFirstChange={setNewPhotosFirst}
           />
           <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
             <input
@@ -493,6 +503,7 @@ export default function LostCaseDetail() {
               onClick={() => {
                 setFields(lostCase);
                 setNewPhotos([]);
+                setNewPhotosFirst(false);
                 setPendingExtraction(null);
                 setEditing(false);
               }}

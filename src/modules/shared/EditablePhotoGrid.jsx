@@ -9,10 +9,12 @@ import { useConfirm } from './useConfirm.jsx';
  * and reused for the photo preview on the create forms (with
  * existingPhotos always empty there). Removing/promoting an existing photo
  * happens immediately via the parent's callback (persisted right away);
- * removing/promoting a newly-picked photo is purely local state, since
- * it hasn't been uploaded yet. Promoting a new photo to "main" is only
- * offered when there are no existing photos ahead of it, since otherwise
- * it wouldn't actually become the first photo overall.
+ * removing/promoting a newly-picked photo is purely local state, since it
+ * hasn't been uploaded yet. Promoting a new photo to "main" ahead of
+ * existing ones is a common real case (e.g. replacing a badly-cropped main
+ * photo with a manually-fixed one) - the parent tracks that intent via
+ * newPhotosFirst and reorders the saved result to match once the new photo
+ * actually has a URL to promote.
  */
 export default function EditablePhotoGrid({
   existingPhotos,
@@ -20,6 +22,8 @@ export default function EditablePhotoGrid({
   onMakeMainExisting,
   newPhotos,
   onNewPhotosChange,
+  newPhotosFirst = false,
+  onNewPhotosFirstChange,
   label = 'תמונות',
   addLabel = 'הוספת תמונות',
 }) {
@@ -45,10 +49,16 @@ export default function EditablePhotoGrid({
 
   function makeNewPhotoMain(index) {
     onNewPhotosChange([newPhotos[index], ...newPhotos.filter((_, i) => i !== index)]);
+    onNewPhotosFirstChange?.(true);
   }
 
   async function handleRemoveExisting(photo) {
     if (await confirm('להסיר את התמונה?')) onRemoveExisting(photo);
+  }
+
+  async function handleMakeExistingMain(photo) {
+    onNewPhotosFirstChange?.(false);
+    await onMakeMainExisting(photo);
   }
 
   return (
@@ -56,18 +66,20 @@ export default function EditablePhotoGrid({
       <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
       {(existingPhotos.length > 0 || newPhotos.length > 0) && (
         <div className="mb-2 flex flex-wrap gap-3">
-          {existingPhotos.map((p, i) => (
+          {existingPhotos.map((p, i) => {
+            const isMain = !newPhotosFirst && i === 0;
+            return (
             <div key={p.path} className="relative">
               <button type="button" onClick={() => setLightboxUrl(p.url)}>
                 <img
                   src={p.url}
                   alt=""
                   className={`h-28 w-28 rounded-lg object-cover ${
-                    i === 0 ? 'ring-4 ring-amber-400' : 'border border-slate-200'
+                    isMain ? 'ring-4 ring-amber-400' : 'border border-slate-200'
                   }`}
                 />
               </button>
-              {i === 0 ? (
+              {isMain ? (
                 <span className="absolute bottom-1 left-1 rounded bg-amber-500 px-1 py-0.5 text-[9px] font-medium text-white">
                   ראשית
                 </span>
@@ -75,7 +87,7 @@ export default function EditablePhotoGrid({
                 onMakeMainExisting && (
                   <button
                     type="button"
-                    onClick={() => onMakeMainExisting(p)}
+                    onClick={() => handleMakeExistingMain(p)}
                     className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
                   >
                     הפוך לראשית
@@ -91,9 +103,10 @@ export default function EditablePhotoGrid({
                 ✕
               </button>
             </div>
-          ))}
+            );
+          })}
           {newPhotos.map((file, i) => {
-            const isMain = existingPhotos.length === 0 && i === 0;
+            const isMain = (existingPhotos.length === 0 || newPhotosFirst) && i === 0;
             return (
               <div key={i} className="relative">
                 <button type="button" onClick={() => setLightboxUrl(previews[i])}>
@@ -110,15 +123,13 @@ export default function EditablePhotoGrid({
                     ראשית
                   </span>
                 ) : (
-                  existingPhotos.length === 0 && (
-                    <button
-                      type="button"
-                      onClick={() => makeNewPhotoMain(i)}
-                      className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
-                    >
-                      הפוך לראשית
-                    </button>
-                  )
+                  <button
+                    type="button"
+                    onClick={() => makeNewPhotoMain(i)}
+                    className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
+                  >
+                    הפוך לראשית
+                  </button>
                 )}
                 <button
                   type="button"
