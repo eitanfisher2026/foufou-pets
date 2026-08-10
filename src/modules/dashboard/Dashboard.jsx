@@ -132,23 +132,24 @@ export default function Dashboard() {
 
 // A raw 0-100 score means nothing to someone who isn't the one who built the
 // matching engine - a plain-language quality word reads at a glance instead.
-function scoreLabel(score) {
-  if (score >= 70) return 'התאמה גבוהה';
-  if (score >= 40) return 'התאמה בינונית';
-  return 'התאמה חלשה';
-}
-
 function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
   const hasNew = newMatchCount > 0;
   const hasScore = typeof topMatchScore === 'number' && topMatchScore > 0;
+  const countLabel = hasNew
+    ? newMatchCount === 1
+      ? 'התאמה חדשה'
+      : `${newMatchCount} התאמות חדשות`
+    : matchCount === 1
+      ? 'נבדקה התאמה אחת'
+      : `${matchCount} נבדקו`;
   return (
     <span
       className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
         hasNew ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
       }`}
     >
-      {hasNew ? `${newMatchCount} התאמות חדשות` : `${matchCount} נבדקו`}
-      {hasScore && ` · ${scoreLabel(topMatchScore)}`}
+      {countLabel}
+      {hasScore && ` · ${topMatchScore}%`}
     </span>
   );
 }

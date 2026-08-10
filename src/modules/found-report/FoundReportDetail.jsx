@@ -63,7 +63,12 @@ export default function FoundReportDetail() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
-  const { reading: extracting, error: extractError, read: extractFromPhotos } = useScreenshotReader();
+  const {
+    reading: extracting,
+    error: extractError,
+    read: extractFromPhotos,
+    cancel: cancelExtracting,
+  } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
@@ -417,7 +422,7 @@ export default function FoundReportDetail() {
               יש צילום מסך נוסף? אפשר להעלות ולעדכן פרטים אוטומטית מתוכו.
             </label>
             <input type="file" accept="image/*" multiple onChange={handleExtractionUpload} />
-            {extracting && <AnalyzingIndicator />}
+            {extracting && <AnalyzingIndicator onCancel={cancelExtracting} />}
             {extractError && <p className="mt-2 text-sm text-red-600">{extractError}</p>}
           </div>
 

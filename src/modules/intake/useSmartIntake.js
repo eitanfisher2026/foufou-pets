@@ -17,7 +17,7 @@ import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js'
 export function useSmartIntake() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { reading, error: readError, read } = useScreenshotReader();
+  const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
   const [files, setFiles] = useState([]);
   const [extracted, setExtracted] = useState(null);
   const [creating, setCreating] = useState(false);
@@ -67,5 +67,6 @@ export function useSmartIntake() {
     readError,
     handleFiles,
     createFromType,
+    cancelReading,
   };
 }

@@ -14,7 +14,7 @@ import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMappi
 export default function FoundReportForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { reading, error: readError, read } = useScreenshotReader();
+  const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
@@ -109,7 +109,7 @@ export default function FoundReportForm() {
           לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
-        {reading && <AnalyzingIndicator />}
+        {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
         {uploadNotice && <p className="mt-2 text-sm text-amber-700">{uploadNotice}</p>}
 

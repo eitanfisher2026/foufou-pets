@@ -12,7 +12,8 @@ import { useSmartIntake } from './useSmartIntake.js';
  * a Facebook post in is exactly as good as uploading its screenshot by hand.
  */
 export default function ShareTargetIntake() {
-  const { files, extracted, busy, readError, handleFiles, createFromType, creating } = useSmartIntake();
+  const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
+    useSmartIntake();
   const [status, setStatus] = useState('loading'); // loading | no-photo | done
   const [sharedText, setSharedText] = useState('');
   const started = useRef(false);
@@ -66,13 +67,21 @@ export default function ShareTargetIntake() {
           {sharedText && (
             <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-xs text-slate-600">{sharedText}</p>
           )}
-          <label className="mt-3 block text-sm font-medium text-slate-600">צירוף תמונה/ות</label>
-          <input type="file" accept="image/*" multiple onChange={handleManualUpload} disabled={busy} className="mt-1" />
         </div>
       )}
 
-      {busy && <AnalyzingIndicator />}
+      {reading && <AnalyzingIndicator onCancel={cancelReading} />}
+      {creating && <AnalyzingIndicator />}
       {readError && <p className="text-sm text-red-600">{readError}</p>}
+
+      {status !== 'loading' && !creating && (
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-600">
+            {status === 'no-photo' ? 'צירוף תמונה/ות' : 'רוצה לנסות תמונה אחרת?'}
+          </label>
+          <input type="file" accept="image/*" multiple onChange={handleManualUpload} disabled={busy} />
+        </div>
+      )}
 
       {extracted && !extracted.reportType && !creating && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">

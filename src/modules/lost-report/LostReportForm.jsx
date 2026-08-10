@@ -14,7 +14,7 @@ import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.
 export default function LostReportForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { reading, error: readError, read } = useScreenshotReader();
+  const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
@@ -95,7 +95,7 @@ export default function LostReportForm() {
           תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
-        {reading && <AnalyzingIndicator />}
+        {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
         {uploadNotice && <p className="mt-2 text-sm text-amber-700">{uploadNotice}</p>}
 

@@ -11,7 +11,8 @@ import { useSmartIntake } from './useSmartIntake.js';
  * full edit view for reviewing/correcting fields - no second form to build.
  */
 export default function SmartIntakeForm() {
-  const { files, extracted, busy, readError, handleFiles, createFromType, creating } = useSmartIntake();
+  const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
+    useSmartIntake();
 
   async function handleUpload(e) {
     const newFiles = Array.from(e.target.files || []);
@@ -33,7 +34,8 @@ export default function SmartIntakeForm() {
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <input type="file" accept="image/*" multiple onChange={handleUpload} disabled={busy} />
-        {busy && <AnalyzingIndicator />}
+        {reading && <AnalyzingIndicator onCancel={cancelReading} />}
+        {creating && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
       </div>
 
