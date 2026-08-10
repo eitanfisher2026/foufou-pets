@@ -93,6 +93,26 @@ export default function LostCaseDetail() {
     load();
   }, [caseId]);
 
+  // Editing this form means scrolling past a lot of fields to reach Save -
+  // losing that on an accidental tab close/refresh is a real, already-
+  // reported way to lose real edits (e.g. after fixing a bad main photo).
+  useEffect(() => {
+    if (!editing) return;
+    function handleBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [editing]);
+
+  async function handleBackToHome() {
+    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+      return;
+    }
+    navigate('/');
+  }
+
   async function load() {
     const data = await getLostCase(caseId);
     setLostCase(data);
@@ -225,12 +245,13 @@ export default function LostCaseDetail() {
 
   return (
     <div className="p-4">
-      <Link to="/" className="mb-4 inline-block text-sm text-slate-500 underline">
+      <button type="button" onClick={handleBackToHome} className="mb-4 inline-block text-sm text-slate-500 underline">
         ← חזרה לעמוד הראשי
-      </Link>
+      </button>
 
       {!editing ? (
         <>
+          <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
           <div className="mb-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">{displayLostCaseName(lostCase)}</h1>
@@ -255,7 +276,6 @@ export default function LostCaseDetail() {
               </button>
             </div>
           </div>
-          <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
           {lostCase.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{lostCase.markings}</p>}
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
@@ -491,7 +511,7 @@ export default function LostCaseDetail() {
             />
           )}
 
-          <div className="flex gap-2">
+          <div className="sticky bottom-0 -mx-4 flex gap-2 border-t border-slate-200 bg-white p-4 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -507,7 +527,7 @@ export default function LostCaseDetail() {
                 setPendingExtraction(null);
                 setEditing(false);
               }}
-              className="flex-1 rounded-xl border border-slate-300 px-4 py-2 font-medium text-slate-600"
+              className="flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2 font-medium text-slate-600"
             >
               ביטול
             </button>

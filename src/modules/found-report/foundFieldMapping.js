@@ -40,9 +40,11 @@ export const EMPTY_FOUND_FIELDS = {
 export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) {
   return {
     ...prev,
-    // Only falls back to colorDescription when the title is still blank -
-    // never overwrites a title someone already typed.
-    title: prev.title || extracted.colorDescription || prev.title,
+    // Only falls back when the title is still blank - never overwrites a
+    // title someone already typed. A found cat can still have a known name
+    // (e.g. a post that names the cat, or a chip/tag the finder read) -
+    // petName is worth more than a generic color description when present.
+    title: prev.title || extracted.petName || extracted.colorDescription,
     color: extracted.color || prev.color,
     colorDescription: extracted.colorDescription || prev.colorDescription,
     size: extracted.size || prev.size,

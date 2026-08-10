@@ -94,12 +94,12 @@ export default function FoundReportForm() {
         אם ראית פוסט בפייסבוק על חתול - אין צורך להכיר את מי שכתב אותו. פשוט העלה/י צילום מסך.
       </p>
 
-      <Field label="כותרת (כך יופיע הדיווח ברשימה)">
+      <Field label="שם החתולה (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)">
         <input
           className="input"
           value={fields.title}
           onChange={(e) => setField('title', e.target.value)}
-          placeholder='למשל "חתול שחור-לבן ליד הפארק"'
+          placeholder='שם אם ידוע, אחרת תיאור כמו "חתול שחור-לבן ליד הפארק"'
         />
       </Field>
 

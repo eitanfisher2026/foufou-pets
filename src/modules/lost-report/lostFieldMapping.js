@@ -72,6 +72,19 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
   };
 }
 
+const MAX_FALLBACK_NAME_LENGTH = 30;
+
+// markings can be several lines long (one distinct mark per line) - only
+// the first line, trimmed to a title-sized snippet, is fit to stand in for
+// a name.
+function shortSnippet(text) {
+  if (!text) return '';
+  const firstLine = text.split('\n')[0].trim();
+  return firstLine.length > MAX_FALLBACK_NAME_LENGTH
+    ? firstLine.slice(0, MAX_FALLBACK_NAME_LENGTH).trim() + '…'
+    : firstLine;
+}
+
 /**
  * A nameless lost cat (the common case - most posts never give a street cat
  * a name) shouldn't just read "חתול ללא שם" everywhere when there's a
@@ -79,5 +92,5 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
  * reports falling back from title to colorDescription.
  */
 export function displayLostCaseName(lostCase) {
-  return lostCase?.name || lostCase?.colorDescription || lostCase?.markings || 'חתול ללא שם';
+  return lostCase?.name || shortSnippet(lostCase?.colorDescription) || shortSnippet(lostCase?.markings) || 'חתול ללא שם';
 }
