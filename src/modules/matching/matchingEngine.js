@@ -212,6 +212,7 @@ export const DEFAULT_MATCH_CONFIG = {
 export const COMPARABLE_FIELDS = [
   { field: 'markings', label: 'סימנים מיוחדים' },
   { field: 'color', label: 'צבע' },
+  { field: 'breed', label: 'גזע' },
   { field: 'size', label: 'גודל' },
   { field: 'ageClass', label: 'גור/מבוגר' },
   { field: 'furType', label: 'סוג פרווה' },
