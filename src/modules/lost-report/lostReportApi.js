@@ -35,6 +35,7 @@ export async function createLostCase(fields, photoFiles, ownerId) {
     originalPosterName: fields.originalPosterName || '',
     sharedByName: fields.sharedByName || '',
     postAgeText: fields.postAgeText || '',
+    aiCostUsd: fields.aiCostUsd || 0,
     photos: [],
     status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
@@ -87,6 +88,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       originalPosterName: fields.originalPosterName || '',
       sharedByName: fields.sharedByName || '',
       postAgeText: fields.postAgeText || '',
+      aiCostUsd: fields.aiCostUsd || 0,
     },
     { merge: true }
   );

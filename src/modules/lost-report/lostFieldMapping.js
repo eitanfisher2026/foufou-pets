@@ -27,6 +27,9 @@ export const EMPTY_LOST_FIELDS = {
   originalPosterName: '',
   sharedByName: '',
   postAgeText: '',
+  // Cumulative real cost of every AI extraction call made for this case
+  // (initial upload plus any re-scans) - see shared/costTracking.js.
+  aiCostUsd: 0,
 };
 
 /**
@@ -63,5 +66,6 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     originalPosterName: extracted.originalPosterName || prev.originalPosterName,
     sharedByName: extracted.sharedByName || prev.sharedByName,
     postAgeText: extracted.postAgeText || prev.postAgeText,
+    aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
 }

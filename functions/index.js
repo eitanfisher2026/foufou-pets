@@ -8,6 +8,31 @@ import Anthropic from '@anthropic-ai/sdk';
 // match time, so this is the only AI spend in the whole app.
 const MODEL = 'claude-sonnet-5';
 
+// Claude Sonnet 5 list pricing, per million tokens. Intro pricing is in
+// effect through 2026-08-31 ($2/$10) - after that date these need updating
+// to the standard $3/$15 rate, or actual spend will read lower than real.
+const PRICE_PER_MTOK_INPUT = 2.0;
+const PRICE_PER_MTOK_OUTPUT = 10.0;
+// Cache reads (not currently used by this function, since the system prompt
+// isn't marked cacheable - kept here so cost stays correct if that changes)
+// bill at roughly a tenth of the input rate.
+const PRICE_PER_MTOK_CACHE_READ = PRICE_PER_MTOK_INPUT * 0.1;
+
+// Real cost from the API's own reported token usage, not a size-based
+// guess - this is what makes the cost dashboard in settings trustworthy
+// rather than a rough estimate on top of a rough estimate.
+function estimateCostUsd(usage) {
+  if (!usage) return 0;
+  const inputTokens = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+  const cacheReadTokens = usage.cache_read_input_tokens || 0;
+  const outputTokens = usage.output_tokens || 0;
+  return (
+    (inputTokens * PRICE_PER_MTOK_INPUT) / 1e6 +
+    (cacheReadTokens * PRICE_PER_MTOK_CACHE_READ) / 1e6 +
+    (outputTokens * PRICE_PER_MTOK_OUTPUT) / 1e6
+  );
+}
+
 // Must match CAT_COLORS/COLLAR_COLORS in src/modules/shared/collections.js -
 // the functions package doesn't share modules with the client, so these are
 // kept in sync by hand. If the color list is customized in the settings
@@ -227,6 +252,14 @@ export const extractReportFromImages = onCall(
       // Cheap to log, useful when a main-photo crop comes out wrong - lets
       // us check what box the model actually returned without guessing.
       console.log('mainPhotoRegion:', JSON.stringify(parsed.mainPhotoRegion));
+      // Real per-call cost from the API's own usage figures, carried back to
+      // the client so it can accumulate onto the resulting record - this is
+      // the only AI spend in the app, so this is the whole cost picture.
+      parsed._aiUsage = {
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+        estimatedCostUsd: estimateCostUsd(response.usage),
+      };
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the extraction result.');

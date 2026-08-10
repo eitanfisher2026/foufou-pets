@@ -118,6 +118,12 @@ export default function FoundReportDetail() {
     try {
       const result = await extractFromPhotos(files);
       setPendingExtraction(result);
+      // The AI call already happened and was billed - track its cost
+      // regardless of whether the suggested fields end up applied.
+      setFields((prev) => ({
+        ...prev,
+        aiCostUsd: (prev.aiCostUsd || 0) + (result._aiUsage?.estimatedCostUsd || 0),
+      }));
     } catch {
       // error already surfaced via extractError
     }

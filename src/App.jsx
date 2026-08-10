@@ -8,6 +8,7 @@ import FoundReportForm from './modules/found-report/FoundReportForm.jsx';
 import FoundReportDetail from './modules/found-report/FoundReportDetail.jsx';
 import MatchSettingsPage from './modules/settings/MatchSettingsPage.jsx';
 import SettingsPage from './modules/settings/SettingsPage.jsx';
+import CostSettingsPage from './modules/settings/CostSettingsPage.jsx';
 import SmartIntakeForm from './modules/intake/SmartIntakeForm.jsx';
 
 function AppRoutes() {
@@ -26,6 +27,7 @@ function AppRoutes() {
       <Route path="/found/:reportId" element={<FoundReportDetail />} />
       <Route path="/settings" element={<SettingsPage />} />
       <Route path="/settings/matching" element={<MatchSettingsPage />} />
+      <Route path="/settings/cost" element={<CostSettingsPage />} />
     </Routes>
   );
 }

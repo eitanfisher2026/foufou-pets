@@ -25,6 +25,9 @@ export const EMPTY_FOUND_FIELDS = {
   originalPosterName: '',
   sharedByName: '',
   postAgeText: '',
+  // Cumulative real cost of every AI extraction call made for this report
+  // (initial upload plus any re-scans).
+  aiCostUsd: 0,
 };
 
 /**
@@ -65,5 +68,6 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
     originalPosterName: extracted.originalPosterName || prev.originalPosterName,
     sharedByName: extracted.sharedByName || prev.sharedByName,
     postAgeText: extracted.postAgeText || prev.postAgeText,
+    aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
 }

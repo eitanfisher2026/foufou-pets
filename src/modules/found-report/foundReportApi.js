@@ -40,6 +40,7 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
     originalPosterName: fields.originalPosterName || '',
     sharedByName: fields.sharedByName || '',
     postAgeText: fields.postAgeText || '',
+    aiCostUsd: fields.aiCostUsd || 0,
     photos: [],
     status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
@@ -94,6 +95,7 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
       originalPosterName: fields.originalPosterName || '',
       sharedByName: fields.sharedByName || '',
       postAgeText: fields.postAgeText || '',
+      aiCostUsd: fields.aiCostUsd || 0,
     },
     { merge: true }
   );
