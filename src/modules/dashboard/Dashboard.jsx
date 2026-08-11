@@ -162,7 +162,7 @@ function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, confidenceC
   return (
     <div className="flex items-center gap-2">
       <span className="whitespace-nowrap text-xs text-black">
-        {hasNew && `חדש - ${newMatchCount}, `}
+        {hasNew && `${newMatchCount} חדש, `}
         {reviewedCount} נבדקו
       </span>
       <ConfidenceBadge score={topMatchScore} confidenceColors={confidenceColors} />

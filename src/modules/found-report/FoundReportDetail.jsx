@@ -23,6 +23,7 @@ import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
 import BackLink from '../shared/BackLink.jsx';
+import Field from '../shared/Field.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -237,7 +238,7 @@ export default function FoundReportDetail() {
             <Field label="שם החתולה (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)">
               <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
             </Field>
-            <Field label="מצב החתול">
+            <Field label="מצב החתול" inline>
               <select
                 className="input"
                 value={fields.condition || 'seen_only'}
@@ -250,7 +251,7 @@ export default function FoundReportDetail() {
                 ))}
               </select>
             </Field>
-            <Field label="צבע">
+            <Field label="צבע" inline>
               <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
                 <option value="">בחר/י צבע</option>
                 {catColors.map((c) => (
@@ -260,23 +261,21 @@ export default function FoundReportDetail() {
                 ))}
               </select>
             </Field>
-            <Field label="גור או מבוגר">
-              <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
-                <option value="">בחר/י</option>
-                {CAT_AGE_CLASSES.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={fields.ageClass === 'kitten'}
+                onChange={(e) => setField('ageClass', e.target.checked ? 'kitten' : 'adult')}
+              />
+              גור
+            </label>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input type="checkbox" checked={!!fields.hasCollar} onChange={(e) => setField('hasCollar', e.target.checked)} />
               לובשת קולר/רתמה
             </label>
             {fields.hasCollar && (
               <>
-                <Field label="צבע הקולר">
+                <Field label="צבע הקולר" inline>
                   <select
                     className="input"
                     value={fields.collarColor || ''}
@@ -316,10 +315,15 @@ export default function FoundReportDetail() {
                 onChange={(e) => setField('markings', e.target.value)}
               />
             </Field>
-            <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
-              <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
+            <Field label="גזע" inline>
+              <input
+                className="input w-28"
+                value={fields.breed || ''}
+                onChange={(e) => setField('breed', e.target.value)}
+                placeholder="אם ידוע"
+              />
             </Field>
-            <Field label="סוג פרווה">
+            <Field label="סוג פרווה" inline>
               <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_FUR_TYPES.map((f) => (
@@ -329,7 +333,7 @@ export default function FoundReportDetail() {
                 ))}
               </select>
             </Field>
-            <Field label="גודל">
+            <Field label="גודל" inline>
               <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_SIZES.map((s) => (
@@ -535,15 +539,6 @@ export default function FoundReportDetail() {
           ]}
         />
       )}
-    </div>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
-      {children}
     </div>
   );
 }

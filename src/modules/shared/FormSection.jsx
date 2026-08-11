@@ -7,8 +7,8 @@
  */
 export default function FormSection({ title, children }) {
   return (
-    <fieldset className="rounded-xl border border-slate-300 p-4">
-      <legend className="px-2 text-sm font-semibold text-slate-700">{title}</legend>
+    <fieldset className="rounded-xl border border-dotted border-slate-400 p-4">
+      <legend className="px-2 text-sm font-bold text-slate-700">{title}</legend>
       <div className="space-y-4">{children}</div>
     </fieldset>
   );

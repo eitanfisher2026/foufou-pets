@@ -12,6 +12,7 @@ import {
   CAT_FUR_TYPES,
   COLLAR_COLORS,
 } from '../shared/collections.js';
+import Field from '../shared/Field.jsx';
 import { formatDate } from '../shared/formatDate.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import {
@@ -313,7 +314,7 @@ export default function LostCaseDetail() {
             <Field label="שם החתולה">
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
             </Field>
-            <Field label="צבע">
+            <Field label="צבע" inline>
               <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
                 <option value="">בחר/י צבע</option>
                 {catColors.map((c) => (
@@ -323,16 +324,14 @@ export default function LostCaseDetail() {
                 ))}
               </select>
             </Field>
-            <Field label="גור או מבוגר">
-              <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
-                <option value="">בחר/י</option>
-                {CAT_AGE_CLASSES.map((a) => (
-                  <option key={a.value} value={a.value}>
-                    {a.label}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={fields.ageClass === 'kitten'}
+                onChange={(e) => setField('ageClass', e.target.checked ? 'kitten' : 'adult')}
+              />
+              גור
+            </label>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -343,7 +342,7 @@ export default function LostCaseDetail() {
             </label>
             {fields.hasCollar && (
               <>
-                <Field label="צבע הקולר">
+                <Field label="צבע הקולר" inline>
                   <select
                     className="input"
                     value={fields.collarColor || ''}
@@ -383,10 +382,15 @@ export default function LostCaseDetail() {
                 onChange={(e) => setField('markings', e.target.value)}
               />
             </Field>
-            <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
-              <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
+            <Field label="גזע" inline>
+              <input
+                className="input w-28"
+                value={fields.breed || ''}
+                onChange={(e) => setField('breed', e.target.value)}
+                placeholder="אם ידוע"
+              />
             </Field>
-            <Field label="סוג פרווה">
+            <Field label="סוג פרווה" inline>
               <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_FUR_TYPES.map((f) => (
@@ -396,7 +400,7 @@ export default function LostCaseDetail() {
                 ))}
               </select>
             </Field>
-            <Field label="גודל">
+            <Field label="גודל" inline>
               <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_SIZES.map((s) => (
@@ -720,15 +724,6 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
         צפייה בדיווח המלא
       </Link>
     </li>
-  );
-}
-
-function Field({ label, children }) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
-      {children}
-    </div>
   );
 }
 

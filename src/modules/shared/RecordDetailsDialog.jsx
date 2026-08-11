@@ -61,8 +61,8 @@ export default function RecordDetailsDialog({ title, sections, photos, onViewPho
         ) : (
           <div className="space-y-4">
             {visibleSections.map((s) => (
-              <fieldset key={s.title} className="rounded-xl border border-slate-200 p-3">
-                <legend className="px-1 text-xs font-semibold text-slate-500">{s.title}</legend>
+              <fieldset key={s.title} className="rounded-xl border border-dotted border-slate-400 p-3">
+                <legend className="px-1 text-xs font-bold text-slate-600">{s.title}</legend>
                 <dl className="space-y-2">
                   {s.rows.map((r) => (
                     <div key={r.label}>
