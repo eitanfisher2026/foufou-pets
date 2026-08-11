@@ -11,6 +11,8 @@ import {
   CAT_AGE_CLASSES,
   CAT_FUR_TYPES,
   COLLAR_COLORS,
+  CLOSURE_REASON,
+  CLOSURE_REASON_LABELS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
 import { formatDate } from '../shared/formatDate.js';
@@ -494,14 +496,20 @@ export default function LostCaseDetail() {
           </FormSection>
 
           <FormSection title="סגירת התיק">
-            <label className="flex items-center gap-2 text-sm text-slate-700">
-              <input
-                type="checkbox"
-                checked={!!fields.returnedToOwner}
-                onChange={(e) => setField('returnedToOwner', e.target.checked)}
-              />
-              החתולה הוחזרה לבעלים
-            </label>
+            <Field label="סטטוס סגירה" inline>
+              <select
+                className="input"
+                value={fields.closureReason || ''}
+                onChange={(e) => setField('closureReason', e.target.value)}
+              >
+                <option value="">-</option>
+                {Object.values(CLOSURE_REASON).map((reason) => (
+                  <option key={reason} value={reason}>
+                    {CLOSURE_REASON_LABELS[reason]}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="תאריך" inline>
               <input
                 type="date"
@@ -732,7 +740,7 @@ export default function LostCaseDetail() {
             {
               title: 'סגירת התיק',
               rows: [
-                { label: 'החתולה הוחזרה לבעלים', value: lostCase.returnedToOwner ? 'כן' : '' },
+                { label: 'סטטוס סגירה', value: CLOSURE_REASON_LABELS[lostCase.closureReason] || '' },
                 { label: 'תאריך', value: lostCase.closureDate ? formatDate(lostCase.closureDate) : '' },
                 { label: 'ע״י', value: lostCase.closedBy },
                 { label: 'הערה', value: lostCase.closingComment },

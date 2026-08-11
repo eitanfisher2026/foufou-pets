@@ -86,6 +86,24 @@ export const FOUND_REPORT_STATUS_LABELS = {
   [RECORD_STATUS.RESOLVED]: 'טופל - הוחזר לבעלים',
 };
 
+// Why a lost case was closed (RECORD_STATUS.ARCHIVED or RESOLVED) - shown
+// and filterable on the archive page. Separate from RECORD_STATUS itself:
+// that still controls whether the case shows up on the working dashboard,
+// this is just the detail of what actually happened.
+export const CLOSURE_REASON = {
+  RETURNED_TO_OWNER: 'returned_to_owner',
+  NOT_FOUND_TOO_LONG: 'not_found_too_long',
+  DIED: 'died',
+  OTHER: 'other',
+};
+
+export const CLOSURE_REASON_LABELS = {
+  [CLOSURE_REASON.RETURNED_TO_OWNER]: 'הוחזר/ה לבעלים',
+  [CLOSURE_REASON.NOT_FOUND_TOO_LONG]: 'לא אותר/ה זמן רב',
+  [CLOSURE_REASON.DIED]: 'נפטר/ה',
+  [CLOSURE_REASON.OTHER]: 'אחר',
+};
+
 export const REPORT_STATUS = {
   NEW: 'new',
   // Set automatically (never by a person) when a fresh match scores 0/100 -

@@ -20,17 +20,17 @@ export const EMPTY_LOST_FIELDS = {
   contactName: '',
   contactPhone: '',
   notes: '',
-  // One shared closing record covers both outcomes (archived without a
-  // confirmed return, or genuinely reunited) - a case is only ever closed
-  // one way at a time, so there's no need for two parallel field sets.
-  // returnedToOwner is what actually distinguishes them (drives which list
-  // a closed case shows up in on the archive page), independent of status.
-  // Not filled in automatically - no Facebook post states who physically
-  // returned a cat - but capturing it is the foundation for a future
-  // rewards/recognition feature for people who genuinely helped.
+  // One shared closing record covers every closed-case outcome - a case is
+  // only ever closed one way at a time, so there's no need for a separate
+  // field set per outcome. closureReason (see CLOSURE_REASON in
+  // collections.js) is what actually distinguishes them, independent of
+  // RECORD_STATUS. Not filled in automatically - no Facebook post states
+  // who physically returned a cat - but capturing "closed by" is the
+  // foundation for a future rewards/recognition feature for people who
+  // genuinely helped.
   closureDate: '',
   closedBy: '',
-  returnedToOwner: false,
+  closureReason: '',
   closingComment: '',
   // A lost-cat post can rely on the Facebook poster's name/group just as
   // much as a found post can - no phone number in the caption means this

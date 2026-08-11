@@ -84,7 +84,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       notes: fields.notes || '',
       closureDate: fields.closureDate || '',
       closedBy: fields.closedBy || '',
-      returnedToOwner: fields.returnedToOwner || false,
+      closureReason: fields.closureReason || '',
       closingComment: fields.closingComment || '',
       sourceGroupName: fields.sourceGroupName || '',
       originalPosterName: fields.originalPosterName || '',
