@@ -296,19 +296,22 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const compare = COMPARATORS[p.comparisonType];
     if (!compare) continue;
 
+    const lostValue = lostCase[p.lostField];
+    const foundValue = foundReport[p.foundField];
+    // Every breakdown entry carries the actual values being compared, not
+    // just the verdict - "color: mismatch" alone doesn't tell you if it was
+    // orange-vs-gray or orange-vs-orange-white, and seeing the real values
+    // is exactly what's needed to judge whether the algorithm (or the
+    // underlying data) is what's actually wrong.
+    const push = (fields) => breakdown.push({ label: p.label, weight: p.weight, lostValue, foundValue, ...fields });
+
     const lenient =
       p.comparisonType === 'dateProximity' &&
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
     const ctx = { lenient, colorGroups: config.colorGroups, defaultValue: p.defaultValue };
-    const result = compare(lostCase[p.lostField], foundReport[p.foundField], ctx);
+    const result = compare(lostValue, foundValue, ctx);
     if (!result) {
-      breakdown.push({
-        label: p.label,
-        weight: p.weight,
-        contribution: 0,
-        verdict: 'skipped',
-        detail: 'חסר מידע באחד הצדדים או בשניהם - לא נבדק',
-      });
+      push({ contribution: 0, verdict: 'skipped', detail: 'חסר מידע באחד הצדדים או בשניהם - לא נבדק' });
       continue;
     }
 
@@ -323,7 +326,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);
-        breakdown.push({ label: p.label, weight: p.weight, contribution: p.weight, verdict: 'match', detail: 'תואם' });
+        push({ contribution: p.weight, verdict: 'match', detail: 'תואם' });
       } else if (result.ratio > 0) {
         // Only colorMatch produces this: a lighting-confusable pair (e.g.
         // white vs. gray) isn't a real disagreement, so it earns partial
@@ -332,7 +335,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
         earned += points;
         const detail = 'התאמה חלקית (יתכן הבדל עקב תאורת הצילום)';
         reasons.push(`${p.label}: ${detail}`);
-        breakdown.push({ label: p.label, weight: p.weight, contribution: points, verdict: 'partial', detail });
+        push({ contribution: points, verdict: 'partial', detail });
       } else if (p.disqualifying) {
         // A hard mismatch on a defining trait (e.g. color, or a permanent
         // marking like a clipped ear) - this isn't just "less similar," it
@@ -342,19 +345,19 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
         disqualified = true;
         const detail = 'אינו תואם - פוסל התאמה';
         reasons.unshift(`${p.label}: ${detail}`);
-        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'disqualifying', detail });
+        push({ contribution: 0, verdict: 'disqualifying', detail });
       } else if (p.mismatchPenalty) {
         earned -= p.mismatchPenalty;
         const detail = 'אינו תואם';
         reasons.push(`${p.label}: ${detail}`);
-        breakdown.push({ label: p.label, weight: p.weight, contribution: -p.mismatchPenalty, verdict: 'mismatch', detail });
+        push({ contribution: -p.mismatchPenalty, verdict: 'mismatch', detail });
       } else {
-        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'mismatch', detail: 'אינו תואם' });
+        push({ contribution: 0, verdict: 'mismatch', detail: 'אינו תואם' });
       }
     } else if (p.comparisonType === 'presence') {
       earned += p.weight;
       reasons.push(`${p.label}: קיימת משני הצדדים`);
-      breakdown.push({ label: p.label, weight: p.weight, contribution: p.weight, verdict: 'match', detail: 'קיימת משני הצדדים' });
+      push({ contribution: p.weight, verdict: 'match', detail: 'קיימת משני הצדדים' });
     } else {
       const points = result.ratio * p.weight;
       const detail =
@@ -364,9 +367,9 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       if (points > 0.01) {
         earned += points;
         reasons.push(`${p.label}: ${detail}`);
-        breakdown.push({ label: p.label, weight: p.weight, contribution: points, verdict: 'partial', detail });
+        push({ contribution: points, verdict: 'partial', detail });
       } else {
-        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'no_overlap', detail: 'אין חפיפה משמעותית' });
+        push({ contribution: 0, verdict: 'no_overlap', detail: 'אין חפיפה משמעותית' });
       }
     }
   }

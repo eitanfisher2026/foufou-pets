@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   getFoundReport,
   updateFoundReport,
@@ -53,8 +53,12 @@ const EXTRACTION_FIELD_DEFS = [
 export default function FoundReportDetail() {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [report, setReport] = useState(null);
-  const [editing, setEditing] = useState(false);
+  // Lets a link jump straight into edit mode (e.g. "עריכה" on a match card
+  // during match review) instead of landing on the view first and requiring
+  // an extra tap.
+  const [editing, setEditing] = useState(() => searchParams.get('edit') === '1');
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
   const [newPhotosFirst, setNewPhotosFirst] = useState(false);

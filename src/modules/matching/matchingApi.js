@@ -1,7 +1,7 @@
 import { collection, doc, getDoc, getDocs, increment, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
-import { rankMatches } from './matchingEngine.js';
+import { rankMatches, scoreMatch } from './matchingEngine.js';
 import { getMatchConfig } from './matchConfigApi.js';
 
 /**
@@ -68,6 +68,48 @@ export async function checkMatchesForLostCase(lostCaseId) {
   );
 
   return ranked;
+}
+
+/**
+ * Re-scores just one lost-case/found-report pair, without touching any of
+ * the case's other matches - useful after tweaking that one found report's
+ * details (or the matching config itself) to see the effect immediately,
+ * instead of re-running the full check against every found report again.
+ * Keeps whatever review status the match already had (or picks the same
+ * NEW/NO_MATCH default as a full check would for a pairing that's brand
+ * new), and refreshes the case's denormalized counters from the full
+ * current match set so the dashboard badge stays accurate.
+ */
+export async function checkSingleMatch(lostCaseId, foundReportId) {
+  const [caseSnap, reportSnap] = await Promise.all([
+    getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId)),
+    getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId)),
+  ]);
+  if (!caseSnap.exists()) throw new Error('lost case not found');
+  if (!reportSnap.exists()) throw new Error('found report not found');
+
+  const config = await getMatchConfig();
+  const { score, reasons, breakdown } = scoreMatch(caseSnap.data(), reportSnap.data(), config);
+
+  const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
+  const prevSnap = await getDoc(matchRef);
+  const status = prevSnap.exists() ? prevSnap.data().status : score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+  await setDoc(matchRef, { foundReportId, score, reasons, breakdown, status, checkedAt: serverTimestamp() }, { merge: true });
+
+  const allMatchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
+  const allMatches = allMatchesSnap.docs.map((d) => d.data());
+  await setDoc(
+    doc(db, COLLECTIONS.LOST_CASES, lostCaseId),
+    {
+      matchCount: allMatches.length,
+      newMatchCount: allMatches.filter((m) => m.status === REPORT_STATUS.NEW).length,
+      topMatchScore: allMatches.reduce((max, m) => Math.max(max, m.score || 0), 0),
+      lastCheckedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+
+  return { score, reasons, breakdown, status };
 }
 
 /**

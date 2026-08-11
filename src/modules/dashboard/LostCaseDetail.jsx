@@ -25,7 +25,13 @@ import {
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { buildFoundReportSections } from '../found-report/foundReportSections.js';
-import { checkMatchesForLostCase, clearMatches, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
+import {
+  checkMatchesForLostCase,
+  checkSingleMatch,
+  clearMatches,
+  getMatches,
+  updateMatchStatus,
+} from '../matching/matchingApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
@@ -38,6 +44,7 @@ import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
+import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
@@ -73,6 +80,17 @@ const MATCH_STATUS_LABELS = {
   [REPORT_STATUS.CLOSED]: 'נסגר',
 };
 
+const MATCH_STATUS_COLORS = {
+  [REPORT_STATUS.NEW]: 'bg-amber-100 text-amber-800',
+  [REPORT_STATUS.NO_MATCH]: 'bg-slate-100 text-slate-600',
+  [REPORT_STATUS.REVIEWING]: 'bg-blue-100 text-blue-800',
+  [REPORT_STATUS.NEEDS_FOLLOWUP]: 'bg-amber-100 text-amber-800',
+  [REPORT_STATUS.NOT_RELEVANT]: 'bg-slate-100 text-slate-600',
+  [REPORT_STATUS.LIKELY_MATCH]: 'bg-emerald-100 text-emerald-800',
+  [REPORT_STATUS.CONTACTED]: 'bg-blue-100 text-blue-800',
+  [REPORT_STATUS.CLOSED]: 'bg-slate-200 text-slate-600',
+};
+
 export default function LostCaseDetail() {
   const { caseId } = useParams();
   const navigate = useNavigate();
@@ -80,6 +98,7 @@ export default function LostCaseDetail() {
   const [matches, setMatches] = useState([]);
   const [reportsById, setReportsById] = useState({});
   const [checking, setChecking] = useState(false);
+  const [recheckingId, setRecheckingId] = useState(null);
   const [editing, setEditing] = useState(false);
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
@@ -177,6 +196,20 @@ export default function LostCaseDetail() {
   async function handleStatusChange(foundReportId, status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatches((prev) => prev.map((m) => (m.foundReportId === foundReportId ? { ...m, status } : m)));
+  }
+
+  // Re-scores just this one pairing - useful right after editing the found
+  // report's details (from the same match card) to see the effect
+  // immediately, without re-running the full check against every found
+  // report again.
+  async function handleRecheckSingleMatch(foundReportId) {
+    setRecheckingId(foundReportId);
+    try {
+      await checkSingleMatch(caseId, foundReportId);
+      await load();
+    } finally {
+      setRecheckingId(null);
+    }
   }
 
   function setField(key, value) {
@@ -581,6 +614,8 @@ export default function LostCaseDetail() {
               onViewPhoto={setLightboxUrl}
               confidenceColors={confidenceColors}
               caseId={caseId}
+              onRecheck={handleRecheckSingleMatch}
+              rechecking={recheckingId === m.foundReportId}
             />
           ))}
         </ul>
@@ -680,7 +715,7 @@ export default function LostCaseDetail() {
   );
 }
 
-function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, caseId }) {
+function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, caseId, onRecheck, rechecking }) {
   const [showCatDetails, setShowCatDetails] = useState(false);
 
   return (
@@ -689,17 +724,22 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
         <span className="flex items-center gap-2 font-medium text-slate-800">
           רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
         </span>
-        <select
-          className="input w-auto text-xs"
-          value={match.status}
-          onChange={(e) => onStatusChange(match.foundReportId, e.target.value)}
+        <button
+          type="button"
+          onClick={() => onRecheck(match.foundReportId)}
+          disabled={rechecking}
+          className="text-xs text-slate-500 underline disabled:opacity-50"
         >
-          {Object.entries(MATCH_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          {rechecking ? 'בודקים מחדש...' : 'בדיקה מחדש להתאמה זו'}
+        </button>
+      </div>
+      <div className="mb-2">
+        <DropdownBadge
+          value={match.status}
+          labels={MATCH_STATUS_LABELS}
+          onChange={(status) => onStatusChange(match.foundReportId, status)}
+          colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+        />
       </div>
 
       {report?.photos?.[0]?.url && (
@@ -735,10 +775,16 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
           פרטי חתול
         </button>
         <Link
+          to={`/found/${match.foundReportId}?edit=1`}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
+        >
+          עריכה
+        </Link>
+        <Link
           to={`/lost/${caseId}/analysis/${match.foundReportId}`}
           className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
         >
-          צפייה בניתוח המלא
+          ניתוח מלא
         </Link>
       </div>
 

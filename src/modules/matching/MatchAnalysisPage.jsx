@@ -17,6 +17,13 @@ const VERDICT_STYLES = {
   no_overlap: { label: 'אין חפיפה', badge: 'bg-slate-100 text-slate-600' },
 };
 
+function formatFieldValue(v) {
+  if (v === null || v === undefined || v === '') return 'לא צוין';
+  if (typeof v === 'boolean') return v ? 'כן' : 'לא';
+  if (Array.isArray(v)) return v.length > 0 ? `יש (${v.length})` : 'אין';
+  return String(v);
+}
+
 /**
  * Every match card only ever showed the fields that actually moved the
  * score - a field skipped for missing data was invisible, so there was no
@@ -71,7 +78,17 @@ export default function MatchAnalysisPage() {
                   {style.label}
                 </span>
               </div>
-              <p className="text-sm text-slate-500">{b.detail}</p>
+              <p className="mb-1 text-sm text-slate-500">{b.detail}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                <span>
+                  <span className="text-slate-400">תיק החיפוש: </span>
+                  {formatFieldValue(b.lostValue)}
+                </span>
+                <span>
+                  <span className="text-slate-400">הדיווח: </span>
+                  {formatFieldValue(b.foundValue)}
+                </span>
+              </div>
             </div>
           );
         })}
