@@ -32,7 +32,7 @@ export default function DropdownBadge({ value, labels, onChange, colorClass = 'b
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-6 max-w-full items-center gap-1 whitespace-nowrap rounded-full border border-black/10 px-3 text-xs font-semibold leading-none shadow-sm ${colorClass}`}
+        className={`inline-flex h-7 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 px-4 text-xs font-semibold leading-none shadow-sm ${colorClass}`}
       >
         {labels[value] || value}
         <span aria-hidden="true" className="text-[9px]">

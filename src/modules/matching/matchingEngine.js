@@ -296,13 +296,20 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const compare = COMPARATORS[p.comparisonType];
     if (!compare) continue;
 
-    const lostValue = lostCase[p.lostField];
-    const foundValue = foundReport[p.foundField];
     // Every breakdown entry carries the actual values being compared, not
     // just the verdict - "color: mismatch" alone doesn't tell you if it was
     // orange-vs-gray or orange-vs-orange-white, and seeing the real values
     // is exactly what's needed to judge whether the algorithm (or the
-    // underlying data) is what's actually wrong.
+    // underlying data) is what's actually wrong. Firestore rejects an
+    // explicit `undefined` field outright (the whole write throws, silently
+    // leaving old data in place) - a field that was never set on an older
+    // record is undefined, not "", so this can't just assume the empty-
+    // string default every other field here already has. A raw photos
+    // array is also stored as a plain boolean instead of the real array -
+    // no need to duplicate every photo URL into every match's breakdown.
+    const displayValue = (v) => (Array.isArray(v) ? v.length > 0 : (v ?? null));
+    const lostValue = displayValue(lostCase[p.lostField]);
+    const foundValue = displayValue(foundReport[p.foundField]);
     const push = (fields) => breakdown.push({ label: p.label, weight: p.weight, lostValue, foundValue, ...fields });
 
     const lenient =

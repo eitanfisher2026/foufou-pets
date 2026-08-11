@@ -720,20 +720,20 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="flex items-center gap-2 font-medium text-slate-800">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="flex shrink-0 items-center gap-2 font-medium text-slate-800">
           רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
         </span>
         <button
           type="button"
           onClick={() => onRecheck(match.foundReportId)}
           disabled={rechecking}
-          className="text-xs text-slate-500 underline disabled:opacity-50"
+          className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
         >
-          {rechecking ? 'בודקים מחדש...' : 'בדיקה מחדש להתאמה זו'}
+          {rechecking ? 'מרענן...' : 'רענן בדיקה'}
         </button>
       </div>
-      <div className="mb-2">
+      <div className="mb-2 flex justify-end">
         <DropdownBadge
           value={match.status}
           labels={MATCH_STATUS_LABELS}
