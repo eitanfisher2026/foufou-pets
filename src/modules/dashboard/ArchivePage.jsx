@@ -9,25 +9,18 @@ import BackLink from '../shared/BackLink.jsx';
 
 const ARCHIVE_STATUSES = new Set([RECORD_STATUS.ARCHIVED, RECORD_STATUS.RESOLVED]);
 
-function ClosureRow({ lostCase: c }) {
+function ClosureTableRow({ lostCase: c }) {
   return (
-    <li>
-      <Link to={`/lost/${c.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
-        <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{displayLostCaseName(c)}</span>
-          {c.closureReason && (
-            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              {CLOSURE_REASON_LABELS[c.closureReason]}
-            </span>
-          )}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-slate-500">{c.closedBy && `ע״י: ${c.closedBy}`}</span>
-          {c.closureDate && <span className="shrink-0 text-xs text-slate-400">{formatDate(c.closureDate)}</span>}
-        </div>
-        {c.closingComment && <p className="mt-1 truncate text-xs text-slate-400">{c.closingComment}</p>}
-      </Link>
-    </li>
+    <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+      <td className="whitespace-nowrap px-3 py-2 text-slate-500">{c.closureDate ? formatDate(c.closureDate) : ''}</td>
+      <td className="max-w-[9rem] truncate px-3 py-2 font-medium text-slate-800">
+        <Link to={`/lost/${c.id}`} className="hover:underline">
+          {displayLostCaseName(c)}
+        </Link>
+      </td>
+      <td className="whitespace-nowrap px-3 py-2 text-slate-600">{CLOSURE_REASON_LABELS[c.closureReason] || ''}</td>
+      <td className="max-w-[10rem] truncate px-3 py-2 text-slate-400">{c.closingComment}</td>
+    </tr>
   );
 }
 
@@ -114,11 +107,25 @@ export default function ArchivePage() {
         </div>
 
         {!loading && filteredCases.length === 0 && <p className="text-sm text-slate-400">אין תיקים תואמים.</p>}
-        <ul className="space-y-2">
-          {filteredCases.map((c) => (
-            <ClosureRow key={c.id} lostCase={c} />
-          ))}
-        </ul>
+        {filteredCases.length > 0 && (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
+                  <th className="px-3 py-2 text-right font-medium">תאריך</th>
+                  <th className="px-3 py-2 text-right font-medium">שם החתול</th>
+                  <th className="px-3 py-2 text-right font-medium">סטטוס</th>
+                  <th className="px-3 py-2 text-right font-medium">הערה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCases.map((c) => (
+                  <ClosureTableRow key={c.id} lostCase={c} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       <section>

@@ -106,6 +106,24 @@ export async function updateLostCaseStatus(caseId, status) {
 }
 
 /**
+ * Sets status together with the closure record (date/reason/comment) in one
+ * write - used when a case is marked archived or resolved, so a closed case
+ * is never left without the details that explain why on the archive page.
+ */
+export async function updateLostCaseClosure(caseId, status, closure) {
+  await setDoc(
+    doc(db, COLLECTIONS.LOST_CASES, caseId),
+    {
+      status,
+      closureDate: closure.closureDate || '',
+      closureReason: closure.closureReason || '',
+      closingComment: closure.closingComment || '',
+    },
+    { merge: true }
+  );
+}
+
+/**
  * Deletes one photo immediately: removes it from storage and updates the
  * case's `photos` array to match. Returns the resulting photo list.
  */

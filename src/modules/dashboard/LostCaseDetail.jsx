@@ -21,6 +21,7 @@ import {
   getLostCase,
   updateLostCase,
   updateLostCaseStatus,
+  updateLostCaseClosure,
   removeLostCasePhoto,
   makeLostCasePhotoMain,
   deleteLostCase,
@@ -48,6 +49,7 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
+import ClosureDialog from '../shared/ClosureDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
@@ -112,6 +114,7 @@ export default function LostCaseDetail() {
   const [showDetails, setShowDetails] = useState(false);
   const [showProcessed, setShowProcessed] = useState(false);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  const [pendingCloseStatus, setPendingCloseStatus] = useState(null);
   const {
     reading: extracting,
     error: extractError,
@@ -218,9 +221,25 @@ export default function LostCaseDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
+  // Archiving or resolving a case closes it out - prompt for the closure
+  // details right then (see ClosureDialog) instead of applying the status
+  // change immediately, so a closed case is never left without them.
   async function handleRecordStatusChange(status) {
+    if (status === RECORD_STATUS.ARCHIVED || status === RECORD_STATUS.RESOLVED) {
+      setPendingCloseStatus(status);
+      return;
+    }
     await updateLostCaseStatus(caseId, status);
     setLostCase((prev) => ({ ...prev, status }));
+  }
+
+  // Once a case is closed there's nothing left to do on its detail page
+  // (matches, edit form) - head back to the working dashboard instead of
+  // staying on a page for a case that's no longer active.
+  async function handleConfirmClosure(closure) {
+    await updateLostCaseClosure(caseId, pendingCloseStatus, closure);
+    setPendingCloseStatus(null);
+    navigate('/');
   }
 
   async function handleRemoveExistingPhoto(photo) {
@@ -686,6 +705,9 @@ export default function LostCaseDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {pendingCloseStatus && (
+        <ClosureDialog onConfirm={handleConfirmClosure} onCancel={() => setPendingCloseStatus(null)} />
+      )}
       {showDetails && (
         <RecordDetailsDialog
           title={displayLostCaseName(lostCase)}
