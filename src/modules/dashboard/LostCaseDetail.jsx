@@ -24,6 +24,7 @@ import {
   deleteLostCase,
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { buildFoundReportSections } from '../found-report/foundReportSections.js';
 import { checkMatchesForLostCase, clearMatches, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
@@ -680,6 +681,8 @@ export default function LostCaseDetail() {
 }
 
 function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, caseId }) {
+  const [showCatDetails, setShowCatDetails] = useState(false);
+
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -723,15 +726,31 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
         </div>
       )}
 
-      <Link to={`/found/${match.foundReportId}`} className="mt-2 block text-center text-sm font-medium text-slate-600 underline">
-        צפייה בדיווח המלא
-      </Link>
-      <Link
-        to={`/lost/${caseId}/analysis/${match.foundReportId}`}
-        className="mt-1 block text-center text-sm font-medium text-slate-600 underline"
-      >
-        צפייה בניתוח המלא
-      </Link>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setShowCatDetails(true)}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600"
+        >
+          פרטי חתול
+        </button>
+        <Link
+          to={`/lost/${caseId}/analysis/${match.foundReportId}`}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
+        >
+          צפייה בניתוח המלא
+        </Link>
+      </div>
+
+      {showCatDetails && report && (
+        <RecordDetailsDialog
+          title={report.title || 'חתול'}
+          onClose={() => setShowCatDetails(false)}
+          photos={report.photos}
+          onViewPhoto={onViewPhoto}
+          sections={buildFoundReportSections(report)}
+        />
+      )}
     </li>
   );
 }
