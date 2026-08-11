@@ -71,12 +71,12 @@ export default function Dashboard() {
 
       {loading && <p className="text-slate-500">טוען...</p>}
 
-      <div className="mb-4 flex flex-wrap gap-4">
-        <Link to="/found" className="text-xs text-slate-500 underline">
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <Link to="/found" className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
           צפייה בכל הדיווחים על חתולים שנמצאו
         </Link>
         <Link to="/archive" className="text-xs text-slate-500 underline">
-          ארכיון (סגורים ומוחזרים לבעלים)
+          ארכיון
         </Link>
       </div>
 

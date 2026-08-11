@@ -493,17 +493,33 @@ export default function LostCaseDetail() {
             </Field>
           </FormSection>
 
-          <FormSection title="מסירה לבעלים">
-            <Field label="תאריך מסירה" inline>
+          <FormSection title="סגירת התיק">
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={!!fields.returnedToOwner}
+                onChange={(e) => setField('returnedToOwner', e.target.checked)}
+              />
+              החתולה הוחזרה לבעלים
+            </label>
+            <Field label="תאריך" inline>
               <input
                 type="date"
                 className="input w-36"
-                value={fields.returnDate || ''}
-                onChange={(e) => setField('returnDate', e.target.value)}
+                value={fields.closureDate || ''}
+                onChange={(e) => setField('closureDate', e.target.value)}
               />
             </Field>
-            <Field label="הוחזר/ה ע״י (למי מגיע קרדיט)">
-              <input className="input" value={fields.returnedBy || ''} onChange={(e) => setField('returnedBy', e.target.value)} />
+            <Field label="ע״י (למי מגיע קרדיט)">
+              <input className="input" value={fields.closedBy || ''} onChange={(e) => setField('closedBy', e.target.value)} />
+            </Field>
+            <Field label="הערה">
+              <textarea
+                className="input"
+                rows={2}
+                value={fields.closingComment || ''}
+                onChange={(e) => setField('closingComment', e.target.value)}
+              />
             </Field>
           </FormSection>
 
@@ -714,10 +730,12 @@ export default function LostCaseDetail() {
               ],
             },
             {
-              title: 'מסירה לבעלים',
+              title: 'סגירת התיק',
               rows: [
-                { label: 'תאריך מסירה', value: lostCase.returnDate ? formatDate(lostCase.returnDate) : '' },
-                { label: 'הוחזר/ה ע״י', value: lostCase.returnedBy },
+                { label: 'החתולה הוחזרה לבעלים', value: lostCase.returnedToOwner ? 'כן' : '' },
+                { label: 'תאריך', value: lostCase.closureDate ? formatDate(lostCase.closureDate) : '' },
+                { label: 'ע״י', value: lostCase.closedBy },
+                { label: 'הערה', value: lostCase.closingComment },
               ],
             },
             {

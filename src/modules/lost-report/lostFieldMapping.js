@@ -20,12 +20,18 @@ export const EMPTY_LOST_FIELDS = {
   contactName: '',
   contactPhone: '',
   notes: '',
-  // Captured when the cat comes home, so a person who genuinely helped
-  // reunite a cat with its owner can be recognized for it later (a future
-  // rewards/recognition feature) - not filled in automatically, since no
-  // Facebook post ever states who physically returned the cat.
-  returnDate: '',
-  returnedBy: '',
+  // One shared closing record covers both outcomes (archived without a
+  // confirmed return, or genuinely reunited) - a case is only ever closed
+  // one way at a time, so there's no need for two parallel field sets.
+  // returnedToOwner is what actually distinguishes them (drives which list
+  // a closed case shows up in on the archive page), independent of status.
+  // Not filled in automatically - no Facebook post states who physically
+  // returned a cat - but capturing it is the foundation for a future
+  // rewards/recognition feature for people who genuinely helped.
+  closureDate: '',
+  closedBy: '',
+  returnedToOwner: false,
+  closingComment: '',
   // A lost-cat post can rely on the Facebook poster's name/group just as
   // much as a found post can - no phone number in the caption means this
   // is the only way back to whoever's actually looking for the cat, same

@@ -58,12 +58,6 @@ export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors }) {
             />
           )}
         </div>
-        {c.status === RECORD_STATUS.RESOLVED && c.returnDate && (
-          <p className="mt-1 text-xs text-slate-400">
-            הוחזר/ה לבעלים {c.returnDate}
-            {c.returnedBy && ` · ע"י ${c.returnedBy}`}
-          </p>
-        )}
       </Link>
     </li>
   );
