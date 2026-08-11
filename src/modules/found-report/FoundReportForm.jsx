@@ -133,7 +133,7 @@ export default function FoundReportForm() {
         </Field>
 
         <Field label="מצב החתול" inline>
-          <select className="input" value={fields.condition} onChange={(e) => setField('condition', e.target.value)}>
+          <select className="input w-36" value={fields.condition} onChange={(e) => setField('condition', e.target.value)}>
             {CAT_CONDITIONS.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}

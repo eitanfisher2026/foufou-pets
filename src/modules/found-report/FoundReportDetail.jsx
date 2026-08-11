@@ -240,7 +240,7 @@ export default function FoundReportDetail() {
             </Field>
             <Field label="מצב החתול" inline>
               <select
-                className="input"
+                className="input w-36"
                 value={fields.condition || 'seen_only'}
                 onChange={(e) => setField('condition', e.target.value)}
               >

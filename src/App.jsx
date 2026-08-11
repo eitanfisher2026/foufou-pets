@@ -11,6 +11,7 @@ import SettingsPage from './modules/settings/SettingsPage.jsx';
 import CostSettingsPage from './modules/settings/CostSettingsPage.jsx';
 import SmartIntakeForm from './modules/intake/SmartIntakeForm.jsx';
 import ShareTargetIntake from './modules/intake/ShareTargetIntake.jsx';
+import MatchAnalysisPage from './modules/matching/MatchAnalysisPage.jsx';
 import { useHomeHistoryGuard } from './modules/shared/useHomeHistoryGuard.js';
 
 function AppRoutes() {
@@ -30,6 +31,7 @@ function AppRoutes() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/lost/new" element={<LostReportForm />} />
         <Route path="/lost/:caseId" element={<LostCaseDetail />} />
+        <Route path="/lost/:caseId/analysis/:foundReportId" element={<MatchAnalysisPage />} />
         <Route path="/found/new" element={<FoundReportForm />} />
         <Route path="/report/new" element={<SmartIntakeForm />} />
         <Route path="/share-target" element={<ShareTargetIntake />} />

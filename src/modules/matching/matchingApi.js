@@ -34,7 +34,7 @@ export async function checkMatchesForLostCase(lostCaseId) {
 
   const batch = writeBatch(db);
   let newMatchCount = 0;
-  for (const { report, score, reasons } of ranked) {
+  for (const { report, score, reasons, breakdown } of ranked) {
     // A brand-new pairing that scores 0 (e.g. a disqualifying mismatch)
     // never needs a person's attention - defaulting it to NO_MATCH instead
     // of NEW keeps the "needs review" count meaningful. An existing status
@@ -43,7 +43,14 @@ export async function checkMatchesForLostCase(lostCaseId) {
     const status = existingStatusById[report.id] || (score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW);
     if (status === REPORT_STATUS.NEW) newMatchCount += 1;
     const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', report.id);
-    batch.set(matchRef, { foundReportId: report.id, score, reasons, status, checkedAt: serverTimestamp() }, { merge: true });
+    // breakdown is stored alongside score/reasons (not recomputed on demand)
+    // so the "full analysis" view always shows exactly what was checked at
+    // the time this match was last scored, even if the config changes later.
+    batch.set(
+      matchRef,
+      { foundReportId: report.id, score, reasons, breakdown, status, checkedAt: serverTimestamp() },
+      { merge: true }
+    );
   }
   await batch.commit();
 
@@ -80,6 +87,11 @@ export async function clearMatches(lostCaseId) {
 export async function getMatches(lostCaseId) {
   const snap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.score - a.score);
+}
+
+export async function getMatch(lostCaseId, foundReportId) {
+  const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
 /**

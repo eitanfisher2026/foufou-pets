@@ -579,6 +579,7 @@ export default function LostCaseDetail() {
               onStatusChange={handleStatusChange}
               onViewPhoto={setLightboxUrl}
               confidenceColors={confidenceColors}
+              caseId={caseId}
             />
           ))}
         </ul>
@@ -600,6 +601,8 @@ export default function LostCaseDetail() {
                   report={reportsById[m.foundReportId]}
                   onStatusChange={handleStatusChange}
                   onViewPhoto={setLightboxUrl}
+                  confidenceColors={confidenceColors}
+                  caseId={caseId}
                 />
               ))}
             </ul>
@@ -676,7 +679,7 @@ export default function LostCaseDetail() {
   );
 }
 
-function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors }) {
+function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, caseId }) {
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-2 flex items-center justify-between">
@@ -722,6 +725,12 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
 
       <Link to={`/found/${match.foundReportId}`} className="mt-2 block text-center text-sm font-medium text-slate-600 underline">
         צפייה בדיווח המלא
+      </Link>
+      <Link
+        to={`/lost/${caseId}/analysis/${match.foundReportId}`}
+        className="mt-1 block text-center text-sm font-medium text-slate-600 underline"
+      >
+        צפייה בניתוח המלא
       </Link>
     </li>
   );

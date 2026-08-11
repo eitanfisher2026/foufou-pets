@@ -278,11 +278,15 @@ export function fieldLabel(field) {
 /**
  * Scores one lost case against one found/seen report using the given rule
  * config (defaults to DEFAULT_MATCH_CONFIG). Returns { score: 0-100,
- * reasons: string[] } where reasons explain every component that moved the
- * score, positive or negative.
+ * reasons: string[], breakdown } where reasons explain every component that
+ * moved the score, positive or negative (skipped for anyone just glancing
+ * at a match card), and breakdown lists literally every enabled parameter -
+ * including ones skipped for missing data - so the "full analysis" view can
+ * show the complete picture of what the algorithm did and didn't check.
  */
 export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG) {
   const reasons = [];
+  const breakdown = [];
   let earned = 0;
   let comparableWeight = 0;
   let disqualified = false;
@@ -297,7 +301,16 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
     const ctx = { lenient, colorGroups: config.colorGroups, defaultValue: p.defaultValue };
     const result = compare(lostCase[p.lostField], foundReport[p.foundField], ctx);
-    if (!result) continue;
+    if (!result) {
+      breakdown.push({
+        label: p.label,
+        weight: p.weight,
+        contribution: 0,
+        verdict: 'skipped',
+        detail: 'חסר מידע באחד הצדדים או בשניהם - לא נבדק',
+      });
+      continue;
+    }
 
     comparableWeight += p.weight;
 
@@ -310,12 +323,16 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);
+        breakdown.push({ label: p.label, weight: p.weight, contribution: p.weight, verdict: 'match', detail: 'תואם' });
       } else if (result.ratio > 0) {
         // Only colorMatch produces this: a lighting-confusable pair (e.g.
         // white vs. gray) isn't a real disagreement, so it earns partial
         // credit instead of triggering a mismatch penalty/disqualification.
-        earned += result.ratio * p.weight;
-        reasons.push(`${p.label}: התאמה חלקית (יתכן הבדל עקב תאורת הצילום)`);
+        const points = result.ratio * p.weight;
+        earned += points;
+        const detail = 'התאמה חלקית (יתכן הבדל עקב תאורת הצילום)';
+        reasons.push(`${p.label}: ${detail}`);
+        breakdown.push({ label: p.label, weight: p.weight, contribution: points, verdict: 'partial', detail });
       } else if (p.disqualifying) {
         // A hard mismatch on a defining trait (e.g. color, or a permanent
         // marking like a clipped ear) - this isn't just "less similar," it
@@ -323,37 +340,47 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
         // shows up in the ranked list (never fully filtered out), so a
         // wrongly-classified field doesn't hide a real match from the owner.
         disqualified = true;
-        reasons.unshift(`${p.label}: אינו תואם - פוסל התאמה`);
+        const detail = 'אינו תואם - פוסל התאמה';
+        reasons.unshift(`${p.label}: ${detail}`);
+        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'disqualifying', detail });
       } else if (p.mismatchPenalty) {
         earned -= p.mismatchPenalty;
-        reasons.push(`${p.label}: אינו תואם`);
+        const detail = 'אינו תואם';
+        reasons.push(`${p.label}: ${detail}`);
+        breakdown.push({ label: p.label, weight: p.weight, contribution: -p.mismatchPenalty, verdict: 'mismatch', detail });
+      } else {
+        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'mismatch', detail: 'אינו תואם' });
       }
     } else if (p.comparisonType === 'presence') {
       earned += p.weight;
       reasons.push(`${p.label}: קיימת משני הצדדים`);
+      breakdown.push({ label: p.label, weight: p.weight, contribution: p.weight, verdict: 'match', detail: 'קיימת משני הצדדים' });
     } else {
       const points = result.ratio * p.weight;
+      const detail =
+        p.comparisonType === 'dateProximity'
+          ? `הפרש של כ-${result.diffDays} ימים${lenient ? ' (תאריך משוער בצד אחד, ההשוואה גמישה יותר)' : ''}`
+          : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
       if (points > 0.01) {
         earned += points;
-        const detail =
-          p.comparisonType === 'dateProximity'
-            ? `הפרש של כ-${result.diffDays} ימים${lenient ? ' (תאריך משוער בצד אחד, ההשוואה גמישה יותר)' : ''}`
-            : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
         reasons.push(`${p.label}: ${detail}`);
+        breakdown.push({ label: p.label, weight: p.weight, contribution: points, verdict: 'partial', detail });
+      } else {
+        breakdown.push({ label: p.label, weight: p.weight, contribution: 0, verdict: 'no_overlap', detail: 'אין חפיפה משמעותית' });
       }
     }
   }
 
   if (comparableWeight === 0) {
-    return { score: 0, reasons: ['אין מספיק מידע משותף להשוואה'] };
+    return { score: 0, reasons: ['אין מספיק מידע משותף להשוואה'], breakdown };
   }
 
   if (disqualified) {
-    return { score: 0, reasons };
+    return { score: 0, reasons, breakdown };
   }
 
   const rawScore = config.relativeScoring ? (earned / comparableWeight) * 100 : earned;
-  return { score: Math.max(0, Math.min(100, Math.round(rawScore))), reasons };
+  return { score: Math.max(0, Math.min(100, Math.round(rawScore))), reasons, breakdown };
 }
 
 export function rankMatches(lostCase, foundReports, config = DEFAULT_MATCH_CONFIG) {
