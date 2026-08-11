@@ -29,6 +29,38 @@ const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 // inconclusive, not a mismatch.
 export const DEFAULT_COLOR_GROUPS = [['לבן', 'אפור']];
 
+// A raw "45/100" or "100%" reads as false precision - two cats that don't
+// even look alike can still land on 100 under relative scoring if the few
+// fields both sides filled in happen to agree. Bucketing into four plain-
+// language confidence levels (with a settings-configurable color per
+// bucket) is honest about what the score actually is: a rough signal, not
+// a measurement.
+export const CONFIDENCE_BUCKETS = [
+  { key: 'noMatch', label: 'אין התאמה', min: 0, max: 0 },
+  { key: 'low', label: 'סבירות נמוכה', min: 1, max: 39 },
+  { key: 'medium', label: 'סבירות בינונית', min: 40, max: 69 },
+  { key: 'high', label: 'סבירות גבוהה', min: 70, max: 100 },
+];
+
+export const DEFAULT_CONFIDENCE_COLORS = { noMatch: 'gray', low: 'yellow', medium: 'orange', high: 'green' };
+
+// Tailwind needs literal class strings to find them at build time - this
+// fixed small palette is the only set of colors the settings panel offers,
+// so every class name it could ever need already appears here literally.
+export const CONFIDENCE_COLOR_PALETTE = {
+  gray: { label: 'אפור', badge: 'bg-slate-100 text-slate-700' },
+  yellow: { label: 'צהוב', badge: 'bg-yellow-100 text-yellow-800' },
+  orange: { label: 'כתום', badge: 'bg-orange-100 text-orange-800' },
+  green: { label: 'ירוק', badge: 'bg-emerald-100 text-emerald-800' },
+  red: { label: 'אדום', badge: 'bg-red-100 text-red-800' },
+  blue: { label: 'כחול', badge: 'bg-blue-100 text-blue-800' },
+};
+
+/** Maps a raw 0-100 score to its confidence bucket ({ key, label }). */
+export function getMatchConfidence(score) {
+  return CONFIDENCE_BUCKETS.find((b) => score >= b.min && score <= b.max) || CONFIDENCE_BUCKETS[0];
+}
+
 function tokenize(text) {
   if (!text) return [];
   return text
@@ -185,6 +217,7 @@ export const DEFAULT_MATCH_CONFIG = {
   // a fully-filled-in pair would.
   relativeScoring: true,
   colorGroups: DEFAULT_COLOR_GROUPS,
+  confidenceColors: DEFAULT_CONFIDENCE_COLORS,
   parameters: [
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },

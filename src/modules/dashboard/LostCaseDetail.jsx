@@ -24,6 +24,9 @@ import {
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { checkMatchesForLostCase, clearMatches, getMatches, updateMatchStatus } from '../matching/matchingApi.js';
+import { getMatchConfig } from '../matching/matchConfigApi.js';
+import { getMatchConfidence } from '../matching/matchingEngine.js';
+import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
@@ -86,6 +89,7 @@ export default function LostCaseDetail() {
   const [deleting, setDeleting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showProcessed, setShowProcessed] = useState(false);
+  const [confidenceColors, setConfidenceColors] = useState(undefined);
   const {
     reading: extracting,
     error: extractError,
@@ -98,6 +102,10 @@ export default function LostCaseDetail() {
   useEffect(() => {
     load();
   }, [caseId]);
+
+  useEffect(() => {
+    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
+  }, []);
 
   // Editing this form means scrolling past a lot of fields to reach Save -
   // losing that on an accidental tab close/refresh is a real, already-
@@ -565,10 +573,9 @@ export default function LostCaseDetail() {
       <h2 className="mb-1 text-lg font-semibold text-slate-700">התאמות אפשריות ({matches.length})</h2>
       {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין דיווחים במאגר.</p>}
       {matches.length > 0 && (
-        <p className="mb-3 text-sm text-slate-500">
-          {newMatches.length > 0
-            ? `${newMatches.length} חדשות לבדיקה · הכי טובה ${matches[0].score}/100`
-            : `כל ההתאמות טופלו · הכי טובה ${matches[0].score}/100`}
+        <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          {newMatches.length > 0 ? `${newMatches.length} חדשות לבדיקה · הכי טובה` : 'כל ההתאמות טופלו · הכי טובה'}
+          <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
         </p>
       )}
 
@@ -581,6 +588,7 @@ export default function LostCaseDetail() {
               report={reportsById[m.foundReportId]}
               onStatusChange={handleStatusChange}
               onViewPhoto={setLightboxUrl}
+              confidenceColors={confidenceColors}
             />
           ))}
         </ul>
@@ -655,11 +663,13 @@ export default function LostCaseDetail() {
   );
 }
 
-function MatchCard({ match, report, onStatusChange, onViewPhoto }) {
+function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors }) {
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="font-medium text-slate-800">רמת התאמה: {match.score}/100</span>
+        <span className="flex items-center gap-2 font-medium text-slate-800">
+          רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
+        </span>
         <select
           className="input w-auto text-xs"
           value={match.status}

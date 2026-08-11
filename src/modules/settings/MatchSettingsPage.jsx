@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getMatchConfig, saveMatchConfig, resetMatchConfig } from '../matching/matchConfigApi.js';
-import { COMPARABLE_FIELDS, COMPARISON_TYPE_LABELS, fieldLabel } from '../matching/matchingEngine.js';
+import {
+  COMPARABLE_FIELDS,
+  COMPARISON_TYPE_LABELS,
+  fieldLabel,
+  CONFIDENCE_BUCKETS,
+  CONFIDENCE_COLOR_PALETTE,
+} from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { CAT_COLORS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
+import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 
 // The AI extraction (functions/index.js) reads its own static copies of
 // any customizable vocabulary - not a live Firestore read, kept simple and
@@ -71,6 +78,10 @@ export default function MatchSettingsPage() {
 
   function removeParam(index) {
     setConfig((prev) => ({ ...prev, parameters: prev.parameters.filter((_, i) => i !== index) }));
+  }
+
+  function setConfidenceColor(bucketKey, colorKey) {
+    setConfig((prev) => ({ ...prev, confidenceColors: { ...prev.confidenceColors, [bucketKey]: colorKey } }));
   }
 
   function addColorGroup() {
@@ -287,6 +298,30 @@ export default function MatchSettingsPage() {
       >
         + הוספת קבוצת צבעים
       </button>
+
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">צבעי רמת התאמה</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        ציון גולמי (כמו "45/100") נראה מדויק יותר משהוא באמת - במקום זאת, כל התאמה מוצגת ברמת סבירות. אפשר לבחור איזה
+        צבע מייצג כל רמה.
+      </p>
+      <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+        {CONFIDENCE_BUCKETS.map((bucket) => (
+          <div key={bucket.key} className="flex items-center justify-between gap-2">
+            <ConfidenceBadge score={bucket.min} confidenceColors={config.confidenceColors} />
+            <select
+              className="input w-auto"
+              value={config.confidenceColors?.[bucket.key] || 'gray'}
+              onChange={(e) => setConfidenceColor(bucket.key, e.target.value)}
+            >
+              {Object.entries(CONFIDENCE_COLOR_PALETTE).map(([key, { label }]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white p-3">
         {saveError && <p className="mx-auto mb-2 max-w-2xl text-sm font-medium text-red-600">{saveError}</p>}
