@@ -100,7 +100,7 @@ export default function Dashboard() {
                   <StatusBadge status={c.status} labels={LOST_CASE_STATUS_LABELS} />
                 </div>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs text-slate-400">{c.lastSeenLocation}</span>
+                  <span className="truncate text-xs text-slate-400">{c.neighborhood}</span>
                   {c.matchCount > 0 && (
                     <MatchSummaryBadge matchCount={c.matchCount} newMatchCount={c.newMatchCount} topMatchScore={c.topMatchScore} />
                   )}
@@ -124,12 +124,10 @@ export default function Dashboard() {
             <li key={r.id}>
               <Link to={`/found/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
                 <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">
-                    {r.title || r.colorDescription || 'חתול'}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{r.title || 'חתול'}</span>
                   <StatusBadge status={r.status} labels={FOUND_REPORT_STATUS_LABELS} />
                 </div>
-                <p className="mt-1 truncate text-xs text-slate-400">{r.location}</p>
+                <p className="mt-1 truncate text-xs text-slate-400">{r.neighborhood}</p>
                 {r.sourceGroupName && <p className="mt-1 text-xs text-slate-400">מקור: {r.sourceGroupName}</p>}
               </Link>
             </li>

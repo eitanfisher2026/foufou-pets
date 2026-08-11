@@ -2,13 +2,34 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from '../shared/usePwaInstall.js';
+import { useConfirm } from '../shared/useConfirm.jsx';
+import { migrateLegacyFields } from './legacyFieldMigration.js';
 import { APP_VERSION } from '../../version.js';
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
+  const { confirm, dialog } = useConfirm();
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResult, setMigrationResult] = useState('');
+
+  async function handleMigrateLegacyFields() {
+    const ok = await confirm(
+      'להעביר תיאור צבע, זנב שעיר ופרטי מיקום ישנים אל תוך "סימנים מיוחדים" ו"שכונה" בכל הרשומות הקיימות? פעולה חד-פעמית, בטוחה להרצה גם פעמיים.',
+      { confirmLabel: 'הרצת המיגרציה' }
+    );
+    if (!ok) return;
+    setMigrating(true);
+    setMigrationResult('');
+    try {
+      const { lostCases, foundReports } = await migrateLegacyFields();
+      setMigrationResult(`הועברו ${lostCases} תיקי חיפוש ו-${foundReports} דיווחים.`);
+    } finally {
+      setMigrating(false);
+    }
+  }
 
   async function handleInstallClick() {
     if (canPrompt) {
@@ -105,12 +126,20 @@ export default function SettingsPage() {
           {shareNotice && <p className="mt-2 text-xs text-slate-500 break-all">{shareNotice}</p>}
         </div>
 
+        <div className="p-4">
+          <button type="button" onClick={handleMigrateLegacyFields} disabled={migrating} className="font-medium text-slate-700 disabled:opacity-50">
+            {migrating ? 'מריצים מיגרציה...' : 'מיגרציית שדות ישנים (תיאור צבע/זנב שעיר/מיקום)'}
+          </button>
+          {migrationResult && <p className="mt-2 text-xs text-slate-500">{migrationResult}</p>}
+        </div>
+
         <button type="button" onClick={signOut} className="w-full p-4 text-right font-medium text-red-600">
           התנתקות
         </button>
       </nav>
 
       <p className="text-center text-xs text-slate-300">{APP_VERSION}</p>
+      {dialog}
     </div>
   );
 }

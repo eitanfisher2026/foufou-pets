@@ -1,12 +1,12 @@
+import { appendLine, appendDetail } from '../shared/textMerge.js';
+
 export const EMPTY_LOST_FIELDS = {
   name: '',
   color: '',
-  colorDescription: '',
   breed: '',
   size: '',
   ageClass: '',
   furType: '',
-  hasFluffyTail: false,
   markings: '',
   hasCollar: false,
   collarColor: '',
@@ -14,7 +14,6 @@ export const EMPTY_LOST_FIELDS = {
   hasClippedEar: false,
   city: '',
   neighborhood: '',
-  lastSeenLocation: '',
   lastSeenAt: '',
   lastSeenDate: '',
   lastSeenDateApprox: false,
@@ -40,26 +39,34 @@ export const EMPTY_LOST_FIELDS = {
  * between the lost-report form's own upload and the unified "add a cat"
  * intake, so there's exactly one place that knows how an extraction result
  * becomes a lost case.
+ *
+ * colorDescription, hasFluffyTail, and location aren't fields of their own
+ * here - the AI still extracts them (they're useful signal), but they fold
+ * straight into markings/neighborhood instead of needing their own form
+ * field, mirroring how a person filling this in by hand would just
+ * describe a fluffy tail or a specific street corner as another line of
+ * "special markings" or "neighborhood", not a separate box.
  */
 export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
+  let markings = extracted.markings || prev.markings;
+  markings = appendLine(markings, extracted.colorDescription);
+  if (extracted.hasFluffyTail) markings = appendLine(markings, 'זנב שעיר/פלומתי במיוחד');
+
   return {
     ...prev,
     name: extracted.petName || prev.name,
     color: extracted.color || prev.color,
-    colorDescription: extracted.colorDescription || prev.colorDescription,
     breed: extracted.breed || prev.breed,
     size: extracted.size || prev.size,
     ageClass: extracted.ageClass || prev.ageClass,
     furType: extracted.furType || prev.furType,
-    hasFluffyTail: extracted.hasFluffyTail ?? prev.hasFluffyTail,
-    markings: extracted.markings || prev.markings,
+    markings,
     hasCollar: extracted.hasCollar ?? prev.hasCollar,
     collarColor: extracted.collarColor || prev.collarColor,
     collarHasBell: extracted.collarHasBell ?? prev.collarHasBell,
     hasClippedEar: extracted.hasClippedEar ?? prev.hasClippedEar,
     city: extracted.city || prev.city,
-    neighborhood: extracted.neighborhood || prev.neighborhood,
-    lastSeenLocation: extracted.location || prev.lastSeenLocation,
+    neighborhood: appendDetail(extracted.neighborhood || prev.neighborhood, extracted.location),
     lastSeenAt: extracted.dateText || prev.lastSeenAt,
     lastSeenDate: extracted.computedDate || prev.lastSeenDate,
     lastSeenDateApprox: extracted.computedDateApprox ?? prev.lastSeenDateApprox,
@@ -90,9 +97,8 @@ function shortSnippet(text) {
 /**
  * A nameless lost cat (the common case - most posts never give a street cat
  * a name) shouldn't just read "חתול ללא שם" everywhere when there's a
- * perfectly good description to show instead - same fallback idea as found
- * reports falling back from title to colorDescription.
+ * perfectly good description to show instead.
  */
 export function displayLostCaseName(lostCase) {
-  return lostCase?.name || shortSnippet(lostCase?.colorDescription) || shortSnippet(lostCase?.markings) || 'חתול ללא שם';
+  return lostCase?.name || shortSnippet(lostCase?.markings) || 'חתול ללא שם';
 }

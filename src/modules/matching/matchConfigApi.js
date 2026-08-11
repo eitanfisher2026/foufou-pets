@@ -18,6 +18,21 @@ function fromFirestoreColorGroups(raw) {
   return Array.isArray(raw) ? raw.map((g) => (Array.isArray(g?.colors) ? g.colors : [])) : DEFAULT_MATCH_CONFIG.colorGroups;
 }
 
+// hasFluffyTail, colorDescription, lastSeenLocation/location were retired
+// as standalone fields (folded into markings/neighborhood) - a parameter
+// saved before that change could still reference one of them, which would
+// never contribute to a score (the field is always empty now) and shows up
+// oddly in the settings panel (a field dropdown with no matching option).
+// Silently drop any such leftover on load rather than requiring a manual
+// settings-panel cleanup.
+const RETIRED_FIELDS = new Set(['hasFluffyTail', 'colorDescription', 'lastSeenLocation', 'location']);
+
+function dropRetiredParameters(parameters) {
+  return (Array.isArray(parameters) ? parameters : DEFAULT_MATCH_CONFIG.parameters).filter(
+    (p) => !RETIRED_FIELDS.has(p.lostField) && !RETIRED_FIELDS.has(p.foundField)
+  );
+}
+
 /**
  * Reads the live matching-algorithm config from Firestore, falling back to
  * DEFAULT_MATCH_CONFIG if it's never been saved (e.g. a fresh project, or
@@ -29,7 +44,7 @@ export async function getMatchConfig() {
   const data = snap.data();
   return {
     relativeScoring: data.relativeScoring ?? DEFAULT_MATCH_CONFIG.relativeScoring,
-    parameters: Array.isArray(data.parameters) ? data.parameters : DEFAULT_MATCH_CONFIG.parameters,
+    parameters: dropRetiredParameters(data.parameters),
     colorGroups: fromFirestoreColorGroups(data.colorGroups),
     confidenceColors: { ...DEFAULT_MATCH_CONFIG.confidenceColors, ...data.confidenceColors },
   };

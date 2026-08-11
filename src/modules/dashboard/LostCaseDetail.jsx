@@ -29,6 +29,7 @@ import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
+import FormSection from '../shared/FormSection.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -39,9 +40,7 @@ import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
-  { targetKey: 'colorDescription', extractedKey: 'colorDescription', label: 'תיאור נוסף לצבע' },
   { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
-  { targetKey: 'hasFluffyTail', extractedKey: 'hasFluffyTail', label: 'זנב שעיר במיוחד' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
@@ -49,7 +48,6 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
   { targetKey: 'city', extractedKey: 'city', label: 'עיר' },
   { targetKey: 'neighborhood', extractedKey: 'neighborhood', label: 'שכונה' },
-  { targetKey: 'lastSeenLocation', extractedKey: 'location', label: 'מקום אחרון שנראתה' },
   { targetKey: 'lastSeenAt', extractedKey: 'dateText', label: 'מועד האובדן' },
   { targetKey: 'lastSeenDate', extractedKey: 'computedDate', label: 'תאריך מדויק (מחושב)' },
   { targetKey: 'contactName', extractedKey: 'contactName', label: 'שם איש קשר' },
@@ -276,7 +274,7 @@ export default function LostCaseDetail() {
               />
             </div>
             <p className="mb-2 text-sm text-slate-500">
-              {lostCase.color} · {lostCase.lastSeenLocation} · {lostCase.lastSeenAt}
+              {lostCase.color} · {lostCase.neighborhood} · {lostCase.lastSeenAt}
             </p>
             <div className="flex flex-wrap gap-3">
               <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
@@ -312,193 +310,182 @@ export default function LostCaseDetail() {
             newPhotosFirst={newPhotosFirst}
             onNewPhotosFirstChange={setNewPhotosFirst}
           />
-          <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
-            <input
-              className="input"
-              value={fields.sourceGroupName || ''}
-              onChange={(e) => setField('sourceGroupName', e.target.value)}
-            />
-          </Field>
-          <Field label="מי כתב את הפוסט המקורי (אם לא הבעלים עצמם)">
-            <input
-              className="input"
-              value={fields.originalPosterName || ''}
-              onChange={(e) => setField('originalPosterName', e.target.value)}
-            />
-          </Field>
-          <Field label="מי שיתף את הפוסט לקבוצה הזו (אם שונה מהכותב)">
-            <input
-              className="input"
-              value={fields.sharedByName || ''}
-              onChange={(e) => setField('sharedByName', e.target.value)}
-            />
-          </Field>
-          <Field label="מתי פורסם (כפי שכתוב בפוסט)">
-            <input
-              className="input"
-              value={fields.postAgeText || ''}
-              onChange={(e) => setField('postAgeText', e.target.value)}
-            />
-          </Field>
-          <Field label="שם החתולה">
-            <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
-          </Field>
-          <Field label="צבע">
-            <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
-              <option value="">בחר/י צבע</option>
-              {catColors.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="תיאור נוסף לצבע (תבניות, כתמים וכו')">
-            <input
-              className="input"
-              value={fields.colorDescription || ''}
-              onChange={(e) => setField('colorDescription', e.target.value)}
-            />
-          </Field>
-          <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
-            <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
-          </Field>
-          <Field label="גודל">
-            <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
-              <option value="">בחר/י</option>
-              {CAT_SIZES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="גור או מבוגר">
-            <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
-              <option value="">בחר/י</option>
-              {CAT_AGE_CLASSES.map((a) => (
-                <option key={a.value} value={a.value}>
-                  {a.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="סוג פרווה">
-            <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
-              <option value="">בחר/י</option>
-              {CAT_FUR_TYPES.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={!!fields.hasFluffyTail}
-              onChange={(e) => setField('hasFluffyTail', e.target.checked)}
-            />
-            זנב שעיר/פלומתי במיוחד
-          </label>
-          <Field label="סימנים מיוחדים (סימן אחד בכל שורה)">
-            <textarea
-              className="input"
-              rows={3}
-              value={fields.markings || ''}
-              onChange={(e) => setField('markings', e.target.value)}
-            />
-          </Field>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={!!fields.hasClippedEar}
-              onChange={(e) => setField('hasClippedEar', e.target.checked)}
-            />
-            אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
-          </label>
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={!!fields.hasCollar}
-              onChange={(e) => setField('hasCollar', e.target.checked)}
-            />
-            לובשת קולר/רתמה
-          </label>
-          {fields.hasCollar && (
-            <>
-              <Field label="צבע הקולר">
-                <select
-                  className="input"
-                  value={fields.collarColor || ''}
-                  onChange={(e) => setField('collarColor', e.target.value)}
-                >
-                  <option value="">בחר/י צבע</option>
-                  {COLLAR_COLORS.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <label className="flex items-center gap-2 text-sm text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={!!fields.collarHasBell}
-                  onChange={(e) => setField('collarHasBell', e.target.checked)}
-                />
-                יש פעמון על הקולר
-              </label>
-            </>
-          )}
-          <Field label="עיר">
-            <input className="input" value={fields.city || ''} onChange={(e) => setField('city', e.target.value)} />
-          </Field>
-          <Field label="שכונה">
-            <input
-              className="input"
-              value={fields.neighborhood || ''}
-              onChange={(e) => setField('neighborhood', e.target.value)}
-            />
-          </Field>
-          <Field label="פרטי מיקום נוספים">
-            <input
-              className="input"
-              value={fields.lastSeenLocation || ''}
-              onChange={(e) => setField('lastSeenLocation', e.target.value)}
-            />
-          </Field>
-          <Field label="מועד האובדן (כפי שידוע/נכתב)">
-            <input className="input" value={fields.lastSeenAt || ''} onChange={(e) => setField('lastSeenAt', e.target.value)} />
-          </Field>
-          <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
-            <input
-              type="date"
-              className="input"
-              value={fields.lastSeenDate || ''}
-              onChange={(e) => {
-                setField('lastSeenDate', e.target.value);
-                setField('lastSeenDateApprox', false);
-              }}
-            />
-            <label className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+          <FormSection title="פרטי חתול">
+            <Field label="שם החתולה">
+              <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
+            </Field>
+            <Field label="צבע">
+              <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
+                <option value="">בחר/י צבע</option>
+                {catColors.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="גור או מבוגר">
+              <select className="input" value={fields.ageClass || ''} onChange={(e) => setField('ageClass', e.target.value)}>
+                <option value="">בחר/י</option>
+                {CAT_AGE_CLASSES.map((a) => (
+                  <option key={a.value} value={a.value}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
-                checked={!!fields.lastSeenDateApprox}
-                onChange={(e) => setField('lastSeenDateApprox', e.target.checked)}
+                checked={!!fields.hasCollar}
+                onChange={(e) => setField('hasCollar', e.target.checked)}
               />
-              תאריך משוער בלבד (חושב מתיאור יחסי כמו "לפני יום", לא מתאריך מפורש)
+              לובשת קולר/רתמה
             </label>
-          </Field>
-          <Field label="שם איש קשר">
-            <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
-          </Field>
-          <Field label="טלפון">
-            <input className="input" value={fields.contactPhone || ''} onChange={(e) => setField('contactPhone', e.target.value)} />
-          </Field>
-          <Field label="הערות נוספות">
-            <textarea className="input" value={fields.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
-          </Field>
+            {fields.hasCollar && (
+              <>
+                <Field label="צבע הקולר">
+                  <select
+                    className="input"
+                    value={fields.collarColor || ''}
+                    onChange={(e) => setField('collarColor', e.target.value)}
+                  >
+                    <option value="">בחר/י צבע</option>
+                    {COLLAR_COLORS.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <label className="flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={!!fields.collarHasBell}
+                    onChange={(e) => setField('collarHasBell', e.target.checked)}
+                  />
+                  יש פעמון על הקולר
+                </label>
+              </>
+            )}
+            <label className="flex items-center gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={!!fields.hasClippedEar}
+                onChange={(e) => setField('hasClippedEar', e.target.checked)}
+              />
+              אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+            </label>
+            <Field label="סימנים מיוחדים (סימן אחד בכל שורה - כולל תיאור צבע/תבניות וזנב שעיר אם רלוונטי)">
+              <textarea
+                className="input"
+                rows={3}
+                value={fields.markings || ''}
+                onChange={(e) => setField('markings', e.target.value)}
+              />
+            </Field>
+            <Field label="גזע (אם ידוע - רוב חתולי הרחוב הם ללא גזע מסוים)">
+              <input className="input" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)} />
+            </Field>
+            <Field label="סוג פרווה">
+              <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
+                <option value="">בחר/י</option>
+                {CAT_FUR_TYPES.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="גודל">
+              <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
+                <option value="">בחר/י</option>
+                {CAT_SIZES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </FormSection>
+
+          <FormSection title="נראה לאחרונה">
+            <Field label="עיר">
+              <input className="input" value={fields.city || ''} onChange={(e) => setField('city', e.target.value)} />
+            </Field>
+            <Field label="שכונה (אפשר גם פרטי מיקום נוספים, כמו רחוב או ציון דרך)">
+              <input
+                className="input"
+                value={fields.neighborhood || ''}
+                onChange={(e) => setField('neighborhood', e.target.value)}
+              />
+            </Field>
+            <Field label="מועד האובדן (כפי שידוע/נכתב)">
+              <input className="input" value={fields.lastSeenAt || ''} onChange={(e) => setField('lastSeenAt', e.target.value)} />
+            </Field>
+            <Field label="תאריך מדויק (אם ידוע - משפר את איכות ההתאמות)">
+              <input
+                type="date"
+                className="input"
+                value={fields.lastSeenDate || ''}
+                onChange={(e) => {
+                  setField('lastSeenDate', e.target.value);
+                  setField('lastSeenDateApprox', false);
+                }}
+              />
+              <label className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={!!fields.lastSeenDateApprox}
+                  onChange={(e) => setField('lastSeenDateApprox', e.target.checked)}
+                />
+                תאריך משוער בלבד (חושב מתיאור יחסי כמו "לפני יום", לא מתאריך מפורש)
+              </label>
+            </Field>
+          </FormSection>
+
+          <FormSection title="פרטי קשר">
+            <Field label="שם איש קשר">
+              <input className="input" value={fields.contactName || ''} onChange={(e) => setField('contactName', e.target.value)} />
+            </Field>
+            <Field label="טלפון">
+              <input className="input" value={fields.contactPhone || ''} onChange={(e) => setField('contactPhone', e.target.value)} />
+            </Field>
+            <Field label="הערות נוספות">
+              <textarea className="input" value={fields.notes || ''} onChange={(e) => setField('notes', e.target.value)} />
+            </Field>
+          </FormSection>
+
+          <FormSection title="מקור מידע">
+            <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
+              <input
+                className="input"
+                value={fields.sourceGroupName || ''}
+                onChange={(e) => setField('sourceGroupName', e.target.value)}
+              />
+            </Field>
+            <Field label="מי כתב את הפוסט המקורי (אם לא הבעלים עצמם)">
+              <input
+                className="input"
+                value={fields.originalPosterName || ''}
+                onChange={(e) => setField('originalPosterName', e.target.value)}
+              />
+            </Field>
+            <Field label="מי שיתף את הפוסט לקבוצה הזו (אם שונה מהכותב)">
+              <input
+                className="input"
+                value={fields.sharedByName || ''}
+                onChange={(e) => setField('sharedByName', e.target.value)}
+              />
+            </Field>
+            <Field label="מתי פורסם (כפי שכתוב בפוסט)">
+              <input
+                className="input"
+                value={fields.postAgeText || ''}
+                onChange={(e) => setField('postAgeText', e.target.value)}
+              />
+            </Field>
+          </FormSection>
 
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
             <label className="mb-2 block text-sm font-medium text-slate-600">
@@ -625,37 +612,60 @@ export default function LostCaseDetail() {
           onClose={() => setShowDetails(false)}
           photos={lostCase.photos}
           onViewPhoto={setLightboxUrl}
-          rows={[
-            { label: 'שם', value: lostCase.name },
-            { label: 'תיאור נוסף לצבע', value: lostCase.colorDescription },
-            { label: 'גזע', value: lostCase.breed },
-            { label: 'צבע', value: lostCase.color },
-            { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
-            { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
-            { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === lostCase.furType)?.label },
-            { label: 'זנב שעיר במיוחד', value: lostCase.hasFluffyTail === true ? 'כן' : lostCase.hasFluffyTail === false ? 'לא' : '' },
-            { label: 'סימנים מיוחדים', value: lostCase.markings },
-            { label: 'אוזן קטומה', value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '' },
-            { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
-            { label: 'צבע הקולר', value: lostCase.collarColor },
-            { label: 'פעמון על הקולר', value: lostCase.collarHasBell === true ? 'כן' : lostCase.collarHasBell === false ? 'לא' : '' },
-            { label: 'עיר', value: lostCase.city },
-            { label: 'שכונה', value: lostCase.neighborhood },
-            { label: 'פרטי מיקום נוספים', value: lostCase.lastSeenLocation },
-            { label: 'מועד האובדן', value: lostCase.lastSeenAt },
+          sections={[
             {
-              label: 'תאריך מדויק',
-              value: lostCase.lastSeenDate
-                ? `${formatDate(lostCase.lastSeenDate)}${lostCase.lastSeenDateApprox ? ' (משוער)' : ''}`
-                : '',
+              title: 'פרטי חתול',
+              rows: [
+                { label: 'שם', value: lostCase.name },
+                { label: 'צבע', value: lostCase.color },
+                { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
+                { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
+                { label: 'צבע הקולר', value: lostCase.collarColor },
+                {
+                  label: 'פעמון על הקולר',
+                  value: lostCase.collarHasBell === true ? 'כן' : lostCase.collarHasBell === false ? 'לא' : '',
+                },
+                {
+                  label: 'אוזן קטומה',
+                  value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '',
+                },
+                { label: 'סימנים מיוחדים', value: lostCase.markings },
+                { label: 'גזע', value: lostCase.breed },
+                { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === lostCase.furType)?.label },
+                { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
+              ],
             },
-            { label: 'שם איש קשר', value: lostCase.contactName },
-            { label: 'טלפון', value: lostCase.contactPhone },
-            { label: 'הערות נוספות', value: lostCase.notes },
-            { label: 'מקור המידע (קבוצה)', value: lostCase.sourceGroupName },
-            { label: 'מי כתב את הפוסט', value: lostCase.originalPosterName },
-            { label: 'מי שיתף', value: lostCase.sharedByName },
-            { label: 'מתי פורסם', value: lostCase.postAgeText },
+            {
+              title: 'נראה לאחרונה',
+              rows: [
+                { label: 'עיר', value: lostCase.city },
+                { label: 'שכונה', value: lostCase.neighborhood },
+                { label: 'מועד האובדן', value: lostCase.lastSeenAt },
+                {
+                  label: 'תאריך מדויק',
+                  value: lostCase.lastSeenDate
+                    ? `${formatDate(lostCase.lastSeenDate)}${lostCase.lastSeenDateApprox ? ' (משוער)' : ''}`
+                    : '',
+                },
+              ],
+            },
+            {
+              title: 'פרטי קשר',
+              rows: [
+                { label: 'שם איש קשר', value: lostCase.contactName },
+                { label: 'טלפון', value: lostCase.contactPhone },
+                { label: 'הערות נוספות', value: lostCase.notes },
+              ],
+            },
+            {
+              title: 'מקור מידע',
+              rows: [
+                { label: 'מקור המידע (קבוצה)', value: lostCase.sourceGroupName },
+                { label: 'מי כתב את הפוסט', value: lostCase.originalPosterName },
+                { label: 'מי שיתף', value: lostCase.sharedByName },
+                { label: 'מתי פורסם', value: lostCase.postAgeText },
+              ],
+            },
           ]}
         />
       )}
