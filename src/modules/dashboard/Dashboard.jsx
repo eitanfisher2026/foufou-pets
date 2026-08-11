@@ -2,30 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { APP_VERSION } from '../../version.js';
-import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
-import { listFoundReports, listLostCases } from './dashboardApi.js';
-import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js';
+import { listLostCases } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
-import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import { LostCaseRow } from './RecordRows.jsx';
 
-const STATUS_BADGE_COLORS = {
-  [RECORD_STATUS.SUSPENDED]: 'bg-amber-100 text-amber-800',
-  [RECORD_STATUS.ARCHIVED]: 'bg-slate-200 text-slate-600',
-  [RECORD_STATUS.RESOLVED]: 'bg-blue-100 text-blue-800',
-};
-
+// A found report doesn't need its own eagerly-loaded browsing list on every
+// dashboard visit - matching already runs its own independent query against
+// found reports (see matchingApi.js), so this list was never actually load-
+// bearing for the app's core flow, just a nice-to-have "browse everything"
+// view. Loading only lost cases by default cuts the dashboard's default
+// read in half; "כל הדיווחים על חתולים שנמצאו" is one tap away instead.
 export default function Dashboard() {
   const { user } = useAuth();
   const [lostCases, setLostCases] = useState([]);
-  const [foundReports, setFoundReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showArchived, setShowArchived] = useState(false);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
 
   useEffect(() => {
-    Promise.all([listLostCases(), listFoundReports()]).then(([cases, reports]) => {
+    listLostCases().then((cases) => {
       setLostCases(cases);
-      setFoundReports(reports);
       setLoading(false);
     });
   }, []);
@@ -34,17 +30,14 @@ export default function Dashboard() {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
 
+  // Archived and resolved cases move to their own archive view (see
+  // ArchivePage.jsx) instead of a same-page toggle - a resolved case (cat
+  // already found) doesn't need attention any more than an archived one
+  // does, so it doesn't belong cluttering the default working list either.
   const visibleLostCases = useMemo(
-    () => lostCases.filter((c) => showArchived || c.status !== RECORD_STATUS.ARCHIVED),
-    [lostCases, showArchived]
+    () => lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED),
+    [lostCases]
   );
-  const visibleFoundReports = useMemo(
-    () => foundReports.filter((r) => showArchived || r.status !== RECORD_STATUS.ARCHIVED),
-    [foundReports, showArchived]
-  );
-  const archivedCount =
-    lostCases.filter((c) => c.status === RECORD_STATUS.ARCHIVED).length +
-    foundReports.filter((r) => r.status === RECORD_STATUS.ARCHIVED).length;
 
   return (
     <div className="p-4">
@@ -78,16 +71,16 @@ export default function Dashboard() {
 
       {loading && <p className="text-slate-500">טוען...</p>}
 
-      {archivedCount > 0 && (
-        <button
-          onClick={() => setShowArchived((v) => !v)}
-          className="mb-4 text-xs text-slate-400 underline"
-        >
-          {showArchived ? 'הסתרת רשומות בארכיון' : `הצגת ${archivedCount} רשומות בארכיון`}
-        </button>
-      )}
+      <div className="mb-4 flex flex-wrap gap-4">
+        <Link to="/found" className="text-xs text-slate-500 underline">
+          צפייה בכל הדיווחים על חתולים שנמצאו
+        </Link>
+        <Link to="/archive" className="text-xs text-slate-500 underline">
+          ארכיון (סגורים ומוחזרים לבעלים)
+        </Link>
+      </div>
 
-      <section className="mb-8">
+      <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-700">
           תיקי חיפוש{' '}
           {visibleLostCases.length > 0 && (
@@ -97,84 +90,10 @@ export default function Dashboard() {
         {visibleLostCases.length === 0 && !loading && <p className="text-sm text-slate-400">אין תיקים פתוחים עדיין.</p>}
         <ul className="space-y-2">
           {visibleLostCases.map((c) => (
-            <li key={c.id}>
-              <Link
-                to={`/lost/${c.id}`}
-                className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{displayLostCaseName(c)}</span>
-                  <StatusBadge status={c.status} labels={LOST_CASE_STATUS_LABELS} />
-                </div>
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <span className="truncate text-xs text-slate-400">{c.neighborhood}</span>
-                  {c.matchCount > 0 && (
-                    <MatchSummaryRow
-                      matchCount={c.matchCount}
-                      newMatchCount={c.newMatchCount}
-                      topMatchScore={c.topMatchScore}
-                      confidenceColors={confidenceColors}
-                    />
-                  )}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">
-          דיווחים על חתולים שנראו/נמצאו{' '}
-          {visibleFoundReports.length > 0 && (
-            <span className="text-sm font-normal text-slate-400">({visibleFoundReports.length})</span>
-          )}
-        </h2>
-        {visibleFoundReports.length === 0 && !loading && <p className="text-sm text-slate-400">אין דיווחים עדיין.</p>}
-        <ul className="space-y-2">
-          {visibleFoundReports.map((r) => (
-            <li key={r.id}>
-              <Link to={`/found/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{r.title || 'חתול'}</span>
-                  <StatusBadge status={r.status} labels={FOUND_REPORT_STATUS_LABELS} />
-                </div>
-                <p className="mt-1 truncate text-xs text-slate-400">{r.neighborhood}</p>
-                {r.sourceGroupName && <p className="mt-1 text-xs text-slate-400">מקור: {r.sourceGroupName}</p>}
-              </Link>
-            </li>
+            <LostCaseRow key={c.id} lostCase={c} statusLabels={LOST_CASE_STATUS_LABELS} confidenceColors={confidenceColors} />
           ))}
         </ul>
       </section>
     </div>
-  );
-}
-
-// The total candidate count (matchCount) is shown once, in the section
-// header - repeating it on every single row added nothing. Each row just
-// needs its own best score and how many of its matches are still unseen.
-// The reviewed/new counts are plain text (not a colored pill) - only the
-// confidence level itself is a color-coded badge, kept separate so the two
-// kinds of information don't visually blur into one thing.
-function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, confidenceColors }) {
-  const hasNew = newMatchCount > 0;
-  const reviewedCount = matchCount - newMatchCount;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="whitespace-nowrap text-xs text-black">
-        {hasNew && `${newMatchCount} חדש, `}
-        {reviewedCount} נבדקו
-      </span>
-      <ConfidenceBadge score={topMatchScore} confidenceColors={confidenceColors} />
-    </div>
-  );
-}
-
-function StatusBadge({ status, labels }) {
-  if (!status || status === RECORD_STATUS.ACTIVE) return null;
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_COLORS[status] || 'bg-slate-100 text-slate-600'}`}>
-      {labels[status] || status}
-    </span>
   );
 }

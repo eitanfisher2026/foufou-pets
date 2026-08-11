@@ -20,6 +20,12 @@ export const EMPTY_LOST_FIELDS = {
   contactName: '',
   contactPhone: '',
   notes: '',
+  // Captured when the cat comes home, so a person who genuinely helped
+  // reunite a cat with its owner can be recognized for it later (a future
+  // rewards/recognition feature) - not filled in automatically, since no
+  // Facebook post ever states who physically returned the cat.
+  returnDate: '',
+  returnedBy: '',
   // A lost-cat post can rely on the Facebook poster's name/group just as
   // much as a found post can - no phone number in the caption means this
   // is the only way back to whoever's actually looking for the cat, same

@@ -493,6 +493,20 @@ export default function LostCaseDetail() {
             </Field>
           </FormSection>
 
+          <FormSection title="מסירה לבעלים">
+            <Field label="תאריך מסירה" inline>
+              <input
+                type="date"
+                className="input w-36"
+                value={fields.returnDate || ''}
+                onChange={(e) => setField('returnDate', e.target.value)}
+              />
+            </Field>
+            <Field label="הוחזר/ה ע״י (למי מגיע קרדיט)">
+              <input className="input" value={fields.returnedBy || ''} onChange={(e) => setField('returnedBy', e.target.value)} />
+            </Field>
+          </FormSection>
+
           <FormSection title="מקור מידע">
             <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
               <input
@@ -697,6 +711,13 @@ export default function LostCaseDetail() {
                 { label: 'שם איש קשר', value: lostCase.contactName },
                 { label: 'טלפון', value: lostCase.contactPhone },
                 { label: 'הערות נוספות', value: lostCase.notes },
+              ],
+            },
+            {
+              title: 'מסירה לבעלים',
+              rows: [
+                { label: 'תאריך מסירה', value: lostCase.returnDate ? formatDate(lostCase.returnDate) : '' },
+                { label: 'הוחזר/ה ע״י', value: lostCase.returnedBy },
               ],
             },
             {
