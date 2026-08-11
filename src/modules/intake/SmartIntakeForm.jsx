@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
+import BackLink from '../shared/BackLink.jsx';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -22,9 +22,7 @@ export default function SmartIntakeForm() {
 
   return (
     <div className="space-y-5 p-4">
-      <Link to="/" className="inline-block text-sm text-slate-500 underline">
-        ← ביטול וחזרה לעמוד הראשי
-      </Link>
+      <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
       <h1 className="text-xl font-bold text-slate-800">הוספה חכמה</h1>
       <p className="text-sm text-slate-500">
         העלה/י צילום מסך של פוסט על חתול - נזהה אוטומטית אם זה דיווח על חתול שאבד או שנמצא/נראה, ונפתח את הרשומה

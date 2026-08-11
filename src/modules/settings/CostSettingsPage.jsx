@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import BackLink from '../shared/BackLink.jsx';
 import { listLostCases, listFoundReports } from '../dashboard/dashboardApi.js';
 
 // Rough size assumption only, since actual file sizes aren't stored per
@@ -43,9 +43,7 @@ export default function CostSettingsPage() {
 
   return (
     <div className="p-4 pb-10">
-      <Link to="/settings" className="mb-4 inline-block text-sm text-slate-500 underline">
-        ← חזרה להגדרות
-      </Link>
+      <BackLink to="/settings">חזרה להגדרות</BackLink>
       <h1 className="mb-1 text-xl font-bold text-slate-800">עלויות</h1>
       <p className="mb-6 text-sm text-slate-500">
         עלות ה-AI מבוססת על צריכת הטוקנים האמיתית שדווחה בכל קריאה בפועל - לא הערכה. עלות Firebase היא הערכה גסה בלבד,

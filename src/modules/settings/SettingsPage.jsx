@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from '../shared/usePwaInstall.js';
+import BackLink from '../shared/BackLink.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { migrateLegacyFields } from './legacyFieldMigration.js';
 import { APP_VERSION } from '../../version.js';
@@ -64,9 +65,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 pb-10">
-      <Link to="/" className="mb-4 inline-block text-sm text-slate-500 underline">
-        ← חזרה לעמוד הראשי
-      </Link>
+      <BackLink to="/">חזרה לעמוד הראשי</BackLink>
       <h1 className="mb-6 text-xl font-bold text-slate-800">הגדרות</h1>
 
       <section className="mb-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4">

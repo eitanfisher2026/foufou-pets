@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
+import BackLink from '../shared/BackLink.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
@@ -87,9 +88,7 @@ export default function FoundReportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-4">
-      <Link to="/" className="inline-block text-sm text-slate-500 underline">
-        ← ביטול וחזרה לעמוד הראשי
-      </Link>
+      <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
       <h1 className="text-xl font-bold text-slate-800">דיווח על חתול שנראה / נמצא</h1>
       <p className="text-sm text-slate-500">
         אם ראית פוסט בפייסבוק על חתול - אין צורך להכיר את מי שכתב אותו. פשוט העלה/י צילום מסך.

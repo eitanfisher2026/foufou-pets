@@ -22,6 +22,7 @@ import { useColorOptions } from '../shared/useColorOptions.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
+import BackLink from '../shared/BackLink.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -179,9 +180,7 @@ export default function FoundReportDetail() {
 
   return (
     <div className="p-4">
-      <button type="button" onClick={handleBackToHome} className="mb-4 inline-block text-sm text-slate-500 underline">
-        ← חזרה לעמוד הראשי
-      </button>
+      <BackLink onClick={handleBackToHome}>חזרה לעמוד הראשי</BackLink>
 
       {!editing ? (
         <>

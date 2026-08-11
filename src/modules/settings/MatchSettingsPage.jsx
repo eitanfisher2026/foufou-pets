@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import BackLink from '../shared/BackLink.jsx';
 import { getMatchConfig, saveMatchConfig, resetMatchConfig } from '../matching/matchConfigApi.js';
 import {
   COMPARABLE_FIELDS,
@@ -160,9 +160,7 @@ export default function MatchSettingsPage() {
 
   return (
     <div className="p-4 pb-24">
-      <Link to="/settings" className="mb-4 inline-block text-sm text-slate-500 underline">
-        ← חזרה להגדרות
-      </Link>
+      <BackLink to="/settings">חזרה להגדרות</BackLink>
       <h1 className="mb-1 text-xl font-bold text-slate-800">הגדרות אלגוריתם ההתאמה</h1>
       <p className="mb-6 text-sm text-slate-500">
         כל פרמטר משווה שדה אחד בין תיק החיפוש לדיווח, לפי משקל ושיטת השוואה. אין צורך למלא כל שדה - שדות חסרים פשוט מדולגים.

@@ -11,9 +11,11 @@ import SettingsPage from './modules/settings/SettingsPage.jsx';
 import CostSettingsPage from './modules/settings/CostSettingsPage.jsx';
 import SmartIntakeForm from './modules/intake/SmartIntakeForm.jsx';
 import ShareTargetIntake from './modules/intake/ShareTargetIntake.jsx';
+import { useHomeHistoryGuard } from './modules/shared/useHomeHistoryGuard.js';
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  useHomeHistoryGuard();
 
   if (loading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
   if (!user) return <LoginScreen />;

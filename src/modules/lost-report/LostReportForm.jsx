@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
+import BackLink from '../shared/BackLink.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
@@ -85,9 +86,7 @@ export default function LostReportForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-4">
-      <Link to="/" className="inline-block text-sm text-slate-500 underline">
-        ← ביטול וחזרה לעמוד הראשי
-      </Link>
+      <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
       <h1 className="text-xl font-bold text-slate-800">פתיחת תיק חיפוש - חתול אבד</h1>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
