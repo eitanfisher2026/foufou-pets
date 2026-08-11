@@ -5,6 +5,8 @@ import { APP_VERSION } from '../../version.js';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { listFoundReports, listLostCases } from './dashboardApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { getMatchConfig } from '../matching/matchConfigApi.js';
+import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 
 const STATUS_BADGE_COLORS = {
   [RECORD_STATUS.SUSPENDED]: 'bg-amber-100 text-amber-800',
@@ -18,6 +20,7 @@ export default function Dashboard() {
   const [foundReports, setFoundReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [confidenceColors, setConfidenceColors] = useState(undefined);
 
   useEffect(() => {
     Promise.all([listLostCases(), listFoundReports()]).then(([cases, reports]) => {
@@ -25,6 +28,10 @@ export default function Dashboard() {
       setFoundReports(reports);
       setLoading(false);
     });
+  }, []);
+
+  useEffect(() => {
+    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
 
   const visibleLostCases = useMemo(
@@ -102,7 +109,12 @@ export default function Dashboard() {
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <span className="truncate text-xs text-slate-400">{c.neighborhood}</span>
                   {c.matchCount > 0 && (
-                    <MatchSummaryBadge matchCount={c.matchCount} newMatchCount={c.newMatchCount} topMatchScore={c.topMatchScore} />
+                    <MatchSummaryRow
+                      matchCount={c.matchCount}
+                      newMatchCount={c.newMatchCount}
+                      topMatchScore={c.topMatchScore}
+                      confidenceColors={confidenceColors}
+                    />
                   )}
                 </div>
               </Link>
@@ -141,20 +153,20 @@ export default function Dashboard() {
 // The total candidate count (matchCount) is shown once, in the section
 // header - repeating it on every single row added nothing. Each row just
 // needs its own best score and how many of its matches are still unseen.
-function MatchSummaryBadge({ matchCount, newMatchCount, topMatchScore }) {
+// The reviewed/new counts are plain text (not a colored pill) - only the
+// confidence level itself is a color-coded badge, kept separate so the two
+// kinds of information don't visually blur into one thing.
+function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, confidenceColors }) {
   const hasNew = newMatchCount > 0;
   const reviewedCount = matchCount - newMatchCount;
-  const hasScore = typeof topMatchScore === 'number' && topMatchScore > 0;
   return (
-    <span
-      className={`whitespace-nowrap rounded-full px-2 py-1 text-xs font-medium ${
-        hasNew ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-      }`}
-    >
-      {hasScore && `${topMatchScore}% - `}
-      {reviewedCount} נבדקו
-      {hasNew && `, חדש - ${newMatchCount}`}
-    </span>
+    <div className="flex items-center gap-2">
+      <span className="whitespace-nowrap text-xs text-black">
+        {reviewedCount} נבדקו
+        {hasNew && `, חדש - ${newMatchCount}`}
+      </span>
+      <ConfidenceBadge score={topMatchScore} confidenceColors={confidenceColors} />
+    </div>
   );
 }
 
