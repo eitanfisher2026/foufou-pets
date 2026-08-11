@@ -315,7 +315,7 @@ export default function LostCaseDetail() {
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
             </Field>
             <Field label="צבע" inline>
-              <select className="input" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
+              <select className="input w-36" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
                 <option value="">בחר/י צבע</option>
                 {catColors.map((c) => (
                   <option key={c} value={c}>
@@ -338,13 +338,13 @@ export default function LostCaseDetail() {
                 checked={!!fields.hasCollar}
                 onChange={(e) => setField('hasCollar', e.target.checked)}
               />
-              לובשת קולר/רתמה
+              קולר
             </label>
             {fields.hasCollar && (
               <>
                 <Field label="צבע הקולר" inline>
                   <select
-                    className="input"
+                    className="input w-36"
                     value={fields.collarColor || ''}
                     onChange={(e) => setField('collarColor', e.target.value)}
                   >
@@ -372,7 +372,7 @@ export default function LostCaseDetail() {
                 checked={!!fields.hasClippedEar}
                 onChange={(e) => setField('hasClippedEar', e.target.checked)}
               />
-              אוזן קטומה (סימון סטנדרטי לאחר עיקור/סירוס - נפוץ בחתולי רחוב)
+              אוזן קטומה
             </label>
             <Field label="סימנים מיוחדים (סימן אחד בכל שורה - כולל תיאור צבע/תבניות וזנב שעיר אם רלוונטי)">
               <textarea
@@ -384,14 +384,14 @@ export default function LostCaseDetail() {
             </Field>
             <Field label="גזע" inline>
               <input
-                className="input w-28"
+                className="input w-36"
                 value={fields.breed || ''}
                 onChange={(e) => setField('breed', e.target.value)}
                 placeholder="אם ידוע"
               />
             </Field>
             <Field label="סוג פרווה" inline>
-              <select className="input" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
+              <select className="input w-36" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_FUR_TYPES.map((f) => (
                   <option key={f.value} value={f.value}>
@@ -401,7 +401,7 @@ export default function LostCaseDetail() {
               </select>
             </Field>
             <Field label="גודל" inline>
-              <select className="input" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
+              <select className="input w-36" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
                 <option value="">בחר/י</option>
                 {CAT_SIZES.map((s) => (
                   <option key={s.value} value={s.value}>

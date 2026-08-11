@@ -16,7 +16,7 @@ const STATUS_COLORS = {
 export default function RecordStatusSelect({ status, labels, onChange }) {
   return (
     <select
-      className={`cursor-pointer rounded-full border border-black/10 px-3 py-1 text-xs font-semibold shadow-sm ${
+      className={`max-w-full shrink-0 cursor-pointer rounded-full border border-black/10 px-3 py-1 text-xs font-semibold shadow-sm ${
         STATUS_COLORS[status] || 'bg-slate-100 text-slate-600'
       }`}
       value={status}
