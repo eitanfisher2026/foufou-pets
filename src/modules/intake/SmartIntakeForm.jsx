@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import BackLink from '../shared/BackLink.jsx';
+import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
+import InfoButton from '../shared/InfoButton.jsx';
 import { getPastedImageFiles } from '../shared/pasteImages.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
@@ -13,48 +15,71 @@ import { useSmartIntake } from './useSmartIntake.js';
  * full edit view for reviewing/correcting fields - no second form to build.
  */
 export default function SmartIntakeForm() {
-  const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
+  const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
     useSmartIntake();
   const [postText, setPostText] = useState('');
 
-  async function handleUpload(e) {
+  function handleUpload(e) {
     const newFiles = Array.from(e.target.files || []);
     e.target.value = '';
-    await handleFiles(newFiles, postText);
+    if (newFiles.length > 0) setFiles((prev) => [...prev, ...newFiles]);
   }
 
-  async function handlePasteText(e) {
+  function handlePasteText(e) {
     const imageFiles = getPastedImageFiles(e);
     if (imageFiles.length === 0) return;
     e.preventDefault();
-    await handleFiles(imageFiles, postText);
+    setFiles((prev) => [...prev, ...imageFiles]);
   }
 
   return (
     <div className="space-y-5 p-4">
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
-      <h1 className="text-xl font-bold text-slate-800">הוספה חכמה</h1>
-      <p className="text-sm text-slate-500">
-        העלה/י צילום מסך של פוסט על חתול - נזהה אוטומטית אם זה דיווח על חתול שאבד או שנמצא/נראה, ונפתח את הרשומה
-        המתאימה כדי שתוכל/י לבדוק ולתקן את הפרטים. אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת
-        שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
-      </p>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-800">הוספה חכמה</h1>
+        <InfoButton title="איך מוסיפים פוסט על חתול?">
+          <p>אפשר לצרף מידע בכמה דרכים, גם ביחד - ואז ללחוץ על "זיהוי אוטומטי":</p>
+          <ul className="list-inside list-disc space-y-1">
+            <li>העלאת צילום מסך של הפוסט מפייסבוק.</li>
+            <li>
+              הדבקת הקישור לפוסט או הטקסט שלו בתיבה למטה - שימושי כשאין גישה לשיתוף ישיר מפייסבוק, או כשהכיתוב ארוך
+              ונחתך בצילום המסך ("...עוד").
+            </li>
+            <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
+            <li>אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
+          </ul>
+          <p>נזהה אוטומטית אם זה דיווח על חתול שאבד או שנמצא/נראה, ונפתח את הרשומה המתאימה לבדיקה ותיקון.</p>
+        </InfoButton>
+      </div>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-        <label className="mb-1 block text-sm font-medium text-slate-600">
-          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה) -
-          יעזור להשלים פרטים גם אם הם נחתכים בצילום המסך. אפשר גם להדביק כאן ישירות תמונה/צילום מסך (Ctrl+V)
-        </label>
         <textarea
           className="input mb-3 w-full"
           rows={2}
-          placeholder="קישור או טקסט מהפוסט, או הדבקת תמונה"
+          placeholder="קישור/טקסט מהפוסט (אפשר גם להדביק כאן תמונה)"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
           onPaste={handlePasteText}
           disabled={busy}
         />
-        <input type="file" accept="image/*" multiple onChange={handleUpload} disabled={busy} />
+
+        <EditablePhotoGrid
+          existingPhotos={[]}
+          newPhotos={files}
+          onNewPhotosChange={setFiles}
+          label="תמונות שנבחרו"
+          addLabel="הוספת תמונות"
+        />
+
+        <button
+          type="button"
+          onClick={() => analyze(postText)}
+          disabled={busy || files.length === 0}
+          className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {reading ? 'מזהים פרטים...' : creating ? 'יוצרים רשומה...' : 'זיהוי אוטומטי'}
+        </button>
+
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {creating && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}

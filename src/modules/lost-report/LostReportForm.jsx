@@ -8,7 +8,7 @@ import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import Field from '../shared/Field.jsx';
-import { useConfirm } from '../shared/useConfirm.jsx';
+import InfoButton from '../shared/InfoButton.jsx';
 import { getPastedImageFiles } from '../shared/pasteImages.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
@@ -19,14 +19,12 @@ export default function LostReportForm() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
-  const { confirm, dialog } = useConfirm();
   const catColors = useColorOptions();
 
   const [fields, setFields] = useState(EMPTY_LOST_FIELDS);
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
-  const [uploadNotice, setUploadNotice] = useState('');
   const [postText, setPostText] = useState('');
   const [source, setSource] = useState('manual');
   const [submitting, setSubmitting] = useState(false);
@@ -35,36 +33,38 @@ export default function LostReportForm() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function processScreenshots(newFiles) {
+  // Adding a screenshot (by picking or pasting) only collects it - it does
+  // not analyze anything by itself, so someone can paste a photo, then
+  // paste the post's link, then add another photo, and only then run one
+  // extraction over everything they've gathered via the button below,
+  // instead of the first paste jumping the gun on a still-incomplete set.
+  function addScreenshots(newFiles) {
     if (newFiles.length === 0) return;
-
-    // A second, separate upload is ambiguous: it could be another screenshot
-    // of the same continued post (caption cut off, "...עוד"), or a mistake -
-    // someone uploading a different cat's screenshot into this same form.
-    // Selecting several files together in one go is unambiguous (that's the
-    // normal same-post case) and isn't gated.
-    if (screenshotFiles.length > 0) {
-      const samePost = await confirm(
-        'כבר הועלתה תמונה קודם לתיק הזה. התמונה החדשה שייכת לאותה חתולה ולאותו פוסט?',
-        { confirmLabel: 'כן, אותה חתולה', cancelLabel: 'לא, זו חתולה אחרת', danger: false }
-      );
-      if (!samePost) {
-        setUploadNotice('כדי לדווח על חתול נוסף, יש לסיים ולפתוח קודם את התיק הנוכחי, ואז לפתוח תיק חדש עבורו.');
-        return;
-      }
-      setUploadNotice('');
-    }
-
-    const allScreenshots = [...screenshotFiles, ...newFiles];
-    setScreenshotFiles(allScreenshots);
+    setScreenshotFiles((prev) => [...prev, ...newFiles]);
     setSource('screenshot');
     setPhotos((prev) => [...prev, ...newFiles]);
+  }
 
+  function handleScreenshotUpload(e) {
+    const newFiles = Array.from(e.target.files || []);
+    e.target.value = '';
+    addScreenshots(newFiles);
+  }
+
+  function handlePasteText(e) {
+    const imageFiles = getPastedImageFiles(e);
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    addScreenshots(imageFiles);
+  }
+
+  async function handleAnalyze() {
+    if (screenshotFiles.length === 0) return;
     try {
-      const extracted = await read(allScreenshots, postText);
+      const extracted = await read(screenshotFiles, postText);
       setFields((prev) => mergeExtractedLostFields(extracted, prev));
 
-      const mainPhoto = await extractMainPhoto(allScreenshots, extracted.mainPhotoRegion);
+      const mainPhoto = await extractMainPhoto(screenshotFiles, extracted.mainPhotoRegion);
       if (mainPhoto) {
         setPhotos((prev) => [mainPhoto, ...(hasAutoMainPhoto ? prev.slice(1) : prev)]);
         setHasAutoMainPhoto(true);
@@ -72,19 +72,6 @@ export default function LostReportForm() {
     } catch {
       // error already surfaced via readError; user can fill in manually
     }
-  }
-
-  async function handleScreenshotUpload(e) {
-    const newFiles = Array.from(e.target.files || []);
-    e.target.value = '';
-    await processScreenshots(newFiles);
-  }
-
-  async function handlePasteText(e) {
-    const imageFiles = getPastedImageFiles(e);
-    if (imageFiles.length === 0) return;
-    e.preventDefault();
-    await processScreenshots(imageFiles);
   }
 
   async function handleSubmit(e) {
@@ -101,29 +88,45 @@ export default function LostReportForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-4">
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
-      <h1 className="text-xl font-bold text-slate-800">פתיחת תיק חיפוש - חתול אבד</h1>
+      <div className="flex items-center gap-2">
+        <h1 className="text-xl font-bold text-slate-800">פתיחת תיק חיפוש - חתול אבד</h1>
+        <InfoButton title="איך מוסיפים פוסט על החתולה?">
+          <p>אפשר לצרף מידע בכמה דרכים, גם ביחד - ואז ללחוץ על "זיהוי אוטומטי":</p>
+          <ul className="list-inside list-disc space-y-1">
+            <li>העלאת צילום מסך של הפוסט מפייסבוק - חלק מהשדות יתמלאו אוטומטית.</li>
+            <li>
+              הדבקת הקישור לפוסט או הטקסט שלו בתיבה למטה - שימושי כשאין גישה לשיתוף ישיר מפייסבוק, או כשהכיתוב ארוך
+              ונחתך בצילום המסך ("...עוד").
+            </li>
+            <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
+            <li>אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
+          </ul>
+        </InfoButton>
+      </div>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-        <label className="mb-2 block text-sm font-medium text-slate-600">
-          יש לך צילום מסך של פוסט מפייסבוק על החתולה? אפשר להעלות אותו וחלק מהשדות יתמלאו אוטומטית. אם בפוסט כמה
-          תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
-        </label>
-        <label className="mb-1 mt-3 block text-sm font-medium text-slate-600">
-          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה). אפשר
-          גם להדביק כאן ישירות תמונה/צילום מסך (Ctrl+V)
-        </label>
         <textarea
           className="input mb-2 w-full"
           rows={2}
-          placeholder="קישור או טקסט מהפוסט, או הדבקת תמונה"
+          placeholder="קישור/טקסט מהפוסט (אפשר גם להדביק כאן תמונה)"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
           onPaste={handlePasteText}
         />
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
+
+        {screenshotFiles.length > 0 && (
+          <button
+            type="button"
+            onClick={handleAnalyze}
+            disabled={reading}
+            className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {reading ? 'מזהים פרטים...' : `זיהוי אוטומטי (${screenshotFiles.length} תמונות)`}
+          </button>
+        )}
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
-        {uploadNotice && <p className="mt-2 text-sm text-amber-700">{uploadNotice}</p>}
 
         <div className="mt-4 border-t border-slate-200 pt-4">
           <EditablePhotoGrid
@@ -322,7 +325,6 @@ export default function LostReportForm() {
       >
         {submitting ? 'פותחים תיק...' : 'פתיחת תיק חיפוש'}
       </button>
-      {dialog}
     </form>
   );
 }

@@ -12,7 +12,7 @@ import { useSmartIntake } from './useSmartIntake.js';
  * a Facebook post in is exactly as good as uploading its screenshot by hand.
  */
 export default function ShareTargetIntake() {
-  const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
+  const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
     useSmartIntake();
   const [status, setStatus] = useState('loading'); // loading | empty | no-photo | done
   const [sharedText, setSharedText] = useState('');
@@ -39,16 +39,18 @@ export default function ShareTargetIntake() {
         return;
       }
       setStatus('done');
-      handleFiles(share.photos, text);
+      setFiles(share.photos);
+      analyze(text, share.photos);
     });
-    // handleFiles is stable enough for a one-time, on-mount import - not a dependency we want to re-run on.
+    // analyze/setFiles are stable enough for a one-time, on-mount import - not a dependency we want to re-run on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleManualUpload(e) {
     const newFiles = Array.from(e.target.files || []);
     e.target.value = '';
-    await handleFiles(newFiles, sharedText);
+    setFiles(newFiles);
+    await analyze(sharedText, newFiles);
   }
 
   return (

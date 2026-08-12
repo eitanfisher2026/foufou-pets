@@ -13,6 +13,13 @@ import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js'
  * used by both the manual smart-intake upload button and the share-target
  * screen (photos shared in from Facebook) - one place owns this so the two
  * entry points can't drift apart.
+ *
+ * `analyze()` is a separate, explicit step from collecting files - adding a
+ * photo (by picking or pasting) never triggers it by itself, so someone can
+ * paste a screenshot, then paste the post's link text, then add another
+ * screenshot, and only then run one extraction over everything they've
+ * collected - instead of the first paste kicking off (and creating a
+ * record from) a still-incomplete set.
  */
 export function useSmartIntake() {
   const { user } = useAuth();
@@ -22,16 +29,19 @@ export function useSmartIntake() {
   const [extracted, setExtracted] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  async function handleFiles(newFiles, postText = '') {
-    if (newFiles.length === 0) return;
-    setFiles(newFiles);
+  // `filesOverride` lets a caller that just set the files itself (e.g. the
+  // share-target screen, reacting to a fresh share) pass them directly
+  // instead of relying on `files` state having already re-rendered.
+  async function analyze(postText = '', filesOverride) {
+    const targetFiles = filesOverride ?? files;
+    if (targetFiles.length === 0) return;
     setExtracted(null);
 
     try {
-      const result = await read(newFiles, postText);
+      const result = await read(targetFiles, postText);
       setExtracted(result);
       if (result.reportType === 'lost' || result.reportType === 'found') {
-        await createFromType(result, result.reportType, newFiles);
+        await createFromType(result, result.reportType, targetFiles);
       }
     } catch {
       // error already surfaced via readError
@@ -60,12 +70,13 @@ export function useSmartIntake() {
 
   return {
     files,
+    setFiles,
     extracted,
     reading,
     creating,
     busy: reading || creating,
     readError,
-    handleFiles,
+    analyze,
     createFromType,
     cancelReading,
   };
