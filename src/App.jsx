@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './modules/auth/AuthProvider.jsx';
 import LoginScreen from './modules/auth/LoginScreen.jsx';
 import Dashboard from './modules/dashboard/Dashboard.jsx';
@@ -9,12 +9,24 @@ import FoundReportDetail from './modules/found-report/FoundReportDetail.jsx';
 import MatchSettingsPage from './modules/settings/MatchSettingsPage.jsx';
 import SettingsPage from './modules/settings/SettingsPage.jsx';
 import CostSettingsPage from './modules/settings/CostSettingsPage.jsx';
+import UsersSettingsPage from './modules/settings/UsersSettingsPage.jsx';
 import SmartIntakeForm from './modules/intake/SmartIntakeForm.jsx';
 import ShareTargetIntake from './modules/intake/ShareTargetIntake.jsx';
 import MatchAnalysisPage from './modules/matching/MatchAnalysisPage.jsx';
 import FoundReportsListPage from './modules/dashboard/FoundReportsListPage.jsx';
 import ArchivePage from './modules/dashboard/ArchivePage.jsx';
 import { useHomeHistoryGuard } from './modules/shared/useHomeHistoryGuard.js';
+
+// Settings (parameters, costs, user management) is admin-only - editors and
+// regular users shouldn't even know it exists, per the role spec, not just
+// be blocked from the actions inside it. Firestore rules are the real
+// enforcement; this just keeps the UI from ever showing it to begin with.
+function RequireAdmin({ children }) {
+  const { isAdmin, roleLoading } = useAuth();
+  if (roleLoading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return children;
+}
 
 function AppRoutes() {
   const { user, loading } = useAuth();
@@ -40,9 +52,38 @@ function AppRoutes() {
         <Route path="/report/new" element={<SmartIntakeForm />} />
         <Route path="/share-target" element={<ShareTargetIntake />} />
         <Route path="/found/:reportId" element={<FoundReportDetail />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/settings/matching" element={<MatchSettingsPage />} />
-        <Route path="/settings/cost" element={<CostSettingsPage />} />
+        <Route
+          path="/settings"
+          element={
+            <RequireAdmin>
+              <SettingsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/settings/matching"
+          element={
+            <RequireAdmin>
+              <MatchSettingsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/settings/cost"
+          element={
+            <RequireAdmin>
+              <CostSettingsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/settings/users"
+          element={
+            <RequireAdmin>
+              <UsersSettingsPage />
+            </RequireAdmin>
+          }
+        />
       </Routes>
     </div>
   );

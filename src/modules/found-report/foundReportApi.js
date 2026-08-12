@@ -45,6 +45,7 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
     source: fields.source || 'manual',
     reportedByUid,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 
   if (photoFiles && photoFiles.length > 0) {
@@ -94,6 +95,7 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
       postAgeText: fields.postAgeText || '',
       sourceUrl: fields.sourceUrl || '',
       aiCostUsd: fields.aiCostUsd || 0,
+      updatedAt: serverTimestamp(),
     },
     { merge: true }
   );
@@ -105,7 +107,7 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
 }
 
 export async function updateFoundReportStatus(reportId, status) {
-  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { status }, { merge: true });
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { status, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 /**

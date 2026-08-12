@@ -6,6 +6,7 @@ import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js
 import { listLostCases } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow } from './RecordRows.jsx';
+import ProfileMenu from '../shared/ProfileMenu.jsx';
 
 // A found report doesn't need its own eagerly-loaded browsing list on every
 // dashboard visit - matching already runs its own independent query against
@@ -48,9 +49,7 @@ export default function Dashboard() {
           </h1>
           <p className="truncate text-sm text-slate-500">{user?.displayName}</p>
         </div>
-        <Link to="/settings" className="shrink-0 text-sm text-slate-500 underline">
-          הגדרות ⚙
-        </Link>
+        <ProfileMenu />
       </header>
 
       <div className="mb-3 flex gap-3">

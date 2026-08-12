@@ -2,8 +2,87 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : 'regular';
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == 'admin';
+    }
+
+    function isEditorOrAdmin() {
+      return signedIn() && (role() == 'admin' || role() == 'editor');
+    }
+
+    // Settings (where roles get managed) is admin-only, which means nobody
+    // could ever reach it to grant the very first admin - one known
+    // identity is allowed to create its own profile doc as admin instead
+    // of regular, mirroring the same check in usersApi.js. Everyone else
+    // always starts REGULAR; only an existing admin can promote anyone
+    // after that.
+    function isBootstrapAdmin() {
+      return request.auth.token.email == 'eitanfisher100@gmail.com';
+    }
+
+    // Everyone who has ever signed in gets a profile doc (see usersApi.js:
+    // upsertUserOnLogin). Only an admin can change someone's role after
+    // creation; a user can still update their own doc (lastLoginAt,
+    // refreshed displayName/photoURL on each sign-in) as long as they
+    // leave role untouched.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid &&
+        (request.resource.data.role == 'regular' || (request.resource.data.role == 'admin' && isBootstrapAdmin()));
+      allow update: if isAdmin() ||
+        (signedIn() && request.auth.uid == uid && request.resource.data.role == resource.data.role);
+      allow delete: if isAdmin();
+    }
+
+    // Everyone can view every case (regular users included - "view all
+    // records" is explicit) and create their own. Editing/deleting someone
+    // else's case is editor/admin-only, EXCEPT the specific denormalized
+    // fields a match-check writes back onto the case (matchCount etc.) -
+    // "run the match for all" needs to write those on any case, not just
+    // your own, without opening up the rest of the record.
+    match /lostCases/{caseId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn() && (
+        isEditorOrAdmin() ||
+        resource.data.ownerId == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['matchCount', 'newMatchCount', 'topMatchScore', 'lastCheckedAt'])
+      );
+      allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.ownerId == request.auth.uid);
+
+      // Match results/status - who exactly may change a match's status is
+      // still undecided (matching + archiving permissions are explicitly a
+      // "refine later" item), so left open to any signed-in user for now.
+      match /matches/{foundReportId} {
+        allow read, write: if signedIn();
+      }
+    }
+
+    match /foundReports/{reportId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
+      allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
+    }
+
+    // Shared config (match weights, the customizable color list) - read by
+    // everyone (forms/matching use these), written only from the
+    // admin-only settings screens that edit them.
+    match /config/{docId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
     }
   }
 }

@@ -41,6 +41,7 @@ export async function createLostCase(fields, photoFiles, ownerId) {
     source: fields.source || 'manual',
     ownerId,
     createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 
   if (photoFiles && photoFiles.length > 0) {
@@ -93,6 +94,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       postAgeText: fields.postAgeText || '',
       sourceUrl: fields.sourceUrl || '',
       aiCostUsd: fields.aiCostUsd || 0,
+      updatedAt: serverTimestamp(),
     },
     { merge: true }
   );
@@ -104,7 +106,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
 }
 
 export async function updateLostCaseStatus(caseId, status) {
-  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { status }, { merge: true });
+  await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { status, updatedAt: serverTimestamp() }, { merge: true });
 }
 
 /**
@@ -121,6 +123,7 @@ export async function updateLostCaseClosure(caseId, status, closure) {
       closureReason: closure.closureReason || '',
       closedBy: closure.closedBy || '',
       closingComment: closure.closingComment || '',
+      updatedAt: serverTimestamp(),
     },
     { merge: true }
   );

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   COLLECTIONS,
   REPORT_STATUS,
@@ -97,6 +98,7 @@ const MATCH_STATUS_COLORS = {
 export default function LostCaseDetail() {
   const { caseId } = useParams();
   const navigate = useNavigate();
+  const { user, isEditorOrAdmin } = useAuth();
   const [lostCase, setLostCase] = useState(null);
   const [matches, setMatches] = useState([]);
   const [reportsById, setReportsById] = useState({});
@@ -315,6 +317,11 @@ export default function LostCaseDetail() {
 
   if (!lostCase) return <p className="p-4 text-slate-500">טוען...</p>;
 
+  // A regular user can manage only what they created; editors/admins can
+  // manage everything. Viewing and running matches stay open to everyone
+  // regardless (see collections.js / firestore.rules).
+  const canManage = isEditorOrAdmin || lostCase.ownerId === user.uid;
+
   const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
   const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
 
@@ -344,14 +351,18 @@ export default function LostCaseDetail() {
                 <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
                   פרטים מלאים
                 </button>
-                <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
-                  עריכה
-                </button>
+                {canManage && (
+                  <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
+                    עריכה
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-3">
-                <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
-                  {deleting ? 'מוחקים...' : 'מחיקת התיק'}
-                </button>
+                {canManage && (
+                  <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
+                    {deleting ? 'מוחקים...' : 'מחיקת התיק'}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() =>

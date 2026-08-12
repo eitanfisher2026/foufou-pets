@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   getFoundReport,
   updateFoundReport,
@@ -53,6 +54,7 @@ const EXTRACTION_FIELD_DEFS = [
 export default function FoundReportDetail() {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const { user, isEditorOrAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   const [report, setReport] = useState(null);
   // Lets a link jump straight into edit mode (e.g. "עריכה" on a match card
@@ -189,13 +191,20 @@ export default function FoundReportDetail() {
 
   if (!report) return <p className="p-4 text-slate-500">טוען...</p>;
 
+  // A regular user can manage only what they reported; editors/admins can
+  // manage everything. A ?edit=1 deep link (e.g. from a match card) still
+  // only works for someone who's actually allowed to edit - anyone else
+  // lands on the normal view instead.
+  const canManage = isEditorOrAdmin || report.reportedByUid === user.uid;
+  const showEditForm = editing && canManage;
+
   return (
     <div className="p-4">
       <BackLink onClick={handleBackToHome} onBack={handleBackInHistory}>
         לעמוד הראשי
       </BackLink>
 
-      {!editing ? (
+      {!showEditForm ? (
         <>
           <MainPhoto photo={report.photos?.[0]} onView={setLightboxUrl} />
           <div className="mb-4">
@@ -216,12 +225,16 @@ export default function FoundReportDetail() {
               <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
                 פרטים מלאים
               </button>
-              <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
-                עריכה
-              </button>
-              <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
-                {deleting ? 'מוחקים...' : 'מחיקת הדיווח'}
-              </button>
+              {canManage && (
+                <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
+                  עריכה
+                </button>
+              )}
+              {canManage && (
+                <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
+                  {deleting ? 'מוחקים...' : 'מחיקת הדיווח'}
+                </button>
+              )}
             </div>
           </div>
           {report.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{report.markings}</p>}
