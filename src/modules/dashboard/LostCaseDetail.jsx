@@ -152,6 +152,13 @@ export default function LostCaseDetail() {
     navigate('/');
   }
 
+  async function handleBackInHistory() {
+    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+      return;
+    }
+    navigate(-1);
+  }
+
   async function load() {
     const data = await getLostCase(caseId);
     setLostCase(data);
@@ -314,7 +321,9 @@ export default function LostCaseDetail() {
 
   return (
     <div className="p-4">
-      <BackLink onClick={handleBackToHome}>חזרה לעמוד הראשי</BackLink>
+      <BackLink onClick={handleBackToHome} onBack={handleBackInHistory}>
+        לעמוד הראשי
+      </BackLink>
 
       {!editing ? (
         <>

@@ -10,10 +10,20 @@ const CLASS_NAME =
  * (a plain underlined text link at the natural RTL start/right was easy to
  * miss). Pass `to` for a plain route link, or `onClick` for screens that
  * need to confirm first (e.g. unsaved edits) instead of navigating directly.
+ *
+ * `onBack`, if given, adds a second "חזרה" button that returns to wherever
+ * the user actually came from (previous history entry) - useful on hub
+ * pages reached from several different places (a list, a match card, the
+ * archive), where jumping straight to the dashboard loses that context.
  */
-export default function BackLink({ to, onClick, children }) {
+export default function BackLink({ to, onClick, onBack, children }) {
   return (
-    <div className="mb-4 flex justify-end">
+    <div className="mb-4 flex justify-end gap-2">
+      {onBack && (
+        <button type="button" onClick={onBack} className={CLASS_NAME}>
+          <span aria-hidden="true">←</span> חזרה
+        </button>
+      )}
       {to ? (
         <Link to={to} className={CLASS_NAME}>
           <span aria-hidden="true">←</span> {children}

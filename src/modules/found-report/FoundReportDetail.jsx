@@ -100,6 +100,13 @@ export default function FoundReportDetail() {
     navigate('/');
   }
 
+  async function handleBackInHistory() {
+    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+      return;
+    }
+    navigate(-1);
+  }
+
   async function load() {
     const data = await getFoundReport(reportId);
     setReport(data);
@@ -184,7 +191,9 @@ export default function FoundReportDetail() {
 
   return (
     <div className="p-4">
-      <BackLink onClick={handleBackToHome}>חזרה לעמוד הראשי</BackLink>
+      <BackLink onClick={handleBackToHome} onBack={handleBackInHistory}>
+        לעמוד הראשי
+      </BackLink>
 
       {!editing ? (
         <>
