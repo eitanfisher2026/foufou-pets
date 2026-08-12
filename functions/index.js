@@ -216,6 +216,13 @@ export const extractReportFromImages = onCall(
       throw new HttpsError('invalid-argument', 'Too many images in one request.');
     }
 
+    // Optional caption/link text captured alongside the screenshot(s) -
+    // shared in from Facebook's own share sheet (which hands over the post's
+    // full text/URL but never a photo) or pasted in by hand. A screenshot
+    // alone often cuts off long captions ("...עוד"); this fills that gap
+    // without replacing the image-based extraction, which is still required.
+    const postText = typeof request.data?.postText === 'string' ? request.data.postText.slice(0, 4000) : '';
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const imageBlocks = images.map((img) => ({
@@ -244,6 +251,14 @@ export const extractReportFromImages = onCall(
           role: 'user',
           content: [
             ...imageBlocks,
+            ...(postText
+              ? [
+                  {
+                    type: 'text',
+                    text: `Additional text shared alongside the screenshot(s) - this is the post's own caption/link text and may include content cut off in the image (e.g. "...עוד"). Prefer it over the image where they overlap:\n${postText}`,
+                  },
+                ]
+              : []),
             { type: 'text', text: `Today's date is ${todayIso}. Extract the fields from this post.` },
           ],
         },

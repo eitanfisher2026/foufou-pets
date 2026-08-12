@@ -22,13 +22,13 @@ export function useSmartIntake() {
   const [extracted, setExtracted] = useState(null);
   const [creating, setCreating] = useState(false);
 
-  async function handleFiles(newFiles) {
+  async function handleFiles(newFiles, postText = '') {
     if (newFiles.length === 0) return;
     setFiles(newFiles);
     setExtracted(null);
 
     try {
-      const result = await read(newFiles);
+      const result = await read(newFiles, postText);
       setExtracted(result);
       if (result.reportType === 'lost' || result.reportType === 'found') {
         await createFromType(result, result.reportType, newFiles);

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { useSmartIntake } from './useSmartIntake.js';
@@ -13,11 +14,12 @@ import { useSmartIntake } from './useSmartIntake.js';
 export default function SmartIntakeForm() {
   const { files, extracted, busy, reading, readError, handleFiles, createFromType, creating, cancelReading } =
     useSmartIntake();
+  const [postText, setPostText] = useState('');
 
   async function handleUpload(e) {
     const newFiles = Array.from(e.target.files || []);
     e.target.value = '';
-    await handleFiles(newFiles);
+    await handleFiles(newFiles, postText);
   }
 
   return (
@@ -31,6 +33,18 @@ export default function SmartIntakeForm() {
       </p>
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+        <label className="mb-1 block text-sm font-medium text-slate-600">
+          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה) -
+          יעזור להשלים פרטים גם אם הם נחתכים בצילום המסך
+        </label>
+        <textarea
+          className="input mb-3 w-full"
+          rows={2}
+          placeholder="קישור או טקסט מהפוסט"
+          value={postText}
+          onChange={(e) => setPostText(e.target.value)}
+          disabled={busy}
+        />
         <input type="file" accept="image/*" multiple onChange={handleUpload} disabled={busy} />
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {creating && <AnalyzingIndicator />}

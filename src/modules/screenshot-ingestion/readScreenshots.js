@@ -19,7 +19,7 @@ function blobToBase64(blob) {
  * WhatsApp/Facebook screenshots can be several MB, which slows the request
  * and costs more in image tokens without improving OCR accuracy.
  */
-export async function readScreenshots(files) {
+export async function readScreenshots(files, postText = '') {
   const images = await Promise.all(
     files.map(async (file) => ({
       base64: await blobToBase64(await compressImage(file)),
@@ -30,6 +30,6 @@ export async function readScreenshots(files) {
   // Matches the function's own 120s timeout - the SDK's 70s default would
   // otherwise abort client-side before a slower extraction finishes server-side.
   const extract = httpsCallable(functions, 'extractReportFromImages', { timeout: 120000 });
-  const result = await extract({ images });
+  const result = await extract({ images, postText });
   return result.data;
 }

@@ -26,6 +26,7 @@ export default function LostReportForm() {
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
   const [uploadNotice, setUploadNotice] = useState('');
+  const [postText, setPostText] = useState('');
   const [source, setSource] = useState('manual');
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +62,7 @@ export default function LostReportForm() {
     setPhotos((prev) => [...prev, ...newFiles]);
 
     try {
-      const extracted = await read(allScreenshots);
+      const extracted = await read(allScreenshots, postText);
       setFields((prev) => mergeExtractedLostFields(extracted, prev));
 
       const mainPhoto = await extractMainPhoto(allScreenshots, extracted.mainPhotoRegion);
@@ -95,6 +96,16 @@ export default function LostReportForm() {
           יש לך צילום מסך של פוסט מפייסבוק על החתולה? אפשר להעלות אותו וחלק מהשדות יתמלאו אוטומטית. אם בפוסט כמה
           תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
+        <label className="mb-1 mt-3 block text-sm font-medium text-slate-600">
+          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה)
+        </label>
+        <textarea
+          className="input mb-2 w-full"
+          rows={2}
+          placeholder="קישור או טקסט מהפוסט"
+          value={postText}
+          onChange={(e) => setPostText(e.target.value)}
+        />
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}

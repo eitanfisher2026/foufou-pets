@@ -32,13 +32,14 @@ export default function ShareTargetIntake() {
         setStatus('empty');
         return;
       }
+      const text = [share.text, share.url].filter(Boolean).join('\n');
+      setSharedText(text);
       if (share.photos.length === 0) {
-        setSharedText([share.text, share.url].filter(Boolean).join('\n'));
         setStatus('no-photo');
         return;
       }
       setStatus('done');
-      handleFiles(share.photos);
+      handleFiles(share.photos, text);
     });
     // handleFiles is stable enough for a one-time, on-mount import - not a dependency we want to re-run on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -47,7 +48,7 @@ export default function ShareTargetIntake() {
   async function handleManualUpload(e) {
     const newFiles = Array.from(e.target.files || []);
     e.target.value = '';
-    await handleFiles(newFiles);
+    await handleFiles(newFiles, sharedText);
   }
 
   return (

@@ -26,6 +26,7 @@ export default function FoundReportForm() {
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
   const [uploadNotice, setUploadNotice] = useState('');
+  const [postText, setPostText] = useState('');
   const [source, setSource] = useState('manual');
   const [extracted, setExtracted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -62,7 +63,7 @@ export default function FoundReportForm() {
     setPhotos((prev) => [...prev, ...newFiles]);
 
     try {
-      const result = await read(allScreenshots);
+      const result = await read(allScreenshots, postText);
       setFields((prev) => mergeExtractedFoundFields(result, prev));
       setExtracted(true);
 
@@ -100,6 +101,16 @@ export default function FoundReportForm() {
           צילום/י מסך של הפוסט (אפשר כמה תמונות, כולל אם הכיתוב נמשך ב"עוד"). אם בפוסט כמה תמונות של החתולה, כדאי
           לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
+        <label className="mb-1 mt-3 block text-sm font-medium text-slate-600">
+          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה)
+        </label>
+        <textarea
+          className="input mb-2 w-full"
+          rows={2}
+          placeholder="קישור או טקסט מהפוסט"
+          value={postText}
+          onChange={(e) => setPostText(e.target.value)}
+        />
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
