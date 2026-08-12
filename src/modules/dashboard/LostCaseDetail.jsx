@@ -803,7 +803,7 @@ export default function LostCaseDetail() {
             },
             {
               title: 'פרטי רשומה',
-              collapsible: true,
+              startClosed: true,
               rows: [
                 { label: 'נוצר/ה על ידי', value: lostCase.ownerName || lostCase.ownerEmail || lostCase.ownerId },
                 { label: 'תאריך יצירה', value: formatDateTime(lostCase.createdAt) },

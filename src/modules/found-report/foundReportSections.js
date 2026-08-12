@@ -66,7 +66,7 @@ export function buildFoundReportSections(report) {
     },
     {
       title: 'פרטי רשומה',
-      collapsible: true,
+      startClosed: true,
       rows: [
         { label: 'נוצר/ה על ידי', value: report.reporterName || report.reporterEmail || report.reportedByUid },
         { label: 'תאריך יצירה', value: formatDateTime(report.createdAt) },
