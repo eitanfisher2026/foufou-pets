@@ -9,6 +9,7 @@ import FormSection from '../shared/FormSection.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import Field from '../shared/Field.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
+import { getPastedImageFiles } from '../shared/pasteImages.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
@@ -35,9 +36,7 @@ export default function FoundReportForm() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleScreenshotUpload(e) {
-    const newFiles = Array.from(e.target.files || []);
-    e.target.value = '';
+  async function processScreenshots(newFiles) {
     if (newFiles.length === 0) return;
 
     // A second, separate upload is ambiguous: it could be another screenshot
@@ -77,6 +76,19 @@ export default function FoundReportForm() {
     }
   }
 
+  async function handleScreenshotUpload(e) {
+    const newFiles = Array.from(e.target.files || []);
+    e.target.value = '';
+    await processScreenshots(newFiles);
+  }
+
+  async function handlePasteText(e) {
+    const imageFiles = getPastedImageFiles(e);
+    if (imageFiles.length === 0) return;
+    e.preventDefault();
+    await processScreenshots(imageFiles);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
@@ -102,14 +114,16 @@ export default function FoundReportForm() {
           לצרף גם תמונה בודדת וממוקדת שלה בנוסף לצילום המסך, כדי שהתמונה הראשית תצא מדויקת.
         </label>
         <label className="mb-1 mt-3 block text-sm font-medium text-slate-600">
-          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה)
+          אין גישה לאפליקציית פייסבוק לשיתוף ישיר? אפשר להדביק כאן את הקישור לפוסט או את הטקסט שלו (לא חובה). אפשר
+          גם להדביק כאן ישירות תמונה/צילום מסך (Ctrl+V)
         </label>
         <textarea
           className="input mb-2 w-full"
           rows={2}
-          placeholder="קישור או טקסט מהפוסט"
+          placeholder="קישור או טקסט מהפוסט, או הדבקת תמונה"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
+          onPaste={handlePasteText}
         />
         <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
