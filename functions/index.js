@@ -296,3 +296,98 @@ export const extractReportFromImages = onCall(
     }
   }
 );
+
+const FACEBOOK_HOSTNAME_RE = /(^|\.)facebook\.com$|^fb\.watch$|^fb\.me$/i;
+const MAX_PREVIEW_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function isFacebookUrl(raw) {
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'https:' && FACEBOOK_HOSTNAME_RE.test(parsed.hostname);
+  } catch {
+    return false;
+  }
+}
+
+// Facebook's HTML escapes non-ASCII into numeric character references
+// (Hebrew text comes back as a long run of &#xNNNN; entities) - this
+// covers those plus the handful of named entities that show up in
+// practice, without pulling in a full HTML-entity-decoding dependency.
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+// Attribute order in Facebook's <meta property="og:X" content="..."> tags
+// is consistent in practice, but matching both orders is cheap insurance
+// against a markup change breaking this silently.
+function extractOgTag(html, property) {
+  const propertyFirst = new RegExp(`<meta[^>]*property=["']og:${property}["'][^>]*content=["']([^"']*)["']`, 'i');
+  const contentFirst = new RegExp(`<meta[^>]*content=["']([^"']*)["'][^>]*property=["']og:${property}["']`, 'i');
+  const match = html.match(propertyFirst) || html.match(contentFirst);
+  return match ? decodeHtmlEntities(match[1]) : '';
+}
+
+/**
+ * Pulls a public Facebook post's own preview text/photo straight from the
+ * link, using the same "facebookexternalhit" crawler identity Facebook
+ * itself expects when generating the rich preview shown when a link is
+ * pasted into Messenger/WhatsApp - a normal browser or plain fetch gets a
+ * login wall, but this identity gets the post's public og:title/
+ * og:description/og:image directly, no login involved and nothing beyond
+ * what the post already exposes for that exact purpose.
+ *
+ * Only works for public posts (private/restricted groups still fail, same
+ * as they'd fail for anyone not already a member) - always a best-effort
+ * supplement to the screenshot-based reading, never a replacement for it.
+ */
+export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+
+  const url = request.data?.url;
+  if (typeof url !== 'string' || !isFacebookUrl(url)) {
+    throw new HttpsError('invalid-argument', 'A facebook.com link is required.');
+  }
+
+  let html;
+  try {
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'facebookexternalhit/1.1' },
+      redirect: 'follow',
+    });
+    html = await res.text();
+  } catch {
+    return { text: '', imageBase64: null, imageMimeType: null };
+  }
+
+  const text = extractOgTag(html, 'description') || extractOgTag(html, 'title');
+  const imageUrl = extractOgTag(html, 'image');
+
+  let imageBase64 = null;
+  let imageMimeType = null;
+  if (imageUrl) {
+    try {
+      const imgRes = await fetch(imageUrl);
+      const contentType = imgRes.headers.get('content-type') || '';
+      if (imgRes.ok && contentType.startsWith('image/')) {
+        const buf = Buffer.from(await imgRes.arrayBuffer());
+        if (buf.length <= MAX_PREVIEW_IMAGE_BYTES) {
+          imageBase64 = buf.toString('base64');
+          imageMimeType = contentType.split(';')[0];
+        }
+      }
+    } catch {
+      // Text alone is still useful - the image is a bonus, not required.
+    }
+  }
+
+  return { text, imageBase64, imageMimeType };
+});

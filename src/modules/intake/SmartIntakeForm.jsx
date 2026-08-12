@@ -4,6 +4,9 @@ import BackLink from '../shared/BackLink.jsx';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import InfoButton from '../shared/InfoButton.jsx';
 import { getPastedImageFiles } from '../shared/pasteImages.js';
+import { extractFacebookUrl } from '../shared/facebookLink.js';
+import { base64ToFile } from '../shared/base64ToFile.js';
+import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -18,6 +21,9 @@ export default function SmartIntakeForm() {
   const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
     useSmartIntake();
   const [postText, setPostText] = useState('');
+  const [fetchingLink, setFetchingLink] = useState(false);
+  const [linkFetchError, setLinkFetchError] = useState('');
+  const detectedFbUrl = extractFacebookUrl(postText);
 
   function handleUpload(e) {
     const newFiles = Array.from(e.target.files || []);
@@ -32,6 +38,33 @@ export default function SmartIntakeForm() {
     setFiles((prev) => [...prev, ...imageFiles]);
   }
 
+  // Pulls the post's own public preview text/photo straight from a pasted
+  // Facebook link (see fetchFacebookPreview.js) - no login needed, since
+  // it's the same preview data Facebook already serves to generate a link's
+  // rich preview elsewhere. Works for public posts only; private/restricted
+  // ones come back empty, same as they would for anyone not already a
+  // member.
+  async function handleFetchFromLink() {
+    if (!detectedFbUrl) return;
+    setFetchingLink(true);
+    setLinkFetchError('');
+    try {
+      const preview = await fetchFacebookPreview(detectedFbUrl);
+      if (preview.text && !postText.includes(preview.text)) {
+        setPostText((prev) => `${prev}\n${preview.text}`.trim());
+      }
+      if (preview.imageBase64) {
+        setFiles((prev) => [...prev, base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);
+      } else if (!preview.text) {
+        setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (יכול לקרות בפוסטים פרטיים) - אפשר להמשיך עם צילום מסך.');
+      }
+    } catch {
+      setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (יכול לקרות בפוסטים פרטיים) - אפשר להמשיך עם צילום מסך.');
+    } finally {
+      setFetchingLink(false);
+    }
+  }
+
   return (
     <div className="space-y-5 p-4">
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
@@ -42,9 +75,11 @@ export default function SmartIntakeForm() {
           <ul className="list-inside list-disc space-y-1">
             <li>העלאת צילום מסך של הפוסט מפייסבוק.</li>
             <li>
-              הדבקת הטקסט של הפוסט עצמו בתיבה למטה - שימושי כשהכיתוב ארוך ונחתך בצילום המסך ("...עוד"). חשוב: צריך
-              להעתיק את הטקסט עצמו מהפוסט, לא רק את הקישור אליו - האפליקציה לא פותחת קישורים, רק קוראת טקסט/תמונה
-              שהודבקו בפועל.
+              הדבקת הטקסט של הפוסט עצמו בתיבה למטה - שימושי כשהכיתוב ארוך ונחתך בצילום המסך ("...עוד").
+            </li>
+            <li>
+              הדבקת קישור לפוסט בתיבה - יופיע כפתור "משיכת מידע מהקישור" שמנסה להביא את הטקסט והתמונה של הפוסט
+              ישירות (עובד רק בפוסטים פומביים, לא בקבוצות סגורות).
             </li>
             <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
             <li>אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
@@ -57,12 +92,23 @@ export default function SmartIntakeForm() {
         <textarea
           className="input mb-3 w-full"
           rows={2}
-          placeholder="טקסט הפוסט עצמו (לא רק קישור) - אפשר גם להדביק כאן תמונה"
+          placeholder="קישור או טקסט מהפוסט - אפשר גם להדביק כאן תמונה"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
           onPaste={handlePasteText}
           disabled={busy}
         />
+        {detectedFbUrl && (
+          <button
+            type="button"
+            onClick={handleFetchFromLink}
+            disabled={fetchingLink || busy}
+            className="mb-3 w-full rounded-xl border border-blue-300 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 disabled:opacity-50"
+          >
+            {fetchingLink ? 'מושכים מידע מהקישור...' : 'משיכת מידע מהקישור (טקסט + תמונה)'}
+          </button>
+        )}
+        {linkFetchError && <p className="mb-2 text-xs text-red-600">{linkFetchError}</p>}
 
         <EditablePhotoGrid
           existingPhotos={[]}

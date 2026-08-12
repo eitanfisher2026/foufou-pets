@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { takePendingShare } from '../shared/shareTargetStorage.js';
+import { extractFacebookUrl } from '../shared/facebookLink.js';
+import { base64ToFile } from '../shared/base64ToFile.js';
+import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -14,7 +17,7 @@ import { useSmartIntake } from './useSmartIntake.js';
 export default function ShareTargetIntake() {
   const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
     useSmartIntake();
-  const [status, setStatus] = useState('loading'); // loading | empty | no-photo | done
+  const [status, setStatus] = useState('loading'); // loading | empty | no-photo | fetching-link | done
   const [sharedText, setSharedText] = useState('');
   const started = useRef(false);
 
@@ -22,7 +25,7 @@ export default function ShareTargetIntake() {
     if (started.current) return;
     started.current = true;
 
-    takePendingShare().then((share) => {
+    takePendingShare().then(async (share) => {
       // Genuinely nothing came through - either this page was opened
       // directly (not via a share), or the pending share was already
       // consumed by an earlier load of this same page (e.g. a service
@@ -34,13 +37,38 @@ export default function ShareTargetIntake() {
       }
       const text = [share.text, share.url].filter(Boolean).join('\n');
       setSharedText(text);
-      if (share.photos.length === 0) {
-        setStatus('no-photo');
+
+      if (share.photos.length > 0) {
+        setStatus('done');
+        setFiles(share.photos);
+        analyze(text, share.photos);
         return;
       }
-      setStatus('done');
-      setFiles(share.photos);
-      analyze(text, share.photos);
+
+      // No photo in the share itself (normal for sharing just a post link)
+      // - before asking for a manual screenshot, try pulling the post's own
+      // public preview photo/text straight from the link. Only works for
+      // public posts; anything else just falls through to the manual
+      // upload prompt below, same as today.
+      const fbUrl = extractFacebookUrl(share.url) || extractFacebookUrl(share.text);
+      if (fbUrl) {
+        setStatus('fetching-link');
+        try {
+          const preview = await fetchFacebookPreview(fbUrl);
+          const combinedText = [text, preview.text].filter(Boolean).join('\n');
+          setSharedText(combinedText);
+          if (preview.imageBase64) {
+            const file = base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg');
+            setStatus('done');
+            setFiles([file]);
+            analyze(combinedText, [file]);
+            return;
+          }
+        } catch {
+          // fall through to the manual no-photo prompt below
+        }
+      }
+      setStatus('no-photo');
     });
     // analyze/setFiles are stable enough for a one-time, on-mount import - not a dependency we want to re-run on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,6 +88,12 @@ export default function ShareTargetIntake() {
 
       {status === 'loading' && <AnalyzingIndicator />}
 
+      {status === 'fetching-link' && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm text-blue-800">מנסים למשוך את התמונה והטקסט ישירות מהקישור לפוסט...</p>
+        </div>
+      )}
+
       {status === 'empty' && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
@@ -72,8 +106,8 @@ export default function ShareTargetIntake() {
       {status === 'no-photo' && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
-            קיבלנו את הטקסט/קישור של הפוסט - שיתוף הפוסט הוא צעד ראשון טוב, בעיקר כשיש טקסט ארוך שנחתך בצילום מסך
-            ("...עוד"). עכשיו נשאר רק לצרף תמונה של החתולה כדי שנוכל לזהות אותה.
+            קיבלנו את הטקסט/קישור של הפוסט, אבל לא הצלחנו למשוך ממנו תמונה (יכול לקרות בפוסטים פרטיים) - צריך לצרף
+            תמונה של החתולה כדי שנוכל לזהות אותה.
           </p>
           <p className="mt-2 text-sm text-amber-800">
             אם בפוסט תמונה אחת בלבד - צילום מסך של הפוסט כולו מספיק. אם יש בו כמה תמונות - עדיף לצרף גם תמונה
@@ -89,7 +123,7 @@ export default function ShareTargetIntake() {
       {creating && <AnalyzingIndicator />}
       {readError && <p className="text-sm text-red-600">{readError}</p>}
 
-      {status !== 'loading' && !creating && (
+      {status !== 'loading' && status !== 'fetching-link' && !creating && (
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-600">
             {status === 'empty' || status === 'no-photo' ? 'צירוף תמונה/ות' : 'רוצה לנסות תמונה אחרת?'}
