@@ -5,6 +5,7 @@ import { takePendingShare } from '../shared/shareTargetStorage.js';
 import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
+import { petLabels } from '../shared/petLabels.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -120,11 +121,11 @@ export default function ShareTargetIntake() {
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
             קיבלנו את הטקסט/קישור של הפוסט, אבל לא הצלחנו למשוך ממנו תמונה (יכול לקרות בפוסטים פרטיים) - צריך לצרף
-            תמונה של החתולה כדי שנוכל לזהות אותה.
+            תמונה של החיה כדי שנוכל לזהות אותה.
           </p>
           <p className="mt-2 text-sm text-amber-800">
             אם בפוסט תמונה אחת בלבד - צילום מסך של הפוסט כולו מספיק. אם יש בו כמה תמונות - עדיף לצרף גם תמונה
-            בודדת וממוקדת של החתולה עצמה (בנוסף לצילום המסך), כדי שהתמונה הראשית של הרשומה תצא מדויקת.
+            בודדת וממוקדת שלה (בנוסף לצילום המסך), כדי שהתמונה הראשית של הרשומה תצא מדויקת.
           </p>
           {sharedText && (
             <p className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-2 text-xs text-slate-600">{sharedText}</p>
@@ -147,23 +148,21 @@ export default function ShareTargetIntake() {
 
       {extracted && !extracted.reportType && !creating && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <p className="mb-3 text-sm text-amber-800">
-            לא הצלחנו לזהות אוטומטית מהפוסט אם זה דיווח על חתול שאבד או שנמצא - איזה מהם זה?
-          </p>
+          <p className="mb-3 text-sm text-amber-800">לא הצלחנו לזהות אוטומטית אם זה דיווח על אבידה או מציאה - איזה מהם זה?</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => createFromType(extracted, 'lost', files)}
               className="flex-1 rounded-xl bg-red-600 px-4 py-2 font-medium text-white"
             >
-              חתול שאבד
+              {petLabels(extracted.species).lostButton}
             </button>
             <button
               type="button"
               onClick={() => createFromType(extracted, 'found', files)}
               className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white"
             >
-              חתול שנמצא/נראה
+              {petLabels(extracted.species).foundButton}
             </button>
           </div>
         </div>

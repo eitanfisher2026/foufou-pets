@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { RECORD_STATUS } from '../shared/collections.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 
 // Shared between the dashboard's default list, the full found-reports
@@ -68,7 +69,7 @@ export function FoundReportRow({ report: r, statusLabels }) {
     <li>
       <Link to={`/found/${r.id}`} className="block rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
         <div className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{r.title || 'חתול'}</span>
+          <span className="min-w-0 flex-1 truncate font-medium text-slate-800">{displayFoundReportName(r)}</span>
           <StatusBadge status={r.status} labels={statusLabels} />
         </div>
         <p className="mt-1 truncate text-xs text-slate-400">{r.neighborhood}</p>

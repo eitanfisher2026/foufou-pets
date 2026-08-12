@@ -33,15 +33,21 @@ function estimateCostUsd(usage) {
   );
 }
 
-// Must match CAT_COLORS/COLLAR_COLORS in src/modules/shared/collections.js -
-// the functions package doesn't share modules with the client, so these are
-// kept in sync by hand. If the color list is customized in the settings
-// panel (config/colorOptions in Firestore), this static copy needs to be
-// updated and redeployed too - the settings panel flags when they've
-// drifted apart, deliberately not fetched live here (keeps this function
+// Must match CAT_COLORS/DOG_COLORS/COLLAR_COLORS in
+// src/modules/shared/collections.js - the functions package doesn't share
+// modules with the client, so these are kept in sync by hand. If either
+// color list is customized in the settings panel (config/colorOptions in
+// Firestore, now keyed by species), this static copy needs to be updated
+// and redeployed too - the settings panel flags when they've drifted
+// apart, deliberately not fetched live here (keeps this function
 // simple/fast and avoids a Firestore dependency for something that changes
 // rarely, same pattern as the static include/exclude word lists in Roy
-// News).
+// News). The two lists are combined into one enum for the AI: a JSON
+// schema enum can't conditionally depend on another field's value (there's
+// no clean way to say "only cat colors when species is cat"), and letting
+// the model pick from the full combined list is harmless in practice - a
+// dog post is never going to get classified as "טאבי (מנומר)" when a
+// dog-appropriate option fits better.
 const CAT_COLORS = [
   'לבן',
   'שחור',
@@ -55,6 +61,19 @@ const CAT_COLORS = [
   'שחור-לבן',
   'אחר',
 ];
+const DOG_COLORS = [
+  'שחור',
+  'לבן',
+  'חום',
+  'זהוב',
+  'שחור-חום (בְּלֶק אנד טאן)',
+  'ברינדל (מנומר בפסים)',
+  'מנומר (מֶרְל)',
+  'שחור-לבן',
+  'חום-לבן',
+  'אחר',
+];
+const ALL_COLORS = [...new Set([...CAT_COLORS, ...DOG_COLORS])];
 const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 const EXTRACTION_SCHEMA = {
@@ -73,13 +92,17 @@ const EXTRACTION_SCHEMA = {
     // keeps real tri-state (true/false/null=unknown) since collapsing
     // "unknown" into false would misreport a case as collarless.
     petName: { type: 'string' },
-    color: { type: 'string', enum: CAT_COLORS },
+    color: { type: 'string', enum: ALL_COLORS },
     colorDescription: { type: 'string' },
     breed: { type: 'string' },
     // anyOf, not type:['string','null']+enum - Anthropic rejects an enum
     // combined with an array-form type ("Enum value 'small' does not match
     // declared type '['string', 'null']'").
     size: { anyOf: [{ type: 'string', enum: ['small', 'medium', 'large'] }, { type: 'null' }] },
+    weightKg: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+    // "kitten" also covers a puppy - one internal value shared across
+    // species (see CAT_AGE_CLASSES in collections.js), not cat-specific
+    // despite the name.
     ageClass: { anyOf: [{ type: 'string', enum: ['kitten', 'adult'] }, { type: 'null' }] },
     furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'long', 'curly'] }, { type: 'null' }] },
     hasFluffyTail: { type: ['boolean', 'null'] },
@@ -88,6 +111,7 @@ const EXTRACTION_SCHEMA = {
     collarColor: { anyOf: [{ type: 'string', enum: COLLAR_COLORS }, { type: 'null' }] },
     collarHasBell: { type: ['boolean', 'null'] },
     hasClippedEar: { type: ['boolean', 'null'] },
+    microchipNumber: { type: 'string' },
     city: { type: 'string' },
     neighborhood: { type: 'string' },
     location: { type: 'string' },
@@ -126,6 +150,7 @@ const EXTRACTION_SCHEMA = {
     'colorDescription',
     'breed',
     'size',
+    'weightKg',
     'ageClass',
     'furType',
     'hasFluffyTail',
@@ -134,6 +159,7 @@ const EXTRACTION_SCHEMA = {
     'collarColor',
     'collarHasBell',
     'hasClippedEar',
+    'microchipNumber',
     'city',
     'neighborhood',
     'location',
@@ -156,21 +182,25 @@ const EXTRACTION_SCHEMA = {
 const SYSTEM_PROMPT = `You read screenshots of Facebook/WhatsApp posts about lost, found, or sighted pets, in Hebrew, Russian, English, or a mix, and extract structured facts. Follow these rules strictly:
 
 - Never invent information. If a text field is not visible or not stated, return an empty string "" for it (not null). For "hasCollar", use null specifically to mean not stated/unclear - true and false are only for when the post clearly shows or says so.
+- "species" is which animal the post is actually about - "cat" or "dog" for either of those (this app only handles the two), "other" for a different kind of animal entirely (bird, rabbit, hamster, etc.), "unknown" only if no animal is identifiable at all from the photos or text.
 - "reportType" is whether the post itself is framed as an animal being lost, or as one being found/seen/held - "lost" for a post from or on behalf of an owner looking for their own missing animal (e.g. "איבדתי", "מישהו ראה את החתולה שלי?", "נעדרת מאתמול", a flyer with the animal's name and "בואי הביתה"), "found" for a post about an animal that isn't the poster's own - sighted, caught, or being cared for pending the owner being found (e.g. "מצאתי", "נמצא/נמצאה", "מישהו מזהה?", "ראיתי חתול משוטט"). Base this on the post's actual wording and framing, not just on whether contact info is present. Null only if the text truly gives no usable signal either way (e.g. a bare photo with no caption and no other context).
 - "petName" is the animal's own name, if given - e.g. a flyer's title like "מאיה בואי הביתה" (Maya, come home) means the name is "מאיה". Only the animal's name, never a person's name.
-- "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos. Look at every provided photo of the animal before deciding, not just the first or most-cropped one - lighting, exposure, and screen glare vary a lot between phone photos and can make the same coat look washed out or shifted in one shot but not another. Judge by hue/undertone, not brightness: a pale or overexposed photo of an orange cat is still orange, not white or gray. Use these anchors to tell the easily-confused ones apart:
+- "color" is your best classification into exactly one of the given Hebrew options, based on what's visible in the photos - the option list covers both cat and dog coloring, so pick whichever fits regardless of species. Look at every provided photo of the animal before deciding, not just the first or most-cropped one - lighting, exposure, and screen glare vary a lot between phone photos and can make the same coat look washed out or shifted in one shot but not another. Judge by hue/undertone, not brightness: a pale or overexposed photo of an orange animal is still orange, not white or gray. Use these anchors to tell the easily-confused ones apart:
   - "אפור" (gray) is a cool, neutral gray with no red/orange/yellow undertone at all - like slate or ash. If the coat has any warm reddish, orange, or golden tint, it is not gray, even if it looks pale, faded, or grayish in low light.
-  - "כתום/ג'ינג'י" (orange/ginger) is a warm reddish-orange to amber hue, often with tabby striping - this is one of the most common cat colors and is frequently misread as gray or brown in bad lighting, so look specifically for warm undertone before ruling it out.
+  - "כתום/ג'ינג'י" (orange/ginger) is a warm reddish-orange to amber hue, often with tabby striping on a cat - this is one of the most common cat colors and is frequently misread as gray or brown in bad lighting, so look specifically for warm undertone before ruling it out. For a dog, a similar warm reddish-orange coat is usually better described as "זהוב" (golden) below instead.
   - "חום" (brown) is a warm but muted brown/chocolate tone - warmer than gray, less vivid/red than כתום/ג'ינג'י.
+  - "זהוב" (golden) is a warm honey/golden-blonde tone typical of breeds like Golden Retrievers or Labradors - dog-specific, distinct from the more reddish כתום/ג'ינג'י.
   - "ג'ינג'י לבן" and "אפור לבן" are for a coat with clearly separate patches of white plus (respectively) orange or gray - not a single blended pale color.
-  - "טאבי (מנומר)" describes a striped/mottled pattern and can apply on top of any base color (including an orange tabby) - use it when the pattern itself, not the hue, is the most identifying feature; otherwise the base hue (e.g. כתום/ג'ינג'י) is usually the more useful classification.
+  - "טאבי (מנומר)" describes a cat's striped/mottled coat pattern and can apply on top of any base color (including an orange tabby) - use it when the pattern itself, not the hue, is the most identifying feature; otherwise the base hue (e.g. כתום/ג'ינג'י) is usually the more useful classification. For a dog with a similarly patterned coat, "ברינדל (מנומר בפסים)" (a fine brindle stripe pattern, often on a tan/brown base) or "מנומר (מרל)" (a dog-specific mottled/marbled coat, often with mixed patches and sometimes blue/odd eyes) usually describes it more precisely - use whichever pattern name actually matches what's visible.
+  - "שחור-חום (בְּלֶק אנד טאן)" is a dog coat with a black body and sharply defined tan/brown points (muzzle, eyebrows, chest, legs) - distinct from a cat's more diffuse שחור-לבן or ג'ינג'י לבן patching.
   Pick the closest match even if the coat is patterned or multi-colored, and use "אחר" only if truly none of the other options fit. "colorDescription" is separate: the fuller free-text description (patterns, patches, markings related to color) in whatever language the post/your description is in - it can and should contain more detail than "color" does.
-- "breed" is only for a specific, named breed - either stated explicitly in the post text (e.g. "פרסי", "מיין קון", "בן-גל"), or visually unmistakable from the photos (e.g. a clearly hairless Sphynx, a clearly flat-faced Persian). The overwhelming majority of street cats in these posts are ordinary mixed-breed cats with no identifiable breed - leave "" in that default case rather than guessing a breed from a generic coat/body type. A wrong guess here is actively misleading, not a harmless default.
-- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
-- "ageClass" is separate from size - "kitten" only if the animal is clearly a young kitten, "adult" otherwise, or null if unclear. A small adult cat is "adult", not "kitten".
-- "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur, e.g. Sphynx), "short" (an ordinary coat that lies close to the body - the large majority of house cats, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond a typical house cat, e.g. Persian or Maine Coon), "curly" (fur is wavy or curly rather than straight, regardless of length, e.g. Devon Rex/Cornish Rex). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-haired cat), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.
+- "breed" is only for a specific, named breed - either stated explicitly in the post text (e.g. "פרסי", "מיין קון", "בן-גל" for a cat; "לברדור", "רועה גרמני", "האסקי" for a dog), or visually unmistakable from the photos (e.g. a clearly hairless Sphynx, a clearly flat-faced Persian, a clearly recognizable Husky or German Shepherd build/coat). The overwhelming majority of street cats in these posts are ordinary mixed-breed cats with no identifiable breed - leave "" in that default case rather than guessing a breed from a generic coat/body type. A dog is meaningfully more likely than a street cat to be purebred or a clearly recognizable mix, so a confident visual read is more often worth recording for a dog - but the same rule still applies either way: only name a breed you're actually confident of, never a guess from a generic build. A wrong guess here is actively misleading, not a harmless default.
+- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge. "weightKg" is a real number of kilograms only when the post explicitly states a weight (common for a dog post, e.g. "כלב בגודל 20 ק\"ג בערך") - never estimate a weight visually from a photo alone, leave it null in that case; a wrong number here actively misleads a numeric comparison later, unlike "size" which is deliberately just a rough visual bucket.
+- "ageClass" is separate from size - "kitten" for a clearly young kitten or puppy (this one value covers both), "adult" otherwise, or null if unclear. A small adult animal is "adult", not "kitten".
+- "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Sphynx cat, or a Xoloitzcuintli/Chinese Crested dog), "short" (an ordinary coat that lies close to the body - the large majority of house cats and dogs like a Labrador or Boxer, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Persian/Maine Coon cat, or a Golden Retriever/Collie/Shih Tzu dog), "curly" (fur is wavy or curly rather than straight, regardless of length - e.g. a Devon Rex/Cornish Rex cat, or a Poodle/Bichon dog). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.
 - "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).
-- "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.
+- "hasClippedEar" is cat-specific: whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible on a cat, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully on a cat - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips. For a dog, this practice doesn't apply - leave it null rather than false, since the field is simply not meaningful for a dog.
+- "microchipNumber" is only for an explicit chip/microchip number written in the post text (e.g. "מספר שבב: 985141...") - never inferred or guessed. Leave "" if no chip number is stated, which is the default/common case.
 - "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
 - "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.
 - "condition" is the animal's current physical custody, based on what the post text actually says happened to it - not just that it was photographed: "held_by_finder" if the poster currently has the animal in their own possession/care/home (e.g. "אצלי", "ביניתיים אצלי", "לקחתי אותה הביתה", "טיפלתי בו"), including when the post also mentions a vet visit but the animal is back with the poster or still in the poster's short-term care afterward - a vet visit alone doesn't change this if the animal ends up with the finder. "at_vet" only if the animal was left at / transferred to a clinic or shelter and is not with the poster anymore (e.g. "הועבר למרפאה ונשאר שם", "בטיפול הוטרינר"). "seen_only" is the default and by far the most common case - the animal was merely sighted/photographed in public, was not caught, and nobody claims to be holding it.

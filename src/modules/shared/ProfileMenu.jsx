@@ -44,7 +44,7 @@ export default function ProfileMenu() {
   async function handleShare() {
     const shareData = {
       title: 'איתור חיות מחמד',
-      text: 'אפליקציה לניהול חיפוש אחר חתולים אבודים והתאמה לדיווחי חתולים שנמצאו',
+      text: 'אפליקציה לניהול חיפוש אחר חתולים וכלבים אבודים והתאמה לדיווחים על חיות שנמצאו',
       url: window.location.origin,
     };
     if (navigator.share) {

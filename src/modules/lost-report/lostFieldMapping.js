@@ -1,6 +1,12 @@
 import { appendLine, appendDetail } from '../shared/textMerge.js';
+import { SPECIES } from '../shared/collections.js';
+import { petLabels } from '../shared/petLabels.js';
 
 export const EMPTY_LOST_FIELDS = {
+  // Defaults to cat (the only species this app supported until now) - a
+  // create form always overwrites this with whatever the person actually
+  // picked/the AI detected before saving.
+  species: SPECIES.CAT,
   name: '',
   color: '',
   breed: '',
@@ -44,6 +50,11 @@ export const EMPTY_LOST_FIELDS = {
   // automatically via the link-preview fetch) - kept as a plain URL so
   // anyone reviewing the case can jump straight to the original post.
   sourceUrl: '',
+  // Dog-oriented fields, but not species-gated - a chip or a known weight
+  // is useful identifying info for a cat too, it's just far more commonly
+  // known/asked-about for dogs.
+  weightKg: '',
+  microchipNumber: '',
   // Cumulative real cost of every AI extraction call made for this case
   // (initial upload plus any re-scans) - see shared/costTracking.js.
   aiCostUsd: 0,
@@ -68,8 +79,18 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
   markings = appendLine(markings, extracted.colorDescription);
   if (extracted.hasFluffyTail) markings = appendLine(markings, 'זנב שעיר/פלומתי במיוחד');
 
+  // Only overrides an already-picked species if the previous value was
+  // still the default 'cat' with no explicit user choice behind it yet -
+  // callers that already have a human-confirmed species (e.g. re-scanning
+  // an existing case) pass that in via `prev` and it wins over a fresh
+  // guess. See useSmartIntake.js/ShareTargetIntake.jsx for where a
+  // confident 'cat'/'dog' extraction skips the human species picker
+  // entirely.
+  const species = extracted.species === 'cat' || extracted.species === 'dog' ? extracted.species : prev.species;
+
   return {
     ...prev,
+    species,
     name: extracted.petName || prev.name,
     color: extracted.color || prev.color,
     breed: extracted.breed || prev.breed,
@@ -93,6 +114,8 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     originalPosterName: extracted.originalPosterName || prev.originalPosterName,
     sharedByName: extracted.sharedByName || prev.sharedByName,
     postAgeText: extracted.postAgeText || prev.postAgeText,
+    weightKg: extracted.weightKg || prev.weightKg,
+    microchipNumber: extracted.microchipNumber || prev.microchipNumber,
     aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
 }
@@ -111,10 +134,10 @@ function shortSnippet(text) {
 }
 
 /**
- * A nameless lost cat (the common case - most posts never give a street cat
- * a name) shouldn't just read "חתול ללא שם" everywhere when there's a
- * perfectly good description to show instead.
+ * A nameless lost pet (the common case - most posts never give a street
+ * animal a name) shouldn't just read a generic fallback everywhere when
+ * there's a perfectly good description to show instead.
  */
 export function displayLostCaseName(lostCase) {
-  return lostCase?.name || shortSnippet(lostCase?.markings) || 'חתול ללא שם';
+  return lostCase?.name || shortSnippet(lostCase?.markings) || petLabels(lostCase?.species).noNameFallback;
 }

@@ -54,11 +54,11 @@ export default function CostSettingsPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות AI (זיהוי אוטומטי מצילומי מסך)</h2>
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-slate-600">תיקי חיפוש (חתולים אבודים)</span>
+            <span className="text-slate-600">תיקי חיפוש (חיות אבודות)</span>
             <span className="font-medium text-slate-800">{formatUsd(lostAiCost)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-600">דיווחים (חתולים שנמצאו/נראו)</span>
+            <span className="text-slate-600">דיווחים (חיות שנמצאו/נראו)</span>
             <span className="font-medium text-slate-800">{formatUsd(foundAiCost)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 pt-2 font-semibold">

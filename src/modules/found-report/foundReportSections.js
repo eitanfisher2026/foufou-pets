@@ -1,21 +1,24 @@
-import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, CAT_CONDITIONS } from '../shared/collections.js';
+import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, CAT_CONDITIONS, SPECIES_LABELS } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
+import { petLabels } from '../shared/petLabels.js';
 
 /**
  * Builds the same [{ title, rows }] sections RecordDetailsDialog expects,
  * for a found report - shared between the report's own "פרטים מלאים" view
- * and the "פרטי חתול" dialog opened from a match card during match review,
- * so both show literally the same fields in the same order rather than two
- * hand-maintained copies drifting apart.
+ * and the "פרטי חתול/כלב" dialog opened from a match card during match
+ * review, so both show literally the same fields in the same order rather
+ * than two hand-maintained copies drifting apart.
  */
 export function buildFoundReportSections(report) {
+  const labels = petLabels(report.species);
   return [
     {
-      title: 'פרטי חתול',
+      title: labels.petDetailsSection,
       rows: [
+        { label: 'מין', value: SPECIES_LABELS[report.species] },
         { label: 'כותרת', value: report.title },
-        { label: 'מצב החתול', value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
+        { label: labels.conditionLabel, value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
         { label: 'צבע', value: report.color },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },
         { label: 'קולר/רתמה', value: report.hasCollar === true ? 'כן' : report.hasCollar === false ? 'לא' : '' },
@@ -29,9 +32,11 @@ export function buildFoundReportSections(report) {
           value: report.hasClippedEar === true ? 'כן' : report.hasClippedEar === false ? 'לא' : '',
         },
         { label: 'סימנים מיוחדים', value: report.markings },
-        { label: 'גזע', value: report.breed },
+        { label: labels.breedLabel, value: report.breed },
         { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === report.furType)?.label },
         { label: 'גודל', value: CAT_SIZES.find((s) => s.value === report.size)?.label },
+        { label: 'משקל (ק״ג)', value: report.weightKg },
+        { label: 'מספר שבב', value: report.microchipNumber },
       ],
     },
     {

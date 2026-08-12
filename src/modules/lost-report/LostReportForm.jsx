@@ -14,17 +14,25 @@ import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
-import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
+import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
+import { petLabels } from '../shared/petLabels.js';
+import SpeciesToggle from '../shared/SpeciesToggle.jsx';
+import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, SPECIES } from '../shared/collections.js';
 import { createLostCase } from './lostReportApi.js';
 import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
 
 export default function LostReportForm() {
-  const { user } = useAuth();
+  const { user, preferredSpecies } = useAuth();
   const navigate = useNavigate();
   const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
-  const catColors = useColorOptions();
 
-  const [fields, setFields] = useState(EMPTY_LOST_FIELDS);
+  // Starts on whichever species this person is currently working in (see
+  // AuthProvider/SpeciesToggle) - saves the usual tap for the common case,
+  // still fully changeable via the toggle for the odd one out.
+  const [fields, setFields] = useState(() => ({ ...EMPTY_LOST_FIELDS, species: preferredSpecies }));
+  const labels = petLabels(fields.species);
+  const colorOptions = useColorOptions(fields.species);
+  const dogBreedOptions = useDogBreedOptions();
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
@@ -125,9 +133,10 @@ export default function LostReportForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-4">
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
+      <SpeciesToggle value={fields.species} onChange={(species) => setField('species', species)} />
       <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold text-slate-800">פתיחת תיק חיפוש - חתול אבד</h1>
-        <InfoButton title="איך מוסיפים פוסט על החתולה?">
+        <h1 className="text-xl font-bold text-slate-800">{labels.lostCaseTitle}</h1>
+        <InfoButton title={labels.infoButtonTitle}>
           <p>אפשר לצרף מידע בכמה דרכים, גם ביחד - ואז ללחוץ על "זיהוי אוטומטי":</p>
           <ul className="list-inside list-disc space-y-1">
             <li>העלאת צילום מסך של הפוסט מפייסבוק - חלק מהשדות יתמלאו אוטומטית.</li>
@@ -139,7 +148,7 @@ export default function LostReportForm() {
               ישירות (עובד רק בפוסטים פומביים, לא בקבוצות סגורות).
             </li>
             <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
-            <li>אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
+            <li>אם בפוסט כמה תמונות של {labels.animalDef}, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
           </ul>
         </InfoButton>
       </div>
@@ -190,15 +199,15 @@ export default function LostReportForm() {
         </div>
       </div>
 
-      <FormSection title="פרטי חתול">
-        <Field label="שם החתולה">
+      <FormSection title={labels.petDetailsSection}>
+        <Field label={labels.nameLabel}>
           <input className="input" value={fields.name} onChange={(e) => setField('name', e.target.value)} />
         </Field>
 
         <Field label="צבע" inline>
           <select className="input w-36" value={fields.color} onChange={(e) => setField('color', e.target.value)}>
             <option value="">בחר/י צבע</option>
-            {catColors.map((c) => (
+            {colorOptions.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -262,13 +271,39 @@ export default function LostReportForm() {
           />
         </Field>
 
-        <Field label="גזע" inline>
+        <Field label={labels.breedLabel} inline>
+          {fields.species === SPECIES.DOG ? (
+            <select className="input w-36" value={fields.breed} onChange={(e) => setField('breed', e.target.value)}>
+              <option value="">בחר/י גזע</option>
+              {dogBreedOptions.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="input w-36"
+              value={fields.breed}
+              onChange={(e) => setField('breed', e.target.value)}
+              placeholder="אם ידוע"
+            />
+          )}
+        </Field>
+
+        <Field label="משקל (ק״ג, אם ידוע)" inline>
           <input
+            type="number"
+            step="0.1"
+            min="0"
             className="input w-36"
-            value={fields.breed}
-            onChange={(e) => setField('breed', e.target.value)}
-            placeholder="אם ידוע"
+            value={fields.weightKg}
+            onChange={(e) => setField('weightKg', e.target.value)}
           />
+        </Field>
+
+        <Field label="מספר שבב (אם ידוע)" inline>
+          <input className="input w-36" value={fields.microchipNumber} onChange={(e) => setField('microchipNumber', e.target.value)} />
         </Field>
 
         <Field label="סוג פרווה" inline>
@@ -348,7 +383,7 @@ export default function LostReportForm() {
             className="input"
             value={fields.sourceGroupName}
             onChange={(e) => setField('sourceGroupName', e.target.value)}
-            placeholder='למשל "חתולים אבודים ונמצאים - תל אביב"'
+            placeholder={labels.groupPlaceholder}
           />
         </Field>
 

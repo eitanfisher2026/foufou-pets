@@ -16,8 +16,13 @@ import {
   CAT_FUR_TYPES,
   COLLAR_COLORS,
   CAT_CONDITIONS,
+  SPECIES,
+  SPECIES_LABELS,
 } from '../shared/collections.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
+import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
+import { petLabels } from '../shared/petLabels.js';
+import { displayFoundReportName } from './foundFieldMapping.js';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
@@ -40,6 +45,8 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
+  { targetKey: 'weightKg', extractedKey: 'weightKg', label: 'משקל' },
+  { targetKey: 'microchipNumber', extractedKey: 'microchipNumber', label: 'מספר שבב' },
   { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
   { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
   { targetKey: 'city', extractedKey: 'city', label: 'עיר' },
@@ -76,7 +83,9 @@ export default function FoundReportDetail() {
     cancel: cancelExtracting,
   } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
-  const catColors = useColorOptions();
+  const colorOptions = useColorOptions(report?.species);
+  const dogBreedOptions = useDogBreedOptions();
+  const labels = petLabels(report?.species);
 
   useEffect(() => {
     load();
@@ -210,7 +219,7 @@ export default function FoundReportDetail() {
           <div className="mb-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
               <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">
-                {report.title || 'חתול'}
+                {displayFoundReportName(report)}
               </h1>
               <RecordStatusSelect
                 status={report.status || RECORD_STATUS.ACTIVE}
@@ -264,11 +273,14 @@ export default function FoundReportDetail() {
             newPhotosFirst={newPhotosFirst}
             onNewPhotosFirstChange={setNewPhotosFirst}
           />
-          <FormSection title="פרטי חתול">
-            <Field label="שם החתולה (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)">
+          <FormSection title={labels.petDetailsSection}>
+            <Field label="מין" inline>
+              <span className="text-sm text-slate-600">{SPECIES_LABELS[report.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
+            </Field>
+            <Field label={`${labels.nameLabel} (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)`}>
               <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
             </Field>
-            <Field label="מצב החתול" inline>
+            <Field label={labels.conditionLabel} inline>
               <select
                 className="input w-36"
                 value={fields.condition || 'seen_only'}
@@ -284,7 +296,7 @@ export default function FoundReportDetail() {
             <Field label="צבע" inline>
               <select className="input w-36" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
                 <option value="">בחר/י צבע</option>
-                {catColors.map((c) => (
+                {colorOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -345,12 +357,40 @@ export default function FoundReportDetail() {
                 onChange={(e) => setField('markings', e.target.value)}
               />
             </Field>
-            <Field label="גזע" inline>
+            <Field label={labels.breedLabel} inline>
+              {report.species === SPECIES.DOG ? (
+                <select className="input w-36" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)}>
+                  <option value="">בחר/י גזע</option>
+                  {dogBreedOptions.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="input w-36"
+                  value={fields.breed || ''}
+                  onChange={(e) => setField('breed', e.target.value)}
+                  placeholder="אם ידוע"
+                />
+              )}
+            </Field>
+            <Field label="משקל (ק״ג, אם ידוע)" inline>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="input w-36"
+                value={fields.weightKg || ''}
+                onChange={(e) => setField('weightKg', e.target.value)}
+              />
+            </Field>
+            <Field label="מספר שבב (אם ידוע)" inline>
               <input
                 className="input w-36"
-                value={fields.breed || ''}
-                onChange={(e) => setField('breed', e.target.value)}
-                placeholder="אם ידוע"
+                value={fields.microchipNumber || ''}
+                onChange={(e) => setField('microchipNumber', e.target.value)}
               />
             </Field>
             <Field label="סוג פרווה" inline>
@@ -519,7 +559,7 @@ export default function FoundReportDetail() {
       {dialog}
       {showDetails && (
         <RecordDetailsDialog
-          title={report.title || 'חתול'}
+          title={displayFoundReportName(report)}
           onClose={() => setShowDetails(false)}
           photos={report.photos}
           onViewPhoto={setLightboxUrl}

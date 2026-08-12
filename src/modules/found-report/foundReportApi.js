@@ -1,7 +1,7 @@
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS, RECORD_STATUS } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS, SPECIES } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 
 /**
@@ -16,7 +16,7 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
  */
 export async function createFoundReport(fields, photoFiles, reporter) {
   const reportRef = await addDoc(collection(db, COLLECTIONS.FOUND_REPORTS), {
-    species: 'cat',
+    species: fields.species || SPECIES.CAT,
     title: fields.title || '',
     color: fields.color || '',
     breed: fields.breed || '',
@@ -42,6 +42,8 @@ export async function createFoundReport(fields, photoFiles, reporter) {
     sharedByName: fields.sharedByName || '',
     postAgeText: fields.postAgeText || '',
     sourceUrl: fields.sourceUrl || '',
+    weightKg: fields.weightKg || '',
+    microchipNumber: fields.microchipNumber || '',
     aiCostUsd: fields.aiCostUsd || 0,
     photos: [],
     status: RECORD_STATUS.ACTIVE,
@@ -99,6 +101,8 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
       sharedByName: fields.sharedByName || '',
       postAgeText: fields.postAgeText || '',
       sourceUrl: fields.sourceUrl || '',
+      weightKg: fields.weightKg || '',
+      microchipNumber: fields.microchipNumber || '',
       aiCostUsd: fields.aiCostUsd || 0,
       updatedAt: serverTimestamp(),
     },

@@ -2,7 +2,8 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../../firebase.js';
-import { COLLECTION as USERS_COLLECTION, ROLES, upsertUserOnLogin } from '../users/usersApi.js';
+import { COLLECTION as USERS_COLLECTION, ROLES, upsertUserOnLogin, updatePreferredSpecies } from '../users/usersApi.js';
+import { SPECIES } from '../shared/collections.js';
 
 const AuthContext = createContext(null);
 
@@ -11,6 +12,7 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState(null);
   const [roleLoading, setRoleLoading] = useState(true);
+  const [preferredSpecies, setPreferredSpeciesState] = useState(SPECIES.CAT);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -35,6 +37,7 @@ export function AuthProvider({ children }) {
     setRoleLoading(true);
     const unsubscribe = onSnapshot(doc(db, USERS_COLLECTION, user.uid), (snap) => {
       setRole(snap.exists() ? snap.data().role || ROLES.REGULAR : ROLES.REGULAR);
+      setPreferredSpeciesState(snap.exists() ? snap.data().preferredSpecies || SPECIES.CAT : SPECIES.CAT);
       setRoleLoading(false);
     });
     return unsubscribe;
@@ -44,10 +47,29 @@ export function AuthProvider({ children }) {
   const signOut = () => firebaseSignOut(auth);
   const isAdmin = role === ROLES.ADMIN;
   const isEditorOrAdmin = role === ROLES.ADMIN || role === ROLES.EDITOR;
+  // Optimistic local update (the live subscription above will confirm it
+  // moments later) so switching species feels instant instead of waiting on
+  // a round trip - saved to the profile, not just this device, so it's
+  // still there next time this person signs in anywhere.
+  function setPreferredSpecies(species) {
+    setPreferredSpeciesState(species);
+    if (user) updatePreferredSpecies(user.uid, species);
+  }
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signInWithGoogle, signOut, role, roleLoading, isAdmin, isEditorOrAdmin }}
+      value={{
+        user,
+        loading,
+        signInWithGoogle,
+        signOut,
+        role,
+        roleLoading,
+        isAdmin,
+        isEditorOrAdmin,
+        preferredSpecies,
+        setPreferredSpecies,
+      }}
     >
       {children}
     </AuthContext.Provider>

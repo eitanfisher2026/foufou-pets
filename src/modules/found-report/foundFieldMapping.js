@@ -1,6 +1,12 @@
 import { appendLine, appendDetail } from '../shared/textMerge.js';
+import { SPECIES } from '../shared/collections.js';
+import { petLabels } from '../shared/petLabels.js';
 
 export const EMPTY_FOUND_FIELDS = {
+  // Defaults to cat (the only species this app supported until now) - a
+  // create form always overwrites this with whatever the person actually
+  // picked/the AI detected before saving.
+  species: SPECIES.CAT,
   title: '',
   color: '',
   breed: '',
@@ -29,6 +35,11 @@ export const EMPTY_FOUND_FIELDS = {
   // automatically via the link-preview fetch) - kept as a plain URL so
   // anyone reviewing the report can jump straight to the original post.
   sourceUrl: '',
+  // Dog-oriented fields, but not species-gated - a chip or a known weight
+  // is useful identifying info for a cat too, it's just far more commonly
+  // known/asked-about for dogs.
+  weightKg: '',
+  microchipNumber: '',
   // Cumulative real cost of every AI extraction call made for this report
   // (initial upload plus any re-scans).
   aiCostUsd: 0,
@@ -53,8 +64,14 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
   markings = appendLine(markings, extracted.colorDescription);
   if (extracted.hasFluffyTail) markings = appendLine(markings, 'זנב שעיר/פלומתי במיוחד');
 
+  // See lostFieldMapping.js's mergeExtractedLostFields for the same
+  // species-merge reasoning - an already-confirmed species in `prev` wins
+  // over a fresh extraction guess.
+  const species = extracted.species === 'cat' || extracted.species === 'dog' ? extracted.species : prev.species;
+
   return {
     ...prev,
+    species,
     // Only falls back when the title is still blank - never overwrites a
     // title someone already typed. A found cat can still have a known name
     // (e.g. a post that names the cat, or a chip/tag the finder read) -
@@ -83,6 +100,18 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
     originalPosterName: extracted.originalPosterName || prev.originalPosterName,
     sharedByName: extracted.sharedByName || prev.sharedByName,
     postAgeText: extracted.postAgeText || prev.postAgeText,
+    weightKg: extracted.weightKg || prev.weightKg,
+    microchipNumber: extracted.microchipNumber || prev.microchipNumber,
     aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
+}
+
+/**
+ * A found report with no title (the common case for a bare screenshot with
+ * no caption at all) shouldn't just read a generic fallback - one shared
+ * helper instead of the same hardcoded fallback string repeated at every
+ * place a report's title gets displayed.
+ */
+export function displayFoundReportName(report) {
+  return report?.title || petLabels(report?.species).animal;
 }

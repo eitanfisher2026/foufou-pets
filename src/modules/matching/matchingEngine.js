@@ -192,6 +192,22 @@ function comparePresence(a, b) {
   return hasA && hasB ? { ratio: 1 } : null;
 }
 
+const WEIGHT_PROXIMITY_CUTOFF_KG = 5;
+
+// Same falloff shape as compareDateProximity but for a plain numeric
+// distance - currently only used for weightKg. A visual weight guess ("kind
+// of big") is common and imprecise on both sides, so this is deliberately a
+// soft signal (a modest weight in the default config), not a hard
+// disqualifier the way color or species is.
+function compareNumericProximity(a, b, ctx) {
+  const na = Number(a);
+  const nb = Number(b);
+  if (!a || !b || Number.isNaN(na) || Number.isNaN(nb)) return null;
+  const diff = Math.abs(na - nb);
+  const cutoff = ctx?.numericCutoff || WEIGHT_PROXIMITY_CUTOFF_KG;
+  return { ratio: Math.max(0, 1 - diff / cutoff), diff };
+}
+
 const COMPARATORS = {
   exact: compareExact,
   booleanTrait: compareBooleanTrait,
@@ -200,6 +216,7 @@ const COMPARATORS = {
   textOverlap: compareTextOverlap,
   markList: compareMarkList,
   dateProximity: compareDateProximity,
+  numericProximity: compareNumericProximity,
   presence: comparePresence,
 };
 
@@ -219,6 +236,7 @@ export const DEFAULT_MATCH_CONFIG = {
   colorGroups: DEFAULT_COLOR_GROUPS,
   confidenceColors: DEFAULT_CONFIDENCE_COLORS,
   parameters: [
+    { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
@@ -231,6 +249,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'collarBell', label: 'פעמון על הקולר', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'collarHasBell', foundField: 'collarHasBell' },
     { key: 'neighborhood', label: 'שכונה', weight: 5, enabled: true, comparisonType: 'textOverlap', lostField: 'neighborhood', foundField: 'neighborhood' },
     { key: 'size', label: 'גודל', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'size', foundField: 'size' },
+    { key: 'weight', label: 'משקל', weight: 5, enabled: true, comparisonType: 'numericProximity', lostField: 'weightKg', foundField: 'weightKg' },
     { key: 'remarks', label: 'הערות נוספות', weight: 5, enabled: true, comparisonType: 'textOverlap', lostField: 'notes', foundField: 'notes' },
     { key: 'hasPhoto', label: 'קיימת תמונה בשני הצדדים', weight: 5, enabled: true, comparisonType: 'presence', lostField: 'photos', foundField: 'photos' },
   ],
@@ -258,6 +277,8 @@ export const COMPARABLE_FIELDS = [
   { field: 'photos', label: 'תמונה (קיימת/לא קיימת)' },
   { field: 'lastSeenDate', label: 'תאריך מדויק - תיק חיפוש' },
   { field: 'seenDate', label: 'תאריך מדויק - דיווח' },
+  { field: 'weightKg', label: 'משקל' },
+  { field: 'microchipNumber', label: 'מספר שבב' },
 ];
 
 export const COMPARISON_TYPE_LABELS = {
@@ -268,6 +289,7 @@ export const COMPARISON_TYPE_LABELS = {
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
+  numericProximity: 'קרבה במספר (למשל משקל)',
   presence: 'קיים משני הצדדים',
 };
 
@@ -285,6 +307,16 @@ export function fieldLabel(field) {
  * show the complete picture of what the algorithm did and didn't check.
  */
 export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG) {
+  // A cat and a dog are never the same animal - checked unconditionally,
+  // before anything else and outside the configurable parameter list, since
+  // nothing about matching should ever be able to turn this off. A record
+  // from before species tracking existed has no species value at all, so
+  // this only disqualifies when both sides actually say something and
+  // disagree, never on missing data.
+  if (lostCase.species && foundReport.species && lostCase.species !== foundReport.species) {
+    return { score: 0, reasons: ['סוג חיה שונה (חתול/כלב) - פוסל התאמה'], breakdown: [] };
+  }
+
   const reasons = [];
   const breakdown = [];
   let earned = 0;
@@ -370,7 +402,9 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       const detail =
         p.comparisonType === 'dateProximity'
           ? `הפרש של כ-${result.diffDays} ימים${lenient ? ' (תאריך משוער בצד אחד, ההשוואה גמישה יותר)' : ''}`
-          : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
+          : p.comparisonType === 'numericProximity'
+            ? `הפרש של כ-${result.diff}`
+            : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
       if (points > 0.01) {
         earned += points;
         reasons.push(`${p.label}: ${detail}`);

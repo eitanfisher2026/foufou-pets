@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { APP_VERSION } from '../../version.js';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js';
+import { petLabels } from '../shared/petLabels.js';
+import SpeciesToggle from '../shared/SpeciesToggle.jsx';
 import { listLostCases } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow } from './RecordRows.jsx';
@@ -13,12 +15,13 @@ import ProfileMenu from '../shared/ProfileMenu.jsx';
 // found reports (see matchingApi.js), so this list was never actually load-
 // bearing for the app's core flow, just a nice-to-have "browse everything"
 // view. Loading only lost cases by default cuts the dashboard's default
-// read in half; "כל הדיווחים על חתולים שנמצאו" is one tap away instead.
+// read in half; "כל הדיווחים על חיות שנמצאו" is one tap away instead.
 export default function Dashboard() {
-  const { user } = useAuth();
+  const { user, preferredSpecies, setPreferredSpecies } = useAuth();
   const [lostCases, setLostCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  const labels = petLabels(preferredSpecies);
 
   useEffect(() => {
     listLostCases().then((cases) => {
@@ -32,12 +35,22 @@ export default function Dashboard() {
   }, []);
 
   // Archived and resolved cases move to their own archive view (see
-  // ArchivePage.jsx) instead of a same-page toggle - a resolved case (cat
-  // already found) doesn't need attention any more than an archived one
+  // ArchivePage.jsx) instead of a same-page toggle - a resolved case
+  // (already found) doesn't need attention any more than an archived one
   // does, so it doesn't belong cluttering the default working list either.
+  // Species filtering matches the toggle above: this person is working in
+  // one species at a time (see petLabels.js/SpeciesToggle.jsx), so a dog
+  // case shouldn't clutter the list while working the cat queue, and vice
+  // versa. A record from before species tracking existed defaults to cat.
   const visibleLostCases = useMemo(
-    () => lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED),
-    [lostCases]
+    () =>
+      lostCases.filter(
+        (c) =>
+          c.status !== RECORD_STATUS.ARCHIVED &&
+          c.status !== RECORD_STATUS.RESOLVED &&
+          (c.species || 'cat') === preferredSpecies
+      ),
+    [lostCases, preferredSpecies]
   );
 
   return (
@@ -52,12 +65,14 @@ export default function Dashboard() {
         <ProfileMenu />
       </header>
 
+      <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} />
+
       <div className="mb-3 flex gap-3">
         <Link to="/lost/new" className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-center font-medium text-white">
-          חתול שלי אבד
+          {labels.lostButton}
         </Link>
         <Link to="/found/new" className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-center font-medium text-white">
-          ראיתי/מצאתי חתול
+          {labels.foundButton}
         </Link>
       </div>
 
@@ -72,7 +87,7 @@ export default function Dashboard() {
 
       <div className="mb-4 flex items-center justify-between gap-4">
         <Link to="/found" className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
-          צפייה בכל הדיווחים על חתולים שנמצאו
+          {labels.allFoundReportsLink}
         </Link>
         <Link to="/archive" className="text-xs text-slate-500 underline">
           ארכיון
@@ -81,7 +96,7 @@ export default function Dashboard() {
 
       <section>
         <h2 className="mb-3 text-lg font-semibold text-slate-700">
-          תיקי חיפוש{' '}
+          {labels.openCasesSection}{' '}
           {visibleLostCases.length > 0 && (
             <span className="text-sm font-normal text-slate-400">({visibleLostCases.length})</span>
           )}

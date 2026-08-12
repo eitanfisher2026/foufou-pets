@@ -4,6 +4,7 @@ import { getMatch } from './matchingApi.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { getMatchConfig } from './matchConfigApi.js';
@@ -59,7 +60,7 @@ export default function MatchAnalysisPage() {
 
       <h1 className="mb-1 text-xl font-bold text-slate-800">ניתוח התאמה מלא</h1>
       <p className="mb-4 text-sm text-slate-500">
-        {displayLostCaseName(lostCase)} מול {foundReport.title || 'חתול'}
+        {displayLostCaseName(lostCase)} מול {displayFoundReportName(foundReport)}
       </p>
 
       <div className="mb-4 flex items-center gap-2">

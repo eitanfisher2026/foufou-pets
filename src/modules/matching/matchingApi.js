@@ -18,10 +18,19 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const reportsSnap = await getDocs(collection(db, COLLECTIONS.FOUND_REPORTS));
   // Skip anything not active: suspended/archived/resolved means that found
   // cat has already been checked/accounted for, so it shouldn't keep
-  // surfacing as a fresh match candidate for other lost cases.
+  // surfacing as a fresh match candidate for other lost cases. Also skip
+  // anything of a different species up front - scoreMatch would disqualify
+  // it to 0 anyway (a cat and a dog are never the same animal), so there's
+  // no reason to even show it as a ranked-but-hopeless candidate. A found
+  // report from before species tracking existed has no species value and
+  // still gets compared normally.
   const foundReports = reportsSnap.docs
     .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((r) => (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE);
+    .filter(
+      (r) =>
+        (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE &&
+        (!lostCase.species || !r.species || r.species === lostCase.species)
+    );
 
   const config = await getMatchConfig();
   const ranked = rankMatches(lostCase, foundReports, config);

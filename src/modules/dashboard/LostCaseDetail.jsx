@@ -13,11 +13,15 @@ import {
   CAT_FUR_TYPES,
   COLLAR_COLORS,
   CLOSURE_REASON_LABELS,
+  SPECIES,
+  SPECIES_LABELS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
+import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
+import { petLabels } from '../shared/petLabels.js';
 import {
   getLostCase,
   updateLostCase,
@@ -28,6 +32,7 @@ import {
   deleteLostCase,
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import { buildFoundReportSections } from '../found-report/foundReportSections.js';
 import {
   checkMatchesForLostCase,
@@ -53,11 +58,13 @@ import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import ClosureDialog from '../shared/ClosureDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
-  { targetKey: 'name', extractedKey: 'petName', label: 'שם החתולה' },
+  { targetKey: 'name', extractedKey: 'petName', label: 'שם החיה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
   { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
+  { targetKey: 'weightKg', extractedKey: 'weightKg', label: 'משקל' },
+  { targetKey: 'microchipNumber', extractedKey: 'microchipNumber', label: 'מספר שבב' },
   { targetKey: 'hasCollar', extractedKey: 'hasCollar', label: 'קולר/רתמה' },
   { targetKey: 'collarColor', extractedKey: 'collarColor', label: 'צבע הקולר' },
   { targetKey: 'collarHasBell', extractedKey: 'collarHasBell', label: 'פעמון על הקולר' },
@@ -124,7 +131,9 @@ export default function LostCaseDetail() {
     cancel: cancelExtracting,
   } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
-  const catColors = useColorOptions();
+  const colorOptions = useColorOptions(lostCase?.species);
+  const dogBreedOptions = useDogBreedOptions();
+  const labels = petLabels(lostCase?.species);
 
   useEffect(() => {
     load();
@@ -407,14 +416,17 @@ export default function LostCaseDetail() {
             newPhotosFirst={newPhotosFirst}
             onNewPhotosFirstChange={setNewPhotosFirst}
           />
-          <FormSection title="פרטי חתול">
-            <Field label="שם החתולה">
+          <FormSection title={labels.petDetailsSection}>
+            <Field label="מין" inline>
+              <span className="text-sm text-slate-600">{SPECIES_LABELS[lostCase.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
+            </Field>
+            <Field label={labels.nameLabel}>
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
             </Field>
             <Field label="צבע" inline>
               <select className="input w-36" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
                 <option value="">בחר/י צבע</option>
-                {catColors.map((c) => (
+                {colorOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -479,12 +491,40 @@ export default function LostCaseDetail() {
                 onChange={(e) => setField('markings', e.target.value)}
               />
             </Field>
-            <Field label="גזע" inline>
+            <Field label={labels.breedLabel} inline>
+              {lostCase.species === SPECIES.DOG ? (
+                <select className="input w-36" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)}>
+                  <option value="">בחר/י גזע</option>
+                  {dogBreedOptions.map((b) => (
+                    <option key={b} value={b}>
+                      {b}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  className="input w-36"
+                  value={fields.breed || ''}
+                  onChange={(e) => setField('breed', e.target.value)}
+                  placeholder="אם ידוע"
+                />
+              )}
+            </Field>
+            <Field label="משקל (ק״ג, אם ידוע)" inline>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="input w-36"
+                value={fields.weightKg || ''}
+                onChange={(e) => setField('weightKg', e.target.value)}
+              />
+            </Field>
+            <Field label="מספר שבב (אם ידוע)" inline>
               <input
                 className="input w-36"
-                value={fields.breed || ''}
-                onChange={(e) => setField('breed', e.target.value)}
-                placeholder="אם ידוע"
+                value={fields.microchipNumber || ''}
+                onChange={(e) => setField('microchipNumber', e.target.value)}
               />
             </Field>
             <Field label="סוג פרווה" inline>
@@ -739,8 +779,9 @@ export default function LostCaseDetail() {
           onViewPhoto={setLightboxUrl}
           sections={[
             {
-              title: 'פרטי חתול',
+              title: labels.petDetailsSection,
               rows: [
+                { label: 'מין', value: SPECIES_LABELS[lostCase.species] },
                 { label: 'שם', value: lostCase.name },
                 { label: 'צבע', value: lostCase.color },
                 { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
@@ -755,9 +796,11 @@ export default function LostCaseDetail() {
                   value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '',
                 },
                 { label: 'סימנים מיוחדים', value: lostCase.markings },
-                { label: 'גזע', value: lostCase.breed },
+                { label: labels.breedLabel, value: lostCase.breed },
                 { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === lostCase.furType)?.label },
                 { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
+                { label: 'משקל (ק״ג)', value: lostCase.weightKg },
+                { label: 'מספר שבב', value: lostCase.microchipNumber },
               ],
             },
             {
@@ -879,7 +922,7 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
           onClick={() => setShowCatDetails(true)}
           className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600"
         >
-          פרטי חתול
+          {petLabels(report?.species).petDetailsSection}
         </button>
         <Link
           to={`/found/${match.foundReportId}?edit=1`}
@@ -897,7 +940,7 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
 
       {showCatDetails && report && (
         <RecordDetailsDialog
-          title={report.title || 'חתול'}
+          title={displayFoundReportName(report)}
           onClose={() => setShowCatDetails(false)}
           photos={report.photos}
           onViewPhoto={onViewPhoto}

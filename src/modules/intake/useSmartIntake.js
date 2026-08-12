@@ -4,9 +4,9 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import { createLostCase } from '../lost-report/lostReportApi.js';
-import { mergeExtractedLostFields } from '../lost-report/lostFieldMapping.js';
+import { mergeExtractedLostFields, EMPTY_LOST_FIELDS } from '../lost-report/lostFieldMapping.js';
 import { createFoundReport } from '../found-report/foundReportApi.js';
-import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js';
+import { mergeExtractedFoundFields, EMPTY_FOUND_FIELDS } from '../found-report/foundFieldMapping.js';
 
 /**
  * The "classify lost vs. found from images, then create the record" flow
@@ -22,7 +22,7 @@ import { mergeExtractedFoundFields } from '../found-report/foundFieldMapping.js'
  * record from) a still-incomplete set.
  */
 export function useSmartIntake() {
-  const { user } = useAuth();
+  const { user, preferredSpecies } = useAuth();
   const navigate = useNavigate();
   const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
   const [files, setFiles] = useState([]);
@@ -60,12 +60,18 @@ export function useSmartIntake() {
       const photos = mainPhoto ? [mainPhoto, ...uploadedFiles] : uploadedFiles;
       const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
 
+      // A confident species read from the screenshot itself always wins
+      // (this flow is exactly for the case of not knowing in advance what
+      // someone's about to share - a cat post should never end up filed as
+      // a dog just because that's this person's current toggle). Only
+      // falls back to the currently-active species when the AI genuinely
+      // couldn't tell.
       if (type === 'lost') {
-        const fields = mergeExtractedLostFields(result);
+        const fields = mergeExtractedLostFields(result, { ...EMPTY_LOST_FIELDS, species: preferredSpecies });
         const caseId = await createLostCase({ ...fields, source: 'screenshot', sourceUrl: finalSourceUrl }, photos, user);
         navigate(`/lost/${caseId}`);
       } else {
-        const fields = mergeExtractedFoundFields(result);
+        const fields = mergeExtractedFoundFields(result, { ...EMPTY_FOUND_FIELDS, species: preferredSpecies });
         const reportId = await createFoundReport(
           { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl },
           photos,

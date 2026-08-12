@@ -3,11 +3,25 @@ export const COLLECTIONS = {
   FOUND_REPORTS: 'foundReports',
 };
 
+// Cats and dogs only, by design - not a generic species registry. Every
+// place that branches on species (labels, color/breed lists, matching)
+// switches on exactly these two values; adding a third species later would
+// need those switches extended, not a redesign.
+export const SPECIES = {
+  CAT: 'cat',
+  DOG: 'dog',
+};
+
+export const SPECIES_LABELS = {
+  [SPECIES.CAT]: 'חתול',
+  [SPECIES.DOG]: 'כלב',
+};
+
 // Default/fallback list only - the live, editable list (which the settings
-// panel writes to Firestore at config/colorOptions) is what forms actually
-// show; see shared/colorOptionsApi.js. This constant is what a fresh
-// project starts with before anyone has customized it. "אחר" (other) is a
-// fixed catch-all, always last, never part of the editable list.
+// panel writes to Firestore at config/colorOptions, keyed by species) is
+// what forms actually show; see shared/colorOptionsApi.js. This constant is
+// what a fresh project starts with before anyone has customized it. "אחר"
+// (other) is a fixed catch-all, always last, never part of the editable list.
 export const CAT_COLORS = [
   'לבן',
   'שחור',
@@ -22,28 +36,81 @@ export const CAT_COLORS = [
   'אחר',
 ];
 
-// Shared between lost cases and found reports - both describe the same cat
-// using the same vocabulary, which also keeps matching (matchingEngine.js)
-// comparing like with like instead of a dropdown value against free text.
+// Dog coat colors/patterns don't overlap well with CAT_COLORS (no
+// tabby/calico, but brindle/merle/tan-points that cats don't have) - a
+// separate list, same "אחר" catch-all convention.
+export const DOG_COLORS = [
+  'שחור',
+  'לבן',
+  'חום',
+  'זהוב',
+  'שחור-חום (בְּלֶק אנד טאן)',
+  'ברינדל (מנומר בפסים)',
+  'מנומר (מֶרְל)',
+  'שחור-לבן',
+  'חום-לבן',
+  'אחר',
+];
+
+// Default/fallback list only - same "live editable list in Firestore"
+// pattern as colors (config/breedOptions, see breedOptionsApi.js). Cats
+// don't get an equivalent picklist - breed stays free text there (see
+// lostFieldMapping.js) since the overwhelming majority of street cats have
+// no identifiable breed. A dog is far more often purebred or a recognizable
+// mix, so breed is a genuinely useful identifying signal worth a real
+// picklist. Skewed toward breeds common in Israel; "אחר" is the fixed
+// catch-all, and the settings panel can extend the rest without a code
+// change.
+export const DOG_BREEDS = [
+  'מעורב (לא ידוע)',
+  'לברדור',
+  'גולדן רטריבר',
+  'רועה גרמני',
+  'האסקי סיברי',
+  'פודל',
+  'ביגל',
+  'יורקשייר טרייר',
+  'שיצו',
+  'צ׳יוואווה',
+  'בורדר קולי',
+  'קוקר ספניאל',
+  'רוטוויילר',
+  'דוברמן',
+  'בוקסר',
+  'שנאוצר',
+  'מלטז',
+  'קאן קורסו',
+  'אמריקן סטפורדשייר (פיטבול)',
+  'קוואליר קינג צ׳ארלס ספניאל',
+  'אחר',
+];
+
+// Shared between cats and dogs, and between lost cases and found reports -
+// all four describe the same animal using the same vocabulary, which also
+// keeps matching (matchingEngine.js) comparing like with like instead of a
+// dropdown value against free text.
 export const CAT_SIZES = [
   { value: 'small', label: 'קטן' },
   { value: 'medium', label: 'בינוני' },
   { value: 'large', label: 'גדול' },
 ];
 
-// Separate from size - a small adult and a kitten are a very different
-// matching signal, so they're no longer conflated into one dropdown.
+// Separate from size - a small adult and a young animal are a very
+// different matching signal, so they're no longer conflated into one
+// dropdown. Labels are deliberately species-neutral ("גור" reads naturally
+// for a kitten or a puppy in Hebrew) - the underlying value name ("kitten")
+// is an internal key only, never shown to a user.
 export const CAT_AGE_CLASSES = [
   { value: 'kitten', label: 'גור' },
   { value: 'adult', label: 'מבוגר' },
 ];
 
-// Real cat coat taxonomy has more nuance (length/texture/density/double
-// coat), but for reliable classification from a photo by a non-expert (or
-// by AI), 4 buckets covering length + the one texture that's visually
-// unmistakable (curly/wavy) is the practical limit - a fluffy/bushy tail
-// is tracked as its own separate trait below since it can stand out even
-// on an otherwise short-haired cat.
+// Real coat taxonomy has more nuance (length/texture/density/double coat),
+// but for reliable classification from a photo by a non-expert (or by AI),
+// 4 buckets covering length + the one texture that's visually unmistakable
+// (curly/wavy) is the practical limit for either species - a fluffy/bushy
+// tail is tracked as its own separate trait below since it can stand out
+// even on an otherwise short-coated animal.
 export const CAT_FUR_TYPES = [
   { value: 'hairless', label: 'ללא פרווה / כמעט ללא פרווה' },
   { value: 'short', label: 'רגיל' },

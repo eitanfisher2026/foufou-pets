@@ -7,6 +7,7 @@ import { getPastedImageFiles } from '../shared/pasteImages.js';
 import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
+import { petLabels } from '../shared/petLabels.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -85,7 +86,7 @@ export default function SmartIntakeForm() {
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
       <div className="flex items-center gap-2">
         <h1 className="text-xl font-bold text-slate-800">הוספה חכמה</h1>
-        <InfoButton title="איך מוסיפים פוסט על חתול?">
+        <InfoButton title="איך מוסיפים פוסט על חתול או כלב?">
           <p>אפשר לצרף מידע בכמה דרכים, גם ביחד - ואז ללחוץ על "זיהוי אוטומטי":</p>
           <ul className="list-inside list-disc space-y-1">
             <li>העלאת צילום מסך של הפוסט מפייסבוק.</li>
@@ -97,9 +98,9 @@ export default function SmartIntakeForm() {
               ישירות (עובד רק בפוסטים פומביים, לא בקבוצות סגורות).
             </li>
             <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
-            <li>אם בפוסט כמה תמונות של החתולה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
+            <li>אם בפוסט כמה תמונות של החיה, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
           </ul>
-          <p>נזהה אוטומטית אם זה דיווח על חתול שאבד או שנמצא/נראה, ונפתח את הרשומה המתאימה לבדיקה ותיקון.</p>
+          <p>נזהה אוטומטית אם זה חתול או כלב, ואם זה דיווח על אבידה או מציאה, ונפתח את הרשומה המתאימה לבדיקה ותיקון.</p>
         </InfoButton>
       </div>
 
@@ -149,23 +150,21 @@ export default function SmartIntakeForm() {
 
       {extracted && !extracted.reportType && !creating && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
-          <p className="mb-3 text-sm text-amber-800">
-            לא הצלחנו לזהות אוטומטית מהפוסט אם זה דיווח על חתול שאבד או שנמצא - איזה מהם זה?
-          </p>
+          <p className="mb-3 text-sm text-amber-800">לא הצלחנו לזהות אוטומטית אם זה דיווח על אבידה או מציאה - איזה מהם זה?</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => createFromType(extracted, 'lost', files)}
               className="flex-1 rounded-xl bg-red-600 px-4 py-2 font-medium text-white"
             >
-              חתול שאבד
+              {petLabels(extracted.species).lostButton}
             </button>
             <button
               type="button"
               onClick={() => createFromType(extracted, 'found', files)}
               className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white"
             >
-              חתול שנמצא/נראה
+              {petLabels(extracted.species).foundButton}
             </button>
           </div>
         </div>

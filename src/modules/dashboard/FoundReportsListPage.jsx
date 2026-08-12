@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
+import { petLabels } from '../shared/petLabels.js';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import { listFoundReports } from './dashboardApi.js';
 import { FoundReportRow } from './RecordRows.jsx';
 import BackLink from '../shared/BackLink.jsx';
@@ -12,8 +14,10 @@ import BackLink from '../shared/BackLink.jsx';
  * Archived/resolved reports live in the archive page instead, not here.
  */
 export default function FoundReportsListPage() {
+  const { preferredSpecies } = useAuth();
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
+  const labels = petLabels(preferredSpecies);
 
   useEffect(() => {
     listFoundReports().then((data) => {
@@ -23,14 +27,17 @@ export default function FoundReportsListPage() {
   }, []);
 
   const visibleReports = reports.filter(
-    (r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED
+    (r) =>
+      r.status !== RECORD_STATUS.ARCHIVED &&
+      r.status !== RECORD_STATUS.RESOLVED &&
+      (r.species || 'cat') === preferredSpecies
   );
 
   return (
     <div className="p-4">
       <BackLink to="/">חזרה לעמוד הראשי</BackLink>
       <h1 className="mb-4 text-xl font-bold text-slate-800">
-        דיווחים על חתולים שנראו/נמצאו
+        {labels.allFoundReportsTitle}
         {visibleReports.length > 0 && <span className="text-sm font-normal text-slate-400"> ({visibleReports.length})</span>}
       </h1>
 

@@ -1,5 +1,6 @@
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
+import { SPECIES } from '../shared/collections.js';
 
 export const COLLECTION = 'users';
 
@@ -41,6 +42,11 @@ export async function upsertUserOnLogin(firebaseUser) {
       displayName: firebaseUser.displayName || '',
       photoURL: firebaseUser.photoURL || '',
       role: firebaseUser.email === BOOTSTRAP_ADMIN_EMAIL ? ROLES.ADMIN : ROLES.REGULAR,
+      // Which species this person is currently working in - a session-
+      // persisted preference (saved on the profile, not just locally, so it
+      // follows them across devices), not a permission. Defaults to cats,
+      // the only species that existed before this field did.
+      preferredSpecies: SPECIES.CAT,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
     });
@@ -68,4 +74,9 @@ export async function listUsers() {
 /** Admin-only: promotes/demotes one user. */
 export async function updateUserRole(uid, role) {
   await setDoc(doc(db, COLLECTION, uid), { role }, { merge: true });
+}
+
+/** Self-service: switches which species this person is currently working in. */
+export async function updatePreferredSpecies(uid, species) {
+  await setDoc(doc(db, COLLECTION, uid), { preferredSpecies: species }, { merge: true });
 }

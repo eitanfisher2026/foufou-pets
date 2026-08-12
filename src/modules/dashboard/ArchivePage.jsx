@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { RECORD_STATUS, CLOSURE_REASON, CLOSURE_REASON_LABELS } from '../shared/collections.js';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import { listLostCases } from './dashboardApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { formatDate } from '../shared/formatDate.js';
@@ -29,6 +30,7 @@ function ClosureTableRow({ lostCase: c }) {
  * archive itself: cases that are done, one way or another.
  */
 export default function ArchivePage() {
+  const { preferredSpecies } = useAuth();
   const [lostCases, setLostCases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
@@ -42,15 +44,19 @@ export default function ArchivePage() {
     });
   }, []);
 
+  // Filtered to the currently-active species too, same as the working
+  // dashboard - the archive is still scoped to "what I'm working on right
+  // now", not a global list.
   const filteredCases = useMemo(
     () =>
       lostCases.filter((c) => {
+        if ((c.species || 'cat') !== preferredSpecies) return false;
         if (statusFilter && c.closureReason !== statusFilter) return false;
         if (dateFrom && (!c.closureDate || c.closureDate < dateFrom)) return false;
         if (dateTo && (!c.closureDate || c.closureDate > dateTo)) return false;
         return true;
       }),
-    [lostCases, statusFilter, dateFrom, dateTo]
+    [lostCases, preferredSpecies, statusFilter, dateFrom, dateTo]
   );
 
   return (
@@ -105,7 +111,7 @@ export default function ArchivePage() {
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-500">
                 <th className="px-3 py-2 text-right font-medium">תאריך</th>
-                <th className="px-3 py-2 text-right font-medium">שם החתול</th>
+                <th className="px-3 py-2 text-right font-medium">שם החיה</th>
                 <th className="px-3 py-2 text-right font-medium">סטטוס</th>
                 <th className="px-3 py-2 text-right font-medium">הערה</th>
               </tr>
