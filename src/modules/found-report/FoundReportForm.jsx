@@ -16,7 +16,6 @@ import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPrevi
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
-import SpeciesToggle from '../shared/SpeciesToggle.jsx';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
@@ -26,9 +25,10 @@ export default function FoundReportForm() {
   const navigate = useNavigate();
   const { reading, error: readError, read, cancel: cancelReading } = useScreenshotReader();
 
-  // Starts on whichever species this person is currently working in (see
-  // AuthProvider/SpeciesToggle) - saves the usual tap for the common case,
-  // still fully changeable via the toggle for the odd one out.
+  // Species is fixed to whichever mode this person is currently working in
+  // (see AuthProvider/SpeciesToggle on the dashboard) - no picker here, since
+  // switching modes mid-form would be surprising. A screenshot's own
+  // AI-detected species can still override it (see mergeExtractedFoundFields).
   const [fields, setFields] = useState(() => ({ ...EMPTY_FOUND_FIELDS, species: preferredSpecies }));
   const labels = petLabels(fields.species);
   const colorOptions = useColorOptions(fields.species);
@@ -135,7 +135,6 @@ export default function FoundReportForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 p-4">
       <BackLink to="/">ביטול וחזרה לעמוד הראשי</BackLink>
-      <SpeciesToggle value={fields.species} onChange={(species) => setField('species', species)} />
       <div className="flex items-center gap-2">
         <h1 className="text-xl font-bold text-slate-800">{labels.foundReportTitle}</h1>
         <InfoButton title={labels.infoButtonTitle}>
