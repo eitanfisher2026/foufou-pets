@@ -75,10 +75,14 @@ export default function FoundReportForm() {
     if (!detectedFbUrl) return;
     setFetchingLink(true);
     setLinkFetchError('');
+    setField('sourceUrl', detectedFbUrl);
     try {
       const preview = await fetchFacebookPreview(detectedFbUrl);
       if (preview.text && !postText.includes(preview.text)) {
         setPostText((prev) => `${prev}\n${preview.text}`.trim());
+      }
+      if (preview.groupName) {
+        setPostText((prev) => `${prev}\n(פורסם בקבוצת פייסבוק: ${preview.groupName})`.trim());
       }
       if (preview.imageBase64) {
         addScreenshots([base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);
@@ -385,6 +389,17 @@ export default function FoundReportForm() {
 
         <Field label="מתי פורסם (כפי שכתוב בפוסט)">
           <input className="input" value={fields.postAgeText} onChange={(e) => setField('postAgeText', e.target.value)} />
+        </Field>
+
+        <Field label="קישור לפוסט המקורי">
+          <input
+            className="input"
+            type="url"
+            dir="ltr"
+            value={fields.sourceUrl}
+            onChange={(e) => setField('sourceUrl', e.target.value)}
+            placeholder="https://www.facebook.com/..."
+          />
         </Field>
       </FormSection>
 

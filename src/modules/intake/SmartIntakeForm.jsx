@@ -18,8 +18,19 @@ import { useSmartIntake } from './useSmartIntake.js';
  * full edit view for reviewing/correcting fields - no second form to build.
  */
 export default function SmartIntakeForm() {
-  const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
-    useSmartIntake();
+  const {
+    files,
+    setFiles,
+    extracted,
+    busy,
+    reading,
+    readError,
+    analyze,
+    createFromType,
+    creating,
+    cancelReading,
+    setSourceUrl,
+  } = useSmartIntake();
   const [postText, setPostText] = useState('');
   const [fetchingLink, setFetchingLink] = useState(false);
   const [linkFetchError, setLinkFetchError] = useState('');
@@ -48,10 +59,14 @@ export default function SmartIntakeForm() {
     if (!detectedFbUrl) return;
     setFetchingLink(true);
     setLinkFetchError('');
+    setSourceUrl(detectedFbUrl);
     try {
       const preview = await fetchFacebookPreview(detectedFbUrl);
       if (preview.text && !postText.includes(preview.text)) {
         setPostText((prev) => `${prev}\n${preview.text}`.trim());
+      }
+      if (preview.groupName) {
+        setPostText((prev) => `${prev}\n(פורסם בקבוצת פייסבוק: ${preview.groupName})`.trim());
       }
       if (preview.imageBase64) {
         setFiles((prev) => [...prev, base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);

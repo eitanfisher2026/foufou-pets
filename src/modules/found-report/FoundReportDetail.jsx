@@ -233,6 +233,11 @@ export default function FoundReportDetail() {
             {report.sharedByName && <p>שותף ע"י: {report.sharedByName}</p>}
             {report.contactName && <p>איש קשר: {report.contactName}</p>}
             {report.contactPhone && <p>טלפון: {report.contactPhone}</p>}
+            {report.sourceUrl && (
+              <a href={report.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                צפייה בפוסט המקורי
+              </a>
+            )}
           </div>
         </>
       ) : (
@@ -431,6 +436,16 @@ export default function FoundReportDetail() {
                 className="input"
                 value={fields.postAgeText || ''}
                 onChange={(e) => setField('postAgeText', e.target.value)}
+              />
+            </Field>
+            <Field label="קישור לפוסט המקורי">
+              <input
+                className="input"
+                type="url"
+                dir="ltr"
+                value={fields.sourceUrl || ''}
+                onChange={(e) => setField('sourceUrl', e.target.value)}
+                placeholder="https://www.facebook.com/..."
               />
             </Field>
           </FormSection>

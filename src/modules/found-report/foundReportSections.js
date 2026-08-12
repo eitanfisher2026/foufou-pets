@@ -60,6 +60,7 @@ export function buildFoundReportSections(report) {
         { label: 'מי כתב את הפוסט', value: report.originalPosterName },
         { label: 'מי שיתף', value: report.sharedByName },
         { label: 'מתי פורסם', value: report.postAgeText },
+        { label: 'קישור לפוסט המקורי', value: report.sourceUrl },
       ],
     },
   ];

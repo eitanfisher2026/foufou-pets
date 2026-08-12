@@ -25,6 +25,10 @@ export const EMPTY_FOUND_FIELDS = {
   originalPosterName: '',
   sharedByName: '',
   postAgeText: '',
+  // The Facebook post's own link, when known (pasted by hand or pulled
+  // automatically via the link-preview fetch) - kept as a plain URL so
+  // anyone reviewing the report can jump straight to the original post.
+  sourceUrl: '',
   // Cumulative real cost of every AI extraction call made for this report
   // (initial upload plus any re-scans).
   aiCostUsd: 0,

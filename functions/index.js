@@ -324,6 +324,18 @@ function decodeHtmlEntities(str) {
     .replace(/&gt;/g, '>');
 }
 
+// Facebook's og:title for a group/page post reliably comes back as
+// "{group or page name} | {post's own caption} | Facebook" - splitting on
+// " | " and taking the first piece recovers the group name without ever
+// needing to log in and look at the group directly. A personal post's
+// title has no such prefix, so this comes back empty for those instead of
+// guessing.
+function extractGroupNameFromTitle(title) {
+  const withoutTrailingFacebook = title.replace(/\s*\|\s*Facebook\s*$/i, '');
+  const parts = withoutTrailingFacebook.split(' | ');
+  return parts.length > 1 ? parts[0].trim() : '';
+}
+
 // Attribute order in Facebook's <meta property="og:X" content="..."> tags
 // is consistent in practice, but matching both orders is cheap insurance
 // against a markup change breaking this silently.
@@ -365,10 +377,12 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
     });
     html = await res.text();
   } catch {
-    return { text: '', imageBase64: null, imageMimeType: null };
+    return { text: '', imageBase64: null, imageMimeType: null, groupName: '' };
   }
 
-  const text = extractOgTag(html, 'description') || extractOgTag(html, 'title');
+  const rawTitle = extractOgTag(html, 'title');
+  const text = extractOgTag(html, 'description') || rawTitle;
+  const groupName = extractGroupNameFromTitle(rawTitle);
   const imageUrl = extractOgTag(html, 'image');
 
   let imageBase64 = null;
@@ -389,5 +403,5 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
     }
   }
 
-  return { text, imageBase64, imageMimeType };
+  return { text, imageBase64, imageMimeType, groupName };
 });

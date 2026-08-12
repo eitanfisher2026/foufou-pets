@@ -11,7 +11,6 @@ import {
   CAT_AGE_CLASSES,
   CAT_FUR_TYPES,
   COLLAR_COLORS,
-  CLOSURE_REASON,
   CLOSURE_REASON_LABELS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
@@ -325,6 +324,24 @@ export default function LostCaseDetail() {
         לעמוד הראשי
       </BackLink>
 
+      {!editing && (
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() =>
+              handleRecordStatusChange(
+                lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
+                  ? lostCase.status
+                  : RECORD_STATUS.ARCHIVED
+              )
+            }
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm active:bg-slate-100"
+          >
+            ארכיון
+          </button>
+        </div>
+      )}
+
       {!editing ? (
         <>
           <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
@@ -356,10 +373,15 @@ export default function LostCaseDetail() {
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
           )}
-          {(lostCase.sourceGroupName || lostCase.originalPosterName) && (
+          {(lostCase.sourceGroupName || lostCase.originalPosterName || lostCase.sourceUrl) && (
             <div className="mb-2 rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
               {lostCase.sourceGroupName && <p>מקור: {lostCase.sourceGroupName}</p>}
               {lostCase.originalPosterName && <p>פורסם ע"י: {lostCase.originalPosterName}</p>}
+              {lostCase.sourceUrl && (
+                <a href={lostCase.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+                  צפייה בפוסט המקורי
+                </a>
+              )}
             </div>
           )}
         </>
@@ -523,42 +545,6 @@ export default function LostCaseDetail() {
             </Field>
           </FormSection>
 
-          <FormSection title="סגירת התיק">
-            <Field label="סטטוס סגירה" inline>
-              <select
-                className="input"
-                value={fields.closureReason || ''}
-                onChange={(e) => setField('closureReason', e.target.value)}
-              >
-                <option value="">-</option>
-                {Object.values(CLOSURE_REASON).map((reason) => (
-                  <option key={reason} value={reason}>
-                    {CLOSURE_REASON_LABELS[reason]}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="תאריך" inline>
-              <input
-                type="date"
-                className="input w-36"
-                value={fields.closureDate || ''}
-                onChange={(e) => setField('closureDate', e.target.value)}
-              />
-            </Field>
-            <Field label="ע״י (למי מגיע קרדיט)">
-              <input className="input" value={fields.closedBy || ''} onChange={(e) => setField('closedBy', e.target.value)} />
-            </Field>
-            <Field label="הערה">
-              <textarea
-                className="input"
-                rows={2}
-                value={fields.closingComment || ''}
-                onChange={(e) => setField('closingComment', e.target.value)}
-              />
-            </Field>
-          </FormSection>
-
           <FormSection title="מקור מידע">
             <Field label="מקור המידע (שם הקבוצה) - אם שונה מדיווח אישי">
               <input
@@ -586,6 +572,16 @@ export default function LostCaseDetail() {
                 className="input"
                 value={fields.postAgeText || ''}
                 onChange={(e) => setField('postAgeText', e.target.value)}
+              />
+            </Field>
+            <Field label="קישור לפוסט המקורי">
+              <input
+                className="input"
+                type="url"
+                dir="ltr"
+                value={fields.sourceUrl || ''}
+                onChange={(e) => setField('sourceUrl', e.target.value)}
+                placeholder="https://www.facebook.com/..."
               />
             </Field>
           </FormSection>
@@ -715,7 +711,14 @@ export default function LostCaseDetail() {
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
       {pendingCloseStatus && (
-        <ClosureDialog onConfirm={handleConfirmClosure} onCancel={() => setPendingCloseStatus(null)} />
+        <ClosureDialog
+          initialDate={lostCase.closureDate}
+          initialReason={lostCase.closureReason}
+          initialClosedBy={lostCase.closedBy}
+          initialComment={lostCase.closingComment}
+          onConfirm={handleConfirmClosure}
+          onCancel={() => setPendingCloseStatus(null)}
+        />
       )}
       {showDetails && (
         <RecordDetailsDialog
@@ -784,6 +787,7 @@ export default function LostCaseDetail() {
                 { label: 'מי כתב את הפוסט', value: lostCase.originalPosterName },
                 { label: 'מי שיתף', value: lostCase.sharedByName },
                 { label: 'מתי פורסם', value: lostCase.postAgeText },
+                { label: 'קישור לפוסט המקורי', value: lostCase.sourceUrl },
               ],
             },
           ]}
@@ -841,6 +845,11 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
           {report.sourceGroupName && <p>מקור: {report.sourceGroupName}</p>}
           {report.originalPosterName && <p>פורסם ע"י: {report.originalPosterName}</p>}
           {report.contactPhone && <p>טלפון ליצירת קשר: {report.contactPhone}</p>}
+          {report.sourceUrl && (
+            <a href={report.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+              צפייה בפוסט המקורי
+            </a>
+          )}
         </div>
       )}
 

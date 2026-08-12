@@ -15,8 +15,19 @@ import { useSmartIntake } from './useSmartIntake.js';
  * a Facebook post in is exactly as good as uploading its screenshot by hand.
  */
 export default function ShareTargetIntake() {
-  const { files, setFiles, extracted, busy, reading, readError, analyze, createFromType, creating, cancelReading } =
-    useSmartIntake();
+  const {
+    files,
+    setFiles,
+    extracted,
+    busy,
+    reading,
+    readError,
+    analyze,
+    createFromType,
+    creating,
+    cancelReading,
+    setSourceUrl,
+  } = useSmartIntake();
   const [status, setStatus] = useState('loading'); // loading | empty | no-photo | fetching-link | done
   const [sharedText, setSharedText] = useState('');
   const started = useRef(false);
@@ -37,11 +48,13 @@ export default function ShareTargetIntake() {
       }
       const text = [share.text, share.url].filter(Boolean).join('\n');
       setSharedText(text);
+      const fbUrl = extractFacebookUrl(share.url) || extractFacebookUrl(share.text);
+      if (fbUrl) setSourceUrl(fbUrl);
 
       if (share.photos.length > 0) {
         setStatus('done');
         setFiles(share.photos);
-        analyze(text, share.photos);
+        analyze(text, share.photos, fbUrl);
         return;
       }
 
@@ -50,18 +63,18 @@ export default function ShareTargetIntake() {
       // public preview photo/text straight from the link. Only works for
       // public posts; anything else just falls through to the manual
       // upload prompt below, same as today.
-      const fbUrl = extractFacebookUrl(share.url) || extractFacebookUrl(share.text);
       if (fbUrl) {
         setStatus('fetching-link');
         try {
           const preview = await fetchFacebookPreview(fbUrl);
-          const combinedText = [text, preview.text].filter(Boolean).join('\n');
+          const groupLine = preview.groupName ? `(פורסם בקבוצת פייסבוק: ${preview.groupName})` : '';
+          const combinedText = [text, preview.text, groupLine].filter(Boolean).join('\n');
           setSharedText(combinedText);
           if (preview.imageBase64) {
             const file = base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg');
             setStatus('done');
             setFiles([file]);
-            analyze(combinedText, [file]);
+            analyze(combinedText, [file], fbUrl);
             return;
           }
         } catch {

@@ -28,11 +28,16 @@ export function useSmartIntake() {
   const [files, setFiles] = useState([]);
   const [extracted, setExtracted] = useState(null);
   const [creating, setCreating] = useState(false);
+  // Set by a caller that pulled/pasted a Facebook link (see facebookLink.js)
+  // - carried through to whichever record ends up created, so it's not
+  // AI-extracted and has nowhere else to live until then.
+  const [sourceUrl, setSourceUrl] = useState('');
 
-  // `filesOverride` lets a caller that just set the files itself (e.g. the
-  // share-target screen, reacting to a fresh share) pass them directly
-  // instead of relying on `files` state having already re-rendered.
-  async function analyze(postText = '', filesOverride) {
+  // `filesOverride`/`sourceUrlOverride` let a caller that just set that
+  // state itself (e.g. the share-target screen, reacting to a fresh share
+  // within the same synchronous handler) pass the values directly instead
+  // of relying on state having already re-rendered.
+  async function analyze(postText = '', filesOverride, sourceUrlOverride) {
     const targetFiles = filesOverride ?? files;
     if (targetFiles.length === 0) return;
     setExtracted(null);
@@ -41,26 +46,31 @@ export function useSmartIntake() {
       const result = await read(targetFiles, postText);
       setExtracted(result);
       if (result.reportType === 'lost' || result.reportType === 'found') {
-        await createFromType(result, result.reportType, targetFiles);
+        await createFromType(result, result.reportType, targetFiles, sourceUrlOverride);
       }
     } catch {
       // error already surfaced via readError
     }
   }
 
-  async function createFromType(result, type, uploadedFiles) {
+  async function createFromType(result, type, uploadedFiles, sourceUrlOverride) {
     setCreating(true);
     try {
       const mainPhoto = await extractMainPhoto(uploadedFiles, result.mainPhotoRegion);
       const photos = mainPhoto ? [mainPhoto, ...uploadedFiles] : uploadedFiles;
+      const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
 
       if (type === 'lost') {
         const fields = mergeExtractedLostFields(result);
-        const caseId = await createLostCase({ ...fields, source: 'screenshot' }, photos, user.uid);
+        const caseId = await createLostCase({ ...fields, source: 'screenshot', sourceUrl: finalSourceUrl }, photos, user.uid);
         navigate(`/lost/${caseId}`);
       } else {
         const fields = mergeExtractedFoundFields(result);
-        const reportId = await createFoundReport({ ...fields, source: 'screenshot' }, photos, user.uid);
+        const reportId = await createFoundReport(
+          { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl },
+          photos,
+          user.uid
+        );
         navigate(`/found/${reportId}`);
       }
     } finally {
@@ -79,5 +89,7 @@ export function useSmartIntake() {
     analyze,
     createFromType,
     cancelReading,
+    sourceUrl,
+    setSourceUrl,
   };
 }
