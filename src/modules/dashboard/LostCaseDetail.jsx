@@ -16,6 +16,7 @@ import {
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
 import { formatDate } from '../shared/formatDate.js';
+import { formatDateTime } from '../shared/formatDateTime.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import {
   getLostCase,
@@ -798,6 +799,15 @@ export default function LostCaseDetail() {
                 { label: 'מי שיתף', value: lostCase.sharedByName },
                 { label: 'מתי פורסם', value: lostCase.postAgeText },
                 { label: 'קישור לפוסט המקורי', value: lostCase.sourceUrl },
+              ],
+            },
+            {
+              title: 'פרטי רשומה',
+              collapsible: true,
+              rows: [
+                { label: 'נוצר/ה על ידי', value: lostCase.ownerName || lostCase.ownerEmail || lostCase.ownerId },
+                { label: 'תאריך יצירה', value: formatDateTime(lostCase.createdAt) },
+                { label: 'עדכון אחרון', value: formatDateTime(lostCase.updatedAt) },
               ],
             },
           ]}

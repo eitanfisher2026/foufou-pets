@@ -9,9 +9,12 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
  * (reportedByUid) separate from the source fields (who originally posted,
  * which group, roughly when) - the uploader is usually not the original
  * poster, and that distinction is what lets an owner trace back to the
- * source even when no phone number was left.
+ * source even when no phone number was left. reporterName/reporterEmail
+ * are denormalized from the uploader at this moment (not looked up live
+ * later) so "who reported this" is visible to everyone without needing
+ * read access to another person's user profile doc.
  */
-export async function createFoundReport(fields, photoFiles, reportedByUid) {
+export async function createFoundReport(fields, photoFiles, reporter) {
   const reportRef = await addDoc(collection(db, COLLECTIONS.FOUND_REPORTS), {
     species: 'cat',
     title: fields.title || '',
@@ -43,7 +46,9 @@ export async function createFoundReport(fields, photoFiles, reportedByUid) {
     photos: [],
     status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
-    reportedByUid,
+    reportedByUid: reporter.uid,
+    reporterName: reporter.displayName || '',
+    reporterEmail: reporter.email || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

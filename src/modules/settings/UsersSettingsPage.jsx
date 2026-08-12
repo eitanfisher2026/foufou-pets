@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react';
 import BackLink from '../shared/BackLink.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listUsers, updateUserRole, ROLES, ROLE_LABELS } from '../users/usersApi.js';
-
-function formatDateTime(ts) {
-  if (!ts?.toDate) return '—';
-  return ts.toDate().toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' });
-}
+import { formatDateTime } from '../shared/formatDateTime.js';
 
 /**
  * Admin-only: everyone who has ever signed in, their role, and when they
@@ -65,7 +61,7 @@ export default function UsersSettingsPage() {
               </div>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-400">כניסה אחרונה: {formatDateTime(u.lastLoginAt)}</span>
+              <span className="text-xs text-slate-400">כניסה אחרונה: {formatDateTime(u.lastLoginAt) || '—'}</span>
               <select
                 className="input w-32 text-sm"
                 value={u.role || ROLES.REGULAR}

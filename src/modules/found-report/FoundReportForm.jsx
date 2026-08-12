@@ -117,7 +117,7 @@ export default function FoundReportForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const reportId = await createFoundReport({ ...fields, source }, photos, user.uid);
+      const reportId = await createFoundReport({ ...fields, source }, photos, user);
       navigate(`/found/${reportId}`);
     } finally {
       setSubmitting(false);

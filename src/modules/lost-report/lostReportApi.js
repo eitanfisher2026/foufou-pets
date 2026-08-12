@@ -6,9 +6,12 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
 
 /**
  * Creates a lost-cat case: writes the Firestore doc first (to get an id for
- * the photo storage path), then attaches uploaded photo URLs.
+ * the photo storage path), then attaches uploaded photo URLs. ownerName/
+ * ownerEmail are denormalized from the creator at this moment (not looked
+ * up live later) so "who created this" is visible to everyone without
+ * needing read access to another person's user profile doc.
  */
-export async function createLostCase(fields, photoFiles, ownerId) {
+export async function createLostCase(fields, photoFiles, owner) {
   const caseRef = await addDoc(collection(db, COLLECTIONS.LOST_CASES), {
     species: 'cat',
     name: fields.name || '',
@@ -39,7 +42,9 @@ export async function createLostCase(fields, photoFiles, ownerId) {
     photos: [],
     status: RECORD_STATUS.ACTIVE,
     source: fields.source || 'manual',
-    ownerId,
+    ownerId: owner.uid,
+    ownerName: owner.displayName || '',
+    ownerEmail: owner.email || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });

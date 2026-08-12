@@ -62,14 +62,14 @@ export function useSmartIntake() {
 
       if (type === 'lost') {
         const fields = mergeExtractedLostFields(result);
-        const caseId = await createLostCase({ ...fields, source: 'screenshot', sourceUrl: finalSourceUrl }, photos, user.uid);
+        const caseId = await createLostCase({ ...fields, source: 'screenshot', sourceUrl: finalSourceUrl }, photos, user);
         navigate(`/lost/${caseId}`);
       } else {
         const fields = mergeExtractedFoundFields(result);
         const reportId = await createFoundReport(
           { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl },
           photos,
-          user.uid
+          user
         );
         navigate(`/found/${reportId}`);
       }

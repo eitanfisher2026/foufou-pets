@@ -1,5 +1,6 @@
 import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, CAT_CONDITIONS } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
+import { formatDateTime } from '../shared/formatDateTime.js';
 
 /**
  * Builds the same [{ title, rows }] sections RecordDetailsDialog expects,
@@ -61,6 +62,15 @@ export function buildFoundReportSections(report) {
         { label: 'מי שיתף', value: report.sharedByName },
         { label: 'מתי פורסם', value: report.postAgeText },
         { label: 'קישור לפוסט המקורי', value: report.sourceUrl },
+      ],
+    },
+    {
+      title: 'פרטי רשומה',
+      collapsible: true,
+      rows: [
+        { label: 'נוצר/ה על ידי', value: report.reporterName || report.reporterEmail || report.reportedByUid },
+        { label: 'תאריך יצירה', value: formatDateTime(report.createdAt) },
+        { label: 'עדכון אחרון', value: formatDateTime(report.updatedAt) },
       ],
     },
   ];

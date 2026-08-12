@@ -115,7 +115,7 @@ export default function LostReportForm() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const caseId = await createLostCase({ ...fields, source }, photos, user.uid);
+      const caseId = await createLostCase({ ...fields, source }, photos, user);
       navigate(`/lost/${caseId}`);
     } finally {
       setSubmitting(false);
