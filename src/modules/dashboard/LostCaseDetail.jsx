@@ -324,24 +324,6 @@ export default function LostCaseDetail() {
         לעמוד הראשי
       </BackLink>
 
-      {!editing && (
-        <div className="mb-4 flex justify-end">
-          <button
-            type="button"
-            onClick={() =>
-              handleRecordStatusChange(
-                lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
-                  ? lostCase.status
-                  : RECORD_STATUS.ARCHIVED
-              )
-            }
-            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm active:bg-slate-100"
-          >
-            ארכיון
-          </button>
-        </div>
-      )}
-
       {!editing ? (
         <>
           <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
@@ -357,16 +339,33 @@ export default function LostCaseDetail() {
             <p className="mb-2 text-sm text-slate-500">
               {lostCase.color} · {lostCase.neighborhood} · {lostCase.lastSeenAt}
             </p>
-            <div className="flex flex-wrap gap-3">
-              <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
-                פרטים מלאים
-              </button>
-              <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
-                עריכה
-              </button>
-              <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
-                {deleting ? 'מוחקים...' : 'מחיקת התיק'}
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-3">
+                <button onClick={() => setShowDetails(true)} className="text-sm text-slate-600 underline">
+                  פרטים מלאים
+                </button>
+                <button onClick={() => setEditing(true)} className="text-sm text-slate-600 underline">
+                  עריכה
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
+                  {deleting ? 'מוחקים...' : 'מחיקת התיק'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleRecordStatusChange(
+                      lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
+                        ? lostCase.status
+                        : RECORD_STATUS.ARCHIVED
+                    )
+                  }
+                  className="text-sm text-slate-600 underline"
+                >
+                  ארכיון
+                </button>
+              </div>
             </div>
           </div>
           {lostCase.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{lostCase.markings}</p>}
