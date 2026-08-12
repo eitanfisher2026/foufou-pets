@@ -68,10 +68,16 @@ export default function Dashboard() {
       <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} />
 
       <div className="mb-3 flex gap-3">
-        <Link to="/lost/new" className="flex-1 rounded-xl bg-red-600 px-4 py-3 text-center font-medium text-white">
+        <Link
+          to="/lost/new"
+          className="flex h-12 flex-1 items-center justify-center whitespace-nowrap rounded-xl bg-red-600 px-3 text-center text-xs font-medium text-white"
+        >
           {labels.lostButton}
         </Link>
-        <Link to="/found/new" className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-center font-medium text-white">
+        <Link
+          to="/found/new"
+          className="flex h-12 flex-1 items-center justify-center whitespace-nowrap rounded-xl bg-emerald-600 px-3 text-center text-xs font-medium text-white"
+        >
           {labels.foundButton}
         </Link>
       </div>
