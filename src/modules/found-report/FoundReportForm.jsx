@@ -45,6 +45,7 @@ export default function FoundReportForm() {
   const [fetchingLink, setFetchingLink] = useState(false);
   const [linkFetchError, setLinkFetchError] = useState('');
   const [duplicateMatches, setDuplicateMatches] = useState(null);
+  const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -87,6 +88,15 @@ export default function FoundReportForm() {
     setFetchingLink(true);
     setLinkFetchError('');
     setField('sourceUrl', detectedFbUrl);
+    // Early heads-up, in parallel with the actual fetch below - no need to
+    // wait for someone to fill in the whole form before finding out a post
+    // with this exact link was already entered.
+    findDuplicatesBySourceUrl('found', detectedFbUrl).then((matches) => {
+      if (matches.length > 0) {
+        setDuplicateDialogMode('info');
+        setDuplicateMatches(matches);
+      }
+    });
     try {
       const preview = await fetchFacebookPreview(detectedFbUrl);
       if (preview.text && !postText.includes(preview.text)) {
@@ -148,6 +158,7 @@ export default function FoundReportForm() {
         setSubmitting(false);
       }
       if (matches.length > 0) {
+        setDuplicateDialogMode('submit');
         setDuplicateMatches(matches);
         return;
       }
@@ -472,6 +483,7 @@ export default function FoundReportForm() {
         <DuplicateWarningDialog
           recordType="found"
           matches={duplicateMatches}
+          mode={duplicateDialogMode}
           onContinue={() => {
             setDuplicateMatches(null);
             createReport();

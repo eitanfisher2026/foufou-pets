@@ -20,3 +20,21 @@ export async function findDuplicatesBySourceUrl(recordType, sourceUrl) {
   const snap = await getDocs(query(collection(db, collectionName), where('sourceUrl', '==', url)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
+
+/**
+ * Same check, but for the smart-add flow where lost-vs-found isn't known
+ * yet at the moment a link is pulled in (that's only decided once
+ * extraction runs) - checks both collections and tags each match with its
+ * own recordType so a caller/dialog that doesn't know the type in advance
+ * can still render each match correctly.
+ */
+export async function findDuplicatesBySourceUrlAnyType(sourceUrl) {
+  const [lost, found] = await Promise.all([
+    findDuplicatesBySourceUrl('lost', sourceUrl),
+    findDuplicatesBySourceUrl('found', sourceUrl),
+  ]);
+  return [
+    ...lost.map((m) => ({ ...m, recordType: 'lost' })),
+    ...found.map((m) => ({ ...m, recordType: 'found' })),
+  ];
+}

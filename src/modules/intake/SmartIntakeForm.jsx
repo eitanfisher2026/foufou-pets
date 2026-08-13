@@ -9,6 +9,7 @@ import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
+import { findDuplicatesBySourceUrlAnyType } from '../shared/duplicateCheckApi.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -40,6 +41,12 @@ export default function SmartIntakeForm() {
   const [postText, setPostText] = useState('');
   const [fetchingLink, setFetchingLink] = useState(false);
   const [linkFetchError, setLinkFetchError] = useState('');
+  // Separate from the hook's own duplicateMatches (the pre-creation gate,
+  // triggered once extraction has classified lost vs. found) - this is an
+  // earlier, type-unaware heads-up shown right after pulling in a link, so
+  // it needs its own state and checks both collections at once (see
+  // findDuplicatesBySourceUrlAnyType).
+  const [linkDuplicateMatches, setLinkDuplicateMatches] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function handleUpload(e) {
@@ -66,6 +73,11 @@ export default function SmartIntakeForm() {
     setFetchingLink(true);
     setLinkFetchError('');
     setSourceUrl(detectedFbUrl);
+    // Early heads-up, in parallel with the actual fetch below - lost/found
+    // isn't known yet at this point, so this checks both collections.
+    findDuplicatesBySourceUrlAnyType(detectedFbUrl).then((matches) => {
+      if (matches.length > 0) setLinkDuplicateMatches(matches);
+    });
     try {
       const preview = await fetchFacebookPreview(detectedFbUrl);
       if (preview.text && !postText.includes(preview.text)) {
@@ -181,6 +193,14 @@ export default function SmartIntakeForm() {
           matches={duplicateMatches}
           onContinue={continueCreateAnyway}
           onCancel={cancelDuplicateCreate}
+        />
+      )}
+
+      {!duplicateMatches && linkDuplicateMatches && (
+        <DuplicateWarningDialog
+          matches={linkDuplicateMatches}
+          mode="info"
+          onCancel={() => setLinkDuplicateMatches(null)}
         />
       )}
     </div>
