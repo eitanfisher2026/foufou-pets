@@ -5,6 +5,7 @@ import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import { buildFoundReportSections } from '../found-report/foundReportSections.js';
 import RecordDetailsDialog from './RecordDetailsDialog.jsx';
 import PhotoLightbox from './PhotoLightbox.jsx';
+import { formatDateTime } from './formatDateTime.js';
 
 /**
  * Shown when one or more existing records share the exact same source URL
@@ -31,6 +32,9 @@ export default function DuplicateWarningDialog({ recordType, matches, onContinue
   const typeOf = (m) => recordType || m.recordType;
   const displayName = (m) => (typeOf(m) === 'lost' ? displayLostCaseName(m) : displayFoundReportName(m));
   const buildSections = (m) => (typeOf(m) === 'lost' ? buildLostCaseSections(m) : buildFoundReportSections(m));
+  // Same "no raw ID" rule as lostCaseSections.js/foundReportSections.js -
+  // just hide the creator half if no name/email snapshot was saved.
+  const creatorOf = (m) => (typeOf(m) === 'lost' ? m.ownerName || m.ownerEmail : m.reporterName || m.reporterEmail);
 
   return (
     <>
@@ -52,6 +56,17 @@ export default function DuplicateWarningDialog({ recordType, matches, onContinue
                   {displayName(m)} - פרטים מלאים
                 </button>
                 {m.neighborhood && <p className="mt-0.5 text-xs text-slate-400">{m.neighborhood}</p>}
+                {(creatorOf(m) || m.createdAt) && (
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {creatorOf(m) && `נוצר ע״י ${creatorOf(m)}`}
+                    {creatorOf(m) && m.createdAt && ' · '}
+                    {m.createdAt && (
+                      <span dir="ltr" className="inline-block">
+                        {formatDateTime(m.createdAt)}
+                      </span>
+                    )}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
