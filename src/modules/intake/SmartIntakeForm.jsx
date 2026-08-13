@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
@@ -21,6 +22,7 @@ import { useSmartIntake } from './useSmartIntake.js';
  * full edit view for reviewing/correcting fields - no second form to build.
  */
 export default function SmartIntakeForm() {
+  const navigate = useNavigate();
   const {
     files,
     setFiles,
@@ -200,7 +202,8 @@ export default function SmartIntakeForm() {
         <DuplicateWarningDialog
           matches={linkDuplicateMatches}
           mode="info"
-          onCancel={() => setLinkDuplicateMatches(null)}
+          onContinue={() => setLinkDuplicateMatches(null)}
+          onCancel={() => navigate('/')}
         />
       )}
     </div>

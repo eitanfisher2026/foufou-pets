@@ -463,9 +463,19 @@ export default function LostReportForm() {
           mode={duplicateDialogMode}
           onContinue={() => {
             setDuplicateMatches(null);
-            createCase();
+            // The early "info" check (from the link-fetch button) is just a
+            // heads-up while the form is still being filled in - only the
+            // later submit-time check should actually create the record.
+            if (duplicateDialogMode === 'submit') createCase();
           }}
-          onCancel={() => setDuplicateMatches(null)}
+          onCancel={() => {
+            setDuplicateMatches(null);
+            // The early "info" check has nothing pending to just dismiss
+            // back to - "cancel" there means abandoning the add attempt.
+            // The later submit-time check just closes back onto the
+            // already-filled-in form, so nothing typed is lost.
+            if (duplicateDialogMode === 'info') navigate('/');
+          }}
         />
       )}
     </form>

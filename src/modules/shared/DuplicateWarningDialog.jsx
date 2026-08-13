@@ -19,10 +19,11 @@ import PhotoLightbox from './PhotoLightbox.jsx';
  * smart-add flow, before extraction has classified the post) - in that case
  * each match carries its own `recordType` (see findDuplicatesBySourceUrlAnyType).
  *
- * `mode="submit"` (default) is the pre-creation gate: continue anyway or
- * cancel the new record. `mode="info"` is an earlier heads-up (e.g. right
- * after pulling in a link, before anything else is filled in) where there's
- * nothing to continue or cancel yet - just one acknowledgement button.
+ * `mode="submit"` (default) is the pre-creation gate, shown right before an
+ * already-filled-in record would be saved. `mode="info"` is an earlier
+ * heads-up (e.g. right after pulling in a link, before anything else is
+ * filled in) - same two choices, just worded for "keep going" rather than
+ * "save this", since nothing's actually being created yet at that point.
  */
 export default function DuplicateWarningDialog({ recordType, matches, onContinue, onCancel, mode = 'submit' }) {
   const [reviewing, setReviewing] = useState(null);
@@ -56,32 +57,20 @@ export default function DuplicateWarningDialog({ recordType, matches, onContinue
           </ul>
 
           <div className="flex gap-2">
-            {mode === 'submit' ? (
-              <>
-                <button
-                  type="button"
-                  onClick={onContinue}
-                  className="flex-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
-                >
-                  המשך ליצירת רשומה חדשה
-                </button>
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="flex-1 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600"
-                >
-                  ביטול
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={onCancel}
-                className="flex-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
-              >
-                הבנתי
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onContinue}
+              className="flex-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
+            >
+              {mode === 'submit' ? 'המשך ליצירת רשומה חדשה' : 'הוספה בכל זאת'}
+            </button>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600"
+            >
+              ביטול
+            </button>
           </div>
         </div>
       </div>
