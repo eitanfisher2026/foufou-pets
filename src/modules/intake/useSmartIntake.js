@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
+import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
 import { createLostCase } from '../lost-report/lostReportApi.js';
 import { mergeExtractedLostFields, EMPTY_LOST_FIELDS } from '../lost-report/lostFieldMapping.js';
 import { createFoundReport } from '../found-report/foundReportApi.js';
@@ -32,6 +33,12 @@ export function useSmartIntake() {
   // - carried through to whichever record ends up created, so it's not
   // AI-extracted and has nowhere else to live until then.
   const [sourceUrl, setSourceUrl] = useState('');
+  // Duplicate-source-url warning (see duplicateCheckApi.js) - the pending
+  // create args are stashed in a ref (not state) so "continue anyway" can
+  // resume the exact same creation call without re-running extraction.
+  const [duplicateMatches, setDuplicateMatches] = useState(null);
+  const [duplicateRecordType, setDuplicateRecordType] = useState(null);
+  const pendingCreateRef = useRef(null);
 
   // `filesOverride`/`sourceUrlOverride` let a caller that just set that
   // state itself (e.g. the share-target screen, reacting to a fresh share
@@ -54,6 +61,20 @@ export function useSmartIntake() {
   }
 
   async function createFromType(result, type, uploadedFiles, sourceUrlOverride) {
+    const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
+    if (finalSourceUrl?.trim()) {
+      const matches = await findDuplicatesBySourceUrl(type, finalSourceUrl);
+      if (matches.length > 0) {
+        pendingCreateRef.current = { result, type, uploadedFiles, sourceUrlOverride };
+        setDuplicateRecordType(type);
+        setDuplicateMatches(matches);
+        return;
+      }
+    }
+    await doCreate(result, type, uploadedFiles, sourceUrlOverride);
+  }
+
+  async function doCreate(result, type, uploadedFiles, sourceUrlOverride) {
     setCreating(true);
     try {
       const mainPhoto = await extractMainPhoto(uploadedFiles, result.mainPhotoRegion);
@@ -84,6 +105,17 @@ export function useSmartIntake() {
     }
   }
 
+  function continueCreateAnyway() {
+    const pending = pendingCreateRef.current;
+    setDuplicateMatches(null);
+    if (pending) doCreate(pending.result, pending.type, pending.uploadedFiles, pending.sourceUrlOverride);
+  }
+
+  function cancelDuplicateCreate() {
+    setDuplicateMatches(null);
+    pendingCreateRef.current = null;
+  }
+
   return {
     files,
     setFiles,
@@ -97,5 +129,9 @@ export function useSmartIntake() {
     cancelReading,
     sourceUrl,
     setSourceUrl,
+    duplicateMatches,
+    duplicateRecordType,
+    continueCreateAnyway,
+    cancelDuplicateCreate,
   };
 }

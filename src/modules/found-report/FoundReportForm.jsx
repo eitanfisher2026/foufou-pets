@@ -16,6 +16,8 @@ import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPrevi
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
+import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
+import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
@@ -42,6 +44,7 @@ export default function FoundReportForm() {
   const [submitting, setSubmitting] = useState(false);
   const [fetchingLink, setFetchingLink] = useState(false);
   const [linkFetchError, setLinkFetchError] = useState('');
+  const [duplicateMatches, setDuplicateMatches] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -121,8 +124,7 @@ export default function FoundReportForm() {
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  async function createReport() {
     setSubmitting(true);
     try {
       const reportId = await createFoundReport({ ...fields, source }, photos, user);
@@ -130,6 +132,27 @@ export default function FoundReportForm() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Only checks for a duplicate at submit time, on the one signal that
+  // exists so far (same source URL) - see duplicateCheckApi.js for why this
+  // is deliberately step one of a check that may grow more conditions.
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (fields.sourceUrl?.trim()) {
+      setSubmitting(true);
+      let matches = [];
+      try {
+        matches = await findDuplicatesBySourceUrl('found', fields.sourceUrl);
+      } finally {
+        setSubmitting(false);
+      }
+      if (matches.length > 0) {
+        setDuplicateMatches(matches);
+        return;
+      }
+    }
+    await createReport();
   }
 
   return (
@@ -444,6 +467,18 @@ export default function FoundReportForm() {
       >
         {submitting ? 'שולחים...' : 'שליחת הדיווח'}
       </button>
+
+      {duplicateMatches && (
+        <DuplicateWarningDialog
+          recordType="found"
+          matches={duplicateMatches}
+          onContinue={() => {
+            setDuplicateMatches(null);
+            createReport();
+          }}
+          onCancel={() => setDuplicateMatches(null)}
+        />
+      )}
     </form>
   );
 }

@@ -6,6 +6,7 @@ import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
+import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -28,6 +29,10 @@ export default function ShareTargetIntake() {
     creating,
     cancelReading,
     setSourceUrl,
+    duplicateMatches,
+    duplicateRecordType,
+    continueCreateAnyway,
+    cancelDuplicateCreate,
   } = useSmartIntake();
   const [status, setStatus] = useState('loading'); // loading | empty | no-photo | fetching-link | done
   const [sharedText, setSharedText] = useState('');
@@ -166,6 +171,15 @@ export default function ShareTargetIntake() {
             </button>
           </div>
         </div>
+      )}
+
+      {duplicateMatches && (
+        <DuplicateWarningDialog
+          recordType={duplicateRecordType}
+          matches={duplicateMatches}
+          onContinue={continueCreateAnyway}
+          onCancel={cancelDuplicateCreate}
+        />
       )}
     </div>
   );

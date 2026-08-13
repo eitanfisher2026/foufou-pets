@@ -8,6 +8,7 @@ import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
+import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -31,6 +32,10 @@ export default function SmartIntakeForm() {
     creating,
     cancelReading,
     setSourceUrl,
+    duplicateMatches,
+    duplicateRecordType,
+    continueCreateAnyway,
+    cancelDuplicateCreate,
   } = useSmartIntake();
   const [postText, setPostText] = useState('');
   const [fetchingLink, setFetchingLink] = useState(false);
@@ -168,6 +173,15 @@ export default function SmartIntakeForm() {
             </button>
           </div>
         </div>
+      )}
+
+      {duplicateMatches && (
+        <DuplicateWarningDialog
+          recordType={duplicateRecordType}
+          matches={duplicateMatches}
+          onContinue={continueCreateAnyway}
+          onCancel={cancelDuplicateCreate}
+        />
       )}
     </div>
   );
