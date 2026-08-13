@@ -48,6 +48,7 @@ export function buildFoundReportSections(report) {
         {
           label: 'תאריך מדויק',
           value: report.seenDate ? `${formatDate(report.seenDate)}${report.seenDateApprox ? ' (משוער)' : ''}` : '',
+          dir: 'ltr',
         },
       ],
     },
@@ -74,8 +75,8 @@ export function buildFoundReportSections(report) {
       startClosed: true,
       rows: [
         { label: 'נוצר/ה על ידי', value: report.reporterName || report.reporterEmail || report.reportedByUid },
-        { label: 'תאריך יצירה', value: formatDateTime(report.createdAt) },
-        { label: 'עדכון אחרון', value: formatDateTime(report.updatedAt) },
+        { label: 'תאריך יצירה', value: formatDateTime(report.createdAt), dir: 'ltr' },
+        { label: 'עדכון אחרון', value: formatDateTime(report.updatedAt), dir: 'ltr' },
       ],
     },
   ];

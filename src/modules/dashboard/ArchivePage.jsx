@@ -12,7 +12,9 @@ const ARCHIVE_STATUSES = new Set([RECORD_STATUS.ARCHIVED, RECORD_STATUS.RESOLVED
 function ClosureTableRow({ lostCase: c }) {
   return (
     <tr className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
-      <td className="whitespace-nowrap px-3 py-2 text-slate-500">{c.closureDate ? formatDate(c.closureDate) : ''}</td>
+      <td className="whitespace-nowrap px-3 py-2 text-slate-500" dir="ltr">
+        {c.closureDate ? formatDate(c.closureDate) : ''}
+      </td>
       <td className="max-w-[9rem] truncate px-3 py-2 font-medium text-slate-800">
         <Link to={`/lost/${c.id}`} className="hover:underline">
           {displayLostCaseName(c)}

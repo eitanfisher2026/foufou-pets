@@ -61,7 +61,9 @@ export default function UsersSettingsPage() {
               </div>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-400">כניסה אחרונה: {formatDateTime(u.lastLoginAt) || '—'}</span>
+              <span className="text-xs text-slate-400">
+                כניסה אחרונה: <span dir="ltr">{formatDateTime(u.lastLoginAt) || '—'}</span>
+              </span>
               <select
                 className="input w-32 text-sm"
                 value={u.role || ROLES.REGULAR}

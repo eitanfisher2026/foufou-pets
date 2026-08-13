@@ -75,7 +75,23 @@ export default function RecordDetailsDialog({ title, sections, photos, onViewPho
                   {s.rows.map((r) => (
                     <div key={r.label}>
                       <dt className="text-xs font-medium text-slate-500">{r.label}</dt>
-                      <dd className="whitespace-pre-wrap text-sm text-slate-800">{r.value}</dd>
+                      {typeof r.value === 'string' && /^https?:\/\//.test(r.value) ? (
+                        <dd className="text-sm">
+                          <a
+                            href={r.value}
+                            target="_blank"
+                            rel="noreferrer"
+                            dir="ltr"
+                            className="break-all text-blue-700 underline"
+                          >
+                            {r.value}
+                          </a>
+                        </dd>
+                      ) : (
+                        <dd className="whitespace-pre-wrap text-sm text-slate-800" dir={r.dir}>
+                          {r.value}
+                        </dd>
+                      )}
                     </div>
                   ))}
                 </dl>

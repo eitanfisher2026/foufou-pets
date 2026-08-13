@@ -50,6 +50,7 @@ export function buildLostCaseSections(lostCase) {
           value: lostCase.lastSeenDate
             ? `${formatDate(lostCase.lastSeenDate)}${lostCase.lastSeenDateApprox ? ' (משוער)' : ''}`
             : '',
+          dir: 'ltr',
         },
       ],
     },
@@ -65,7 +66,7 @@ export function buildLostCaseSections(lostCase) {
       title: 'סגירת התיק',
       rows: [
         { label: 'סטטוס סגירה', value: CLOSURE_REASON_LABELS[lostCase.closureReason] || '' },
-        { label: 'תאריך', value: lostCase.closureDate ? formatDate(lostCase.closureDate) : '' },
+        { label: 'תאריך', value: lostCase.closureDate ? formatDate(lostCase.closureDate) : '', dir: 'ltr' },
         { label: 'ע״י', value: lostCase.closedBy },
         { label: 'הערה', value: lostCase.closingComment },
       ],
@@ -85,8 +86,8 @@ export function buildLostCaseSections(lostCase) {
       startClosed: true,
       rows: [
         { label: 'נוצר/ה על ידי', value: lostCase.ownerName || lostCase.ownerEmail || lostCase.ownerId },
-        { label: 'תאריך יצירה', value: formatDateTime(lostCase.createdAt) },
-        { label: 'עדכון אחרון', value: formatDateTime(lostCase.updatedAt) },
+        { label: 'תאריך יצירה', value: formatDateTime(lostCase.createdAt), dir: 'ltr' },
+        { label: 'עדכון אחרון', value: formatDateTime(lostCase.updatedAt), dir: 'ltr' },
       ],
     },
   ];
