@@ -354,6 +354,10 @@ function decodeHtmlEntities(str) {
     .replace(/&gt;/g, '>');
 }
 
+function stripTrailingFacebook(title) {
+  return title.replace(/\s*\|\s*Facebook\s*$/i, '');
+}
+
 // Facebook's og:title for a group/page post reliably comes back as
 // "{group or page name} | {post's own caption} | Facebook" - splitting on
 // " | " and taking the first piece recovers the group name without ever
@@ -361,8 +365,7 @@ function decodeHtmlEntities(str) {
 // title has no such prefix, so this comes back empty for those instead of
 // guessing.
 function extractGroupNameFromTitle(title) {
-  const withoutTrailingFacebook = title.replace(/\s*\|\s*Facebook\s*$/i, '');
-  const parts = withoutTrailingFacebook.split(' | ');
+  const parts = stripTrailingFacebook(title).split(' | ');
   return parts.length > 1 ? parts[0].trim() : '';
 }
 
@@ -411,7 +414,11 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
   }
 
   const rawTitle = extractOgTag(html, 'title');
-  const text = extractOgTag(html, 'description') || rawTitle;
+  // A video post has no og:description at all (Facebook only exposes that
+  // for photo posts) - falling back to the title is still useful, but the
+  // title's own trailing " | Facebook" needs stripping same as the group
+  // name extraction below, or it'd show up as literal junk text.
+  const text = extractOgTag(html, 'description') || stripTrailingFacebook(rawTitle);
   const groupName = extractGroupNameFromTitle(rawTitle);
   const imageUrl = extractOgTag(html, 'image');
 
