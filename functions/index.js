@@ -414,13 +414,23 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
   }
 
   const rawTitle = extractOgTag(html, 'title');
-  // A video post has no og:description at all (Facebook only exposes that
-  // for photo posts) - falling back to the title is still useful, but the
-  // title's own trailing " | Facebook" needs stripping same as the group
-  // name extraction below, or it'd show up as literal junk text.
-  const text = extractOgTag(html, 'description') || stripTrailingFacebook(rawTitle);
+  const description = extractOgTag(html, 'description');
   const groupName = extractGroupNameFromTitle(rawTitle);
-  const imageUrl = extractOgTag(html, 'image');
+
+  // A restricted/closed group's post doesn't expose its real content to an
+  // anonymous crawler at all - Facebook falls back to generic group-level
+  // info instead (title = just the group's own name, no og:description),
+  // even though a member sees the actual post fine. That fallback has no
+  // og:description AND no "Group | Caption" split to pull a group name out
+  // of (a normal accessible post always has at least one of the two) - in
+  // that specific combination, the title is almost certainly just the
+  // group's name, not this post's caption, and the image is almost
+  // certainly a generic group graphic, not a photo of the animal. Treating
+  // it as "nothing found" is more honest than showing the group's name as
+  // if it were the post's own caption.
+  const isGenericGroupFallback = !description && !groupName;
+  const text = isGenericGroupFallback ? '' : description || stripTrailingFacebook(rawTitle);
+  const imageUrl = isGenericGroupFallback ? '' : extractOgTag(html, 'image');
 
   let imageBase64 = null;
   let imageMimeType = null;
