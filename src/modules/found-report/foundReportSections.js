@@ -74,7 +74,11 @@ export function buildFoundReportSections(report) {
       title: 'פרטי רשומה',
       startClosed: true,
       rows: [
-        { label: 'נוצר/ה על ידי', value: report.reporterName || report.reporterEmail || report.reportedByUid },
+        // No reportedByUid fallback - a raw account ID means nothing to a
+        // person reading this; if the name/email snapshot is missing (see
+        // createFoundReport), better to just hide the row than show a
+        // technical ID.
+        { label: 'נוצר/ה על ידי', value: report.reporterName || report.reporterEmail || '' },
         { label: 'תאריך יצירה', value: formatDateTime(report.createdAt), dir: 'ltr' },
         { label: 'עדכון אחרון', value: formatDateTime(report.updatedAt), dir: 'ltr' },
       ],
