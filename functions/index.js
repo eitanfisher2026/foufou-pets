@@ -415,7 +415,7 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
 
   const rawTitle = extractOgTag(html, 'title');
   const description = extractOgTag(html, 'description');
-  const groupName = extractGroupNameFromTitle(rawTitle);
+  let groupName = extractGroupNameFromTitle(rawTitle);
 
   // A restricted/closed group's post doesn't expose its real content to an
   // anonymous crawler at all - Facebook falls back to generic group-level
@@ -426,9 +426,13 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
   // that specific combination, the title is almost certainly just the
   // group's name, not this post's caption, and the image is almost
   // certainly a generic group graphic, not a photo of the animal. Treating
-  // it as "nothing found" is more honest than showing the group's name as
-  // if it were the post's own caption.
+  // caption/photo as "nothing found" is more honest than showing the
+  // group's name as if it were the post's own caption.
   const isGenericGroupFallback = !description && !groupName;
+  // The group name itself is still real, useful source info even then
+  // (see sourceGroupName elsewhere in the app) - in the fallback case the
+  // whole title IS the group's own name, just not split out yet.
+  if (isGenericGroupFallback) groupName = stripTrailingFacebook(rawTitle);
   const text = isGenericGroupFallback ? '' : description || stripTrailingFacebook(rawTitle);
   const imageUrl = isGenericGroupFallback ? '' : extractOgTag(html, 'image');
 
