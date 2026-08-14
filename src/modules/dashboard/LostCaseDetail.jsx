@@ -53,6 +53,7 @@ import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import ClosureDialog from '../shared/ClosureDialog.jsx';
+import SelectField from '../shared/SelectField.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החיה' },
@@ -421,14 +422,14 @@ export default function LostCaseDetail() {
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
             </Field>
             <Field label="צבע" inline>
-              <select className="input w-36" value={fields.color || ''} onChange={(e) => setField('color', e.target.value)}>
-                <option value="">בחר/י צבע</option>
-                {colorOptions.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                className="w-36"
+                label="בחירת צבע"
+                placeholder="בחר/י צבע"
+                value={fields.color || ''}
+                onChange={(v) => setField('color', v)}
+                options={colorOptions}
+              />
             </Field>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -449,18 +450,14 @@ export default function LostCaseDetail() {
             {fields.hasCollar && (
               <>
                 <Field label="צבע הקולר" inline>
-                  <select
-                    className="input w-36"
+                  <SelectField
+                    className="w-36"
+                    label="בחירת צבע קולר"
+                    placeholder="בחר/י צבע"
                     value={fields.collarColor || ''}
-                    onChange={(e) => setField('collarColor', e.target.value)}
-                  >
-                    <option value="">בחר/י צבע</option>
-                    {COLLAR_COLORS.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => setField('collarColor', v)}
+                    options={COLLAR_COLORS}
+                  />
                 </Field>
                 <label className="flex items-center gap-2 text-sm text-slate-700">
                   <input
@@ -490,14 +487,14 @@ export default function LostCaseDetail() {
             </Field>
             <Field label={labels.breedLabel} inline>
               {lostCase.species === SPECIES.DOG ? (
-                <select className="input w-36" value={fields.breed || ''} onChange={(e) => setField('breed', e.target.value)}>
-                  <option value="">בחר/י גזע</option>
-                  {dogBreedOptions.map((b) => (
-                    <option key={b} value={b}>
-                      {b}
-                    </option>
-                  ))}
-                </select>
+                <SelectField
+                  className="w-36"
+                  label="בחירת גזע"
+                  placeholder="בחר/י גזע"
+                  value={fields.breed || ''}
+                  onChange={(v) => setField('breed', v)}
+                  options={dogBreedOptions}
+                />
               ) : (
                 <input
                   className="input w-36"
@@ -525,24 +522,22 @@ export default function LostCaseDetail() {
               />
             </Field>
             <Field label="סוג פרווה" inline>
-              <select className="input w-36" value={fields.furType || ''} onChange={(e) => setField('furType', e.target.value)}>
-                <option value="">בחר/י</option>
-                {CAT_FUR_TYPES.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                className="w-36"
+                label="בחירת סוג פרווה"
+                value={fields.furType || ''}
+                onChange={(v) => setField('furType', v)}
+                options={CAT_FUR_TYPES}
+              />
             </Field>
             <Field label="גודל" inline>
-              <select className="input w-36" value={fields.size || ''} onChange={(e) => setField('size', e.target.value)}>
-                <option value="">בחר/י</option>
-                {CAT_SIZES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                className="w-36"
+                label="בחירת גודל"
+                value={fields.size || ''}
+                onChange={(v) => setField('size', v)}
+                options={CAT_SIZES}
+              />
             </Field>
           </FormSection>
 

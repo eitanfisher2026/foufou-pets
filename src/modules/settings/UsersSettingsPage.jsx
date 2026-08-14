@@ -3,6 +3,9 @@ import BackLink from '../shared/BackLink.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listUsers, updateUserRole, ROLES, ROLE_LABELS } from '../users/usersApi.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
+import SelectField from '../shared/SelectField.jsx';
+
+const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
 /**
  * Admin-only: everyone who has ever signed in, their role, and when they
@@ -64,18 +67,15 @@ export default function UsersSettingsPage() {
               <span className="text-xs text-slate-400">
                 כניסה אחרונה: <span dir="ltr">{formatDateTime(u.lastLoginAt) || '—'}</span>
               </span>
-              <select
-                className="input w-32 text-sm"
+              <SelectField
+                className="w-32 text-sm"
+                label="בחירת תפקיד"
+                allowClear={false}
                 value={u.role || ROLES.REGULAR}
                 disabled={savingUid === u.id || u.id === currentUser.uid}
-                onChange={(e) => handleRoleChange(u.id, e.target.value)}
-              >
-                {Object.values(ROLES).map((role) => (
-                  <option key={role} value={role}>
-                    {ROLE_LABELS[role]}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => handleRoleChange(u.id, v)}
+                options={ROLE_OPTIONS}
+              />
             </div>
             {u.id === currentUser.uid && <p className="mt-1 text-xs text-slate-400">זה אתה - לא ניתן לשנות לעצמך</p>}
           </li>

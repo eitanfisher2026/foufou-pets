@@ -13,6 +13,7 @@ import { getDogBreedOptions, saveDogBreedOptions } from '../shared/breedOptionsA
 import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, DOG_BREEDS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import SelectField from '../shared/SelectField.jsx';
 
 const OTHER = 'אחר';
 
@@ -422,17 +423,14 @@ export default function MatchSettingsPage() {
         {CONFIDENCE_BUCKETS.map((bucket) => (
           <div key={bucket.key} className="flex items-center justify-between gap-2">
             <ConfidenceBadge score={bucket.min} confidenceColors={config.confidenceColors} />
-            <select
-              className="input w-auto"
+            <SelectField
+              className="w-auto"
+              label="בחירת צבע"
+              allowClear={false}
               value={config.confidenceColors?.[bucket.key] || 'gray'}
-              onChange={(e) => setConfidenceColor(bucket.key, e.target.value)}
-            >
-              {Object.entries(CONFIDENCE_COLOR_PALETTE).map(([key, { label }]) => (
-                <option key={key} value={key}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setConfidenceColor(bucket.key, v)}
+              options={Object.entries(CONFIDENCE_COLOR_PALETTE).map(([key, { label }]) => ({ value: key, label }))}
+            />
           </div>
         ))}
       </div>
@@ -508,37 +506,33 @@ function ParameterRow({ param, onChange, onRemove }) {
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
           <label className="block">
             <span className="mb-1 block text-slate-500">שדה בתיק החיפוש</span>
-            <select className="input" value={param.lostField} onChange={(e) => onChange({ lostField: e.target.value })}>
-              {COMPARABLE_FIELDS.map((f) => (
-                <option key={f.field} value={f.field}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              label="שדה בתיק החיפוש"
+              allowClear={false}
+              value={param.lostField}
+              onChange={(v) => onChange({ lostField: v })}
+              options={COMPARABLE_FIELDS.map((f) => ({ value: f.field, label: f.label }))}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-slate-500">שדה בדיווח</span>
-            <select className="input" value={param.foundField} onChange={(e) => onChange({ foundField: e.target.value })}>
-              {COMPARABLE_FIELDS.map((f) => (
-                <option key={f.field} value={f.field}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              label="שדה בדיווח"
+              allowClear={false}
+              value={param.foundField}
+              onChange={(v) => onChange({ foundField: v })}
+              options={COMPARABLE_FIELDS.map((f) => ({ value: f.field, label: f.label }))}
+            />
           </label>
           <label className="block">
             <span className="mb-1 block text-slate-500">שיטת השוואה</span>
-            <select
-              className="input"
+            <SelectField
+              label="שיטת השוואה"
+              allowClear={false}
               value={param.comparisonType}
-              onChange={(e) => onChange({ comparisonType: e.target.value })}
-            >
-              {Object.entries(COMPARISON_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => onChange({ comparisonType: v })}
+              options={Object.entries(COMPARISON_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+            />
           </label>
           {(param.comparisonType === 'exact' ||
             param.comparisonType === 'booleanTrait' ||

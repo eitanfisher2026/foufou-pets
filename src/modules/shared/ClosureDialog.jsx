@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { CLOSURE_REASON, CLOSURE_REASON_LABELS } from './collections.js';
+import SelectField from './SelectField.jsx';
+
+const CLOSURE_OPTIONS = Object.values(CLOSURE_REASON).map((reason) => ({ value: reason, label: CLOSURE_REASON_LABELS[reason] }));
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -42,14 +45,14 @@ export default function ClosureDialog({
 
         <label className="mb-3 block text-sm text-slate-700">
           סטטוס
-          <select className="input mt-1 block w-full" value={closureReason} onChange={(e) => setClosureReason(e.target.value)}>
-            <option value="">-</option>
-            {Object.values(CLOSURE_REASON).map((reason) => (
-              <option key={reason} value={reason}>
-                {CLOSURE_REASON_LABELS[reason]}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            className="mt-1 block w-full"
+            label="בחירת סטטוס"
+            clearLabel="-"
+            value={closureReason}
+            onChange={setClosureReason}
+            options={CLOSURE_OPTIONS}
+          />
         </label>
 
         <label className="mb-3 block text-sm text-slate-700">

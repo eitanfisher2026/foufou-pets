@@ -18,6 +18,7 @@ import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
 import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
+import SelectField from '../shared/SelectField.jsx';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
 import { createFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
@@ -251,24 +252,25 @@ export default function FoundReportForm() {
         </Field>
 
         <Field label={labels.conditionLabel} inline>
-          <select className="input w-36" value={fields.condition} onChange={(e) => setField('condition', e.target.value)}>
-            {CAT_CONDITIONS.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            className="w-36"
+            label={labels.conditionLabel}
+            allowClear={false}
+            value={fields.condition}
+            onChange={(v) => setField('condition', v)}
+            options={CAT_CONDITIONS}
+          />
         </Field>
 
         <Field label="צבע" inline>
-          <select className="input w-36" value={fields.color} onChange={(e) => setField('color', e.target.value)}>
-            <option value="">בחר/י צבע</option>
-            {colorOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            className="w-36"
+            label="בחירת צבע"
+            placeholder="בחר/י צבע"
+            value={fields.color}
+            onChange={(v) => setField('color', v)}
+            options={colorOptions}
+          />
         </Field>
 
         <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -288,14 +290,14 @@ export default function FoundReportForm() {
         {fields.hasCollar && (
           <>
             <Field label="צבע הקולר" inline>
-              <select className="input w-36" value={fields.collarColor} onChange={(e) => setField('collarColor', e.target.value)}>
-                <option value="">בחר/י צבע</option>
-                {COLLAR_COLORS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
+              <SelectField
+                className="w-36"
+                label="בחירת צבע קולר"
+                placeholder="בחר/י צבע"
+                value={fields.collarColor}
+                onChange={(v) => setField('collarColor', v)}
+                options={COLLAR_COLORS}
+              />
             </Field>
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -329,14 +331,14 @@ export default function FoundReportForm() {
 
         <Field label={labels.breedLabel} inline>
           {fields.species === SPECIES.DOG ? (
-            <select className="input w-36" value={fields.breed} onChange={(e) => setField('breed', e.target.value)}>
-              <option value="">בחר/י גזע</option>
-              {dogBreedOptions.map((b) => (
-                <option key={b} value={b}>
-                  {b}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              className="w-36"
+              label="בחירת גזע"
+              placeholder="בחר/י גזע"
+              value={fields.breed}
+              onChange={(v) => setField('breed', v)}
+              options={dogBreedOptions}
+            />
           ) : (
             <input
               className="input w-36"
@@ -363,25 +365,17 @@ export default function FoundReportForm() {
         </Field>
 
         <Field label="סוג פרווה" inline>
-          <select className="input w-36" value={fields.furType} onChange={(e) => setField('furType', e.target.value)}>
-            <option value="">בחר/י</option>
-            {CAT_FUR_TYPES.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            className="w-36"
+            label="בחירת סוג פרווה"
+            value={fields.furType}
+            onChange={(v) => setField('furType', v)}
+            options={CAT_FUR_TYPES}
+          />
         </Field>
 
         <Field label="גודל" inline>
-          <select className="input w-36" value={fields.size} onChange={(e) => setField('size', e.target.value)}>
-            <option value="">בחר/י</option>
-            {CAT_SIZES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <SelectField className="w-36" label="בחירת גודל" value={fields.size} onChange={(v) => setField('size', v)} options={CAT_SIZES} />
         </Field>
       </FormSection>
 

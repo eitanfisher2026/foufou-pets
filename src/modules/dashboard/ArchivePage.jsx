@@ -6,6 +6,9 @@ import { listLostCases } from './dashboardApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { formatDate } from '../shared/formatDate.js';
 import BackLink from '../shared/BackLink.jsx';
+import SelectField from '../shared/SelectField.jsx';
+
+const STATUS_FILTER_OPTIONS = Object.values(CLOSURE_REASON).map((reason) => ({ value: reason, label: CLOSURE_REASON_LABELS[reason] }));
 
 const ARCHIVE_STATUSES = new Set([RECORD_STATUS.ARCHIVED, RECORD_STATUS.RESOLVED]);
 
@@ -74,14 +77,14 @@ export default function ArchivePage() {
       <div className="mb-3 flex flex-wrap items-end gap-3">
         <label className="text-xs text-slate-600">
           סטטוס
-          <select className="input mt-1 block" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="">הכל</option>
-            {Object.values(CLOSURE_REASON).map((reason) => (
-              <option key={reason} value={reason}>
-                {CLOSURE_REASON_LABELS[reason]}
-              </option>
-            ))}
-          </select>
+          <SelectField
+            className="mt-1 block"
+            label="סינון לפי סטטוס"
+            clearLabel="הכל"
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={STATUS_FILTER_OPTIONS}
+          />
         </label>
         <label className="text-xs text-slate-600">
           מתאריך
