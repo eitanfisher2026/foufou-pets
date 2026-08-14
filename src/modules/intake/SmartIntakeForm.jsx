@@ -91,10 +91,10 @@ export default function SmartIntakeForm() {
       if (preview.imageBase64) {
         setFiles((prev) => [...prev, base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);
       } else if (!preview.text) {
-        setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (יכול לקרות בפוסטים פרטיים) - אפשר להמשיך עם צילום מסך.');
+        setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (קורה כשתוכן הקבוצה גלוי לחברים בלבד) - אפשר להמשיך עם צילום מסך.');
       }
     } catch {
-      setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (יכול לקרות בפוסטים פרטיים) - אפשר להמשיך עם צילום מסך.');
+      setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (קורה כשתוכן הקבוצה גלוי לחברים בלבד) - אפשר להמשיך עם צילום מסך.');
     } finally {
       setFetchingLink(false);
     }

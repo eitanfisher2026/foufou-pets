@@ -388,9 +388,13 @@ function extractOgTag(html, property) {
  * og:description/og:image directly, no login involved and nothing beyond
  * what the post already exposes for that exact purpose.
  *
- * Only works for public posts (private/restricted groups still fail, same
- * as they'd fail for anyone not already a member) - always a best-effort
- * supplement to the screenshot-based reading, never a replacement for it.
+ * Only works when the group's post content itself is visible to non-members
+ * - a group can be publicly listed/joinable while still restricting its
+ * actual posts to members only, in which case Facebook hands back generic
+ * group-level info instead (see isGenericGroupFallback below), same as it
+ * would for anyone trying to view the post without joining. Always a
+ * best-effort supplement to the screenshot-based reading, never a
+ * replacement for it.
  */
 export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) {

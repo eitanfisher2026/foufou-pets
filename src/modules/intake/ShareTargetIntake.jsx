@@ -125,7 +125,7 @@ export default function ShareTargetIntake() {
       {status === 'no-photo' && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4">
           <p className="text-sm text-amber-800">
-            קיבלנו את הטקסט/קישור של הפוסט, אבל לא הצלחנו למשוך ממנו תמונה (יכול לקרות בפוסטים פרטיים) - צריך לצרף
+            קיבלנו את הטקסט/קישור של הפוסט, אבל לא הצלחנו למשוך ממנו תמונה (קורה כשתוכן הקבוצה גלוי לחברים בלבד) - צריך לצרף
             תמונה של החיה כדי שנוכל לזהות אותה.
           </p>
           <p className="mt-2 text-sm text-amber-800">
