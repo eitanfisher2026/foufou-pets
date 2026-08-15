@@ -19,8 +19,9 @@ import { petLabels } from '../shared/petLabels.js';
 import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
-import { createFoundReport } from './foundReportApi.js';
+import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
 
 export default function FoundReportForm() {
@@ -47,6 +48,7 @@ export default function FoundReportForm() {
   const [linkFetchError, setLinkFetchError] = useState('');
   const [duplicateMatches, setDuplicateMatches] = useState(null);
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
+  const [colorCheckReportId, setColorCheckReportId] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -139,10 +141,26 @@ export default function FoundReportForm() {
     setSubmitting(true);
     try {
       const reportId = await createFoundReport({ ...fields, source }, photos, user);
-      navigate(`/found/${reportId}`);
+      // The record is already saved at this point either way - this is a
+      // one-time nudge to fix a non-specific color right after creation,
+      // never a gate on the save itself (see ColorCheckDialog.jsx).
+      if (fields.color === 'אחר') {
+        setColorCheckReportId(reportId);
+      } else {
+        navigate(`/found/${reportId}`);
+      }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleColorCheckSave(newColor) {
+    await updateFoundReport(colorCheckReportId, { ...fields, color: newColor }, []);
+    navigate(`/found/${colorCheckReportId}`);
+  }
+
+  function handleColorCheckSkip() {
+    navigate(`/found/${colorCheckReportId}`);
   }
 
   // Only checks for a duplicate at submit time, on the one signal that
@@ -494,6 +512,10 @@ export default function FoundReportForm() {
             if (duplicateDialogMode === 'info') navigate('/');
           }}
         />
+      )}
+
+      {colorCheckReportId && (
+        <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
       )}
     </form>
   );

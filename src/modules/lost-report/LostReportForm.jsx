@@ -19,8 +19,9 @@ import { petLabels } from '../shared/petLabels.js';
 import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, SPECIES } from '../shared/collections.js';
-import { createLostCase } from './lostReportApi.js';
+import { createLostCase, updateLostCase } from './lostReportApi.js';
 import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
 
 export default function LostReportForm() {
@@ -46,6 +47,7 @@ export default function LostReportForm() {
   const [linkFetchError, setLinkFetchError] = useState('');
   const [duplicateMatches, setDuplicateMatches] = useState(null);
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
+  const [colorCheckCaseId, setColorCheckCaseId] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -137,10 +139,26 @@ export default function LostReportForm() {
     setSubmitting(true);
     try {
       const caseId = await createLostCase({ ...fields, source }, photos, user);
-      navigate(`/lost/${caseId}`);
+      // The record is already saved at this point either way - this is a
+      // one-time nudge to fix a non-specific color right after creation,
+      // never a gate on the save itself (see ColorCheckDialog.jsx).
+      if (fields.color === 'אחר') {
+        setColorCheckCaseId(caseId);
+      } else {
+        navigate(`/lost/${caseId}`);
+      }
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleColorCheckSave(newColor) {
+    await updateLostCase(colorCheckCaseId, { ...fields, color: newColor }, []);
+    navigate(`/lost/${colorCheckCaseId}`);
+  }
+
+  function handleColorCheckSkip() {
+    navigate(`/lost/${colorCheckCaseId}`);
   }
 
   // Only checks for a duplicate at submit time, on the one signal that
@@ -470,6 +488,10 @@ export default function LostReportForm() {
             if (duplicateDialogMode === 'info') navigate('/');
           }}
         />
+      )}
+
+      {colorCheckCaseId && (
+        <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
       )}
     </form>
   );

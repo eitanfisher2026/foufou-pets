@@ -10,6 +10,7 @@ import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { findDuplicatesBySourceUrlAnyType } from '../shared/duplicateCheckApi.js';
 import { useSmartIntake } from './useSmartIntake.js';
 
@@ -39,6 +40,9 @@ export default function SmartIntakeForm() {
     duplicateRecordType,
     continueCreateAnyway,
     cancelDuplicateCreate,
+    colorCheck,
+    saveColorCheck,
+    skipColorCheck,
   } = useSmartIntake();
   const [postText, setPostText] = useState('');
   const [fetchingLink, setFetchingLink] = useState(false);
@@ -205,6 +209,10 @@ export default function SmartIntakeForm() {
           onContinue={() => setLinkDuplicateMatches(null)}
           onCancel={() => navigate('/')}
         />
+      )}
+
+      {colorCheck && (
+        <ColorCheckDialog colorOptions={colorCheck.colorOptions} onSave={saveColorCheck} onSkip={skipColorCheck} />
       )}
     </div>
   );

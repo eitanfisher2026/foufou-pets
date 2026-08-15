@@ -4,9 +4,10 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
 import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
-import { createLostCase } from '../lost-report/lostReportApi.js';
+import { getColorOptions } from '../shared/colorOptionsApi.js';
+import { createLostCase, updateLostCase } from '../lost-report/lostReportApi.js';
 import { mergeExtractedLostFields, EMPTY_LOST_FIELDS } from '../lost-report/lostFieldMapping.js';
-import { createFoundReport } from '../found-report/foundReportApi.js';
+import { createFoundReport, updateFoundReport } from '../found-report/foundReportApi.js';
 import { mergeExtractedFoundFields, EMPTY_FOUND_FIELDS } from '../found-report/foundFieldMapping.js';
 
 /**
@@ -39,6 +40,11 @@ export function useSmartIntake() {
   const [duplicateMatches, setDuplicateMatches] = useState(null);
   const [duplicateRecordType, setDuplicateRecordType] = useState(null);
   const pendingCreateRef = useRef(null);
+  // Non-blocking post-creation nudge when color came out as "אחר" (see
+  // ColorCheckDialog.jsx) - holds what's needed to save a better color or
+  // just navigate on, since the record itself is already saved by the time
+  // this is set.
+  const [colorCheck, setColorCheck] = useState(null);
 
   // `filesOverride`/`sourceUrlOverride` let a caller that just set that
   // state itself (e.g. the share-target screen, reacting to a fresh share
@@ -89,20 +95,44 @@ export function useSmartIntake() {
       // couldn't tell.
       if (type === 'lost') {
         const fields = mergeExtractedLostFields(result, { ...EMPTY_LOST_FIELDS, species: preferredSpecies });
-        const caseId = await createLostCase({ ...fields, source: 'screenshot', sourceUrl: finalSourceUrl }, photos, user);
-        navigate(`/lost/${caseId}`);
+        const finalFields = { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl };
+        const caseId = await createLostCase(finalFields, photos, user);
+        if (finalFields.color === 'אחר') {
+          setColorCheck({ type: 'lost', id: caseId, fields: finalFields, colorOptions: await getColorOptions(fields.species) });
+        } else {
+          navigate(`/lost/${caseId}`);
+        }
       } else {
         const fields = mergeExtractedFoundFields(result, { ...EMPTY_FOUND_FIELDS, species: preferredSpecies });
-        const reportId = await createFoundReport(
-          { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl },
-          photos,
-          user
-        );
-        navigate(`/found/${reportId}`);
+        const finalFields = { ...fields, source: 'screenshot', sourceUrl: finalSourceUrl };
+        const reportId = await createFoundReport(finalFields, photos, user);
+        if (finalFields.color === 'אחר') {
+          setColorCheck({ type: 'found', id: reportId, fields: finalFields, colorOptions: await getColorOptions(fields.species) });
+        } else {
+          navigate(`/found/${reportId}`);
+        }
       }
     } finally {
       setCreating(false);
     }
+  }
+
+  async function saveColorCheck(newColor) {
+    const { type, id, fields } = colorCheck;
+    if (type === 'lost') {
+      await updateLostCase(id, { ...fields, color: newColor }, []);
+      navigate(`/lost/${id}`);
+    } else {
+      await updateFoundReport(id, { ...fields, color: newColor }, []);
+      navigate(`/found/${id}`);
+    }
+    setColorCheck(null);
+  }
+
+  function skipColorCheck() {
+    const { type, id } = colorCheck;
+    navigate(type === 'lost' ? `/lost/${id}` : `/found/${id}`);
+    setColorCheck(null);
   }
 
   function continueCreateAnyway() {
@@ -133,5 +163,8 @@ export function useSmartIntake() {
     duplicateRecordType,
     continueCreateAnyway,
     cancelDuplicateCreate,
+    colorCheck,
+    saveColorCheck,
+    skipColorCheck,
   };
 }

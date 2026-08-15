@@ -7,6 +7,7 @@ import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { useSmartIntake } from './useSmartIntake.js';
 
 /**
@@ -33,6 +34,9 @@ export default function ShareTargetIntake() {
     duplicateRecordType,
     continueCreateAnyway,
     cancelDuplicateCreate,
+    colorCheck,
+    saveColorCheck,
+    skipColorCheck,
   } = useSmartIntake();
   const [status, setStatus] = useState('loading'); // loading | empty | no-photo | fetching-link | done
   const [sharedText, setSharedText] = useState('');
@@ -180,6 +184,10 @@ export default function ShareTargetIntake() {
           onContinue={continueCreateAnyway}
           onCancel={cancelDuplicateCreate}
         />
+      )}
+
+      {colorCheck && (
+        <ColorCheckDialog colorOptions={colorCheck.colorOptions} onSave={saveColorCheck} onSkip={skipColorCheck} />
       )}
     </div>
   );
