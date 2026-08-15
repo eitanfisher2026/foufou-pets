@@ -59,19 +59,19 @@ export default function Dashboard() {
 
   return (
     <div className="p-4">
-      <header className="mb-6 grid grid-cols-3 items-center gap-2">
+      <header className="relative mb-6 flex h-9 items-center justify-center">
         <div className="flex items-center gap-2">
+          <h1 className="whitespace-nowrap text-xl font-bold text-slate-800">חיות אבודות</h1>
           <button
             type="button"
             onClick={() => setShowHelp(true)}
             aria-label="עזרה"
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-500"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-500"
           >
             ℹ️
           </button>
         </div>
-        <h1 className="truncate text-center text-xl font-bold text-slate-800">חיות אבודות</h1>
-        <div className="flex justify-end">
+        <div className="absolute inset-y-0 left-0 flex items-center">
           <ProfileMenu />
         </div>
       </header>
@@ -100,9 +100,6 @@ export default function Dashboard() {
         או: הוספה חכמה - נזהה אוטומטית אם זה אבד או נמצא
       </Link>
 
-      {progress && <ProgressBar current={progress.current} total={progress.total} />}
-      {loading && !progress && <p className="text-slate-500">טוען...</p>}
-
       <div className="mb-4 flex items-center justify-between gap-4">
         <Link to="/found" className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
           {labels.allFoundReportsLink}
@@ -120,6 +117,8 @@ export default function Dashboard() {
             <span className="text-sm font-normal text-slate-400">({visibleLostCases.length})</span>
           )}
         </h2>
+        {progress && <ProgressBar current={progress.current} total={progress.total} />}
+        {loading && !progress && <p className="text-slate-500">טוען...</p>}
         {visibleLostCases.length === 0 && !loading && <p className="text-sm text-slate-400">אין תיקים פתוחים עדיין.</p>}
         <ul className="space-y-2">
           {visibleLostCases.map((c) => (

@@ -32,8 +32,19 @@ export function useLoadWithProgress(fetchFn, deps = []) {
         return;
       }
       const stepMs = Math.max(MIN_STEP_MS, Math.min(MAX_STEP_MS, ANIMATION_DURATION_MS / total));
-      let current = 0;
+      // Starts at 1/N immediately, not 0/N - the data's already fully in
+      // hand at this point, so there's no reason the very first frame
+      // shown should look like nothing has loaded yet.
+      let current = 1;
       setProgress({ current, total });
+      if (current >= total) {
+        if (!cancelled) {
+          setItems(result);
+          setProgress(null);
+          setLoading(false);
+        }
+        return;
+      }
       timerRef.current = setInterval(() => {
         current += 1;
         if (current >= total) {

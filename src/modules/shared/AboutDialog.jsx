@@ -91,8 +91,8 @@ export default function AboutDialog({ onClose }) {
           )}
 
           <div className="border-t border-slate-100 pt-3 text-center text-xs text-slate-400">
-            <p>© Eitan Fisher</p>
-            <p>{APP_VERSION}</p>
+            <p>© FouFou-Pets</p>
+            <p>2026 {APP_VERSION}</p>
           </div>
         </div>
       </div>
