@@ -1,5 +1,5 @@
 import { useAuth } from './AuthProvider.jsx';
-import Copyright from '../shared/Copyright.jsx';
+import AppFooter from '../shared/AppFooter.jsx';
 
 export default function LoginScreen() {
   const { signInWithGoogle } = useAuth();
@@ -16,8 +16,8 @@ export default function LoginScreen() {
           התחברות עם Google
         </button>
       </div>
-      <div className="mt-6">
-        <Copyright />
+      <div className="mt-6 w-full max-w-sm">
+        <AppFooter />
       </div>
     </div>
   );

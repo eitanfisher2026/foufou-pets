@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from './usePwaInstall.js';
+import AboutDialog from './AboutDialog.jsx';
+import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 
 /**
  * The account entry point on the dashboard header: a round profile-photo
@@ -15,6 +17,8 @@ export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
+  const [showAbout, setShowAbout] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const rootRef = useRef(null);
 
   useEffect(() => {
@@ -103,6 +107,28 @@ export default function ProfileMenu() {
 
           <button
             type="button"
+            onClick={() => {
+              setOpen(false);
+              setShowFeedback(true);
+            }}
+            className="block w-full px-4 py-2.5 text-right text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            💬 שליחת משוב
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setShowAbout(true);
+            }}
+            className="block w-full px-4 py-2.5 text-right text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            ℹ️ אודות
+          </button>
+
+          <button
+            type="button"
             onClick={handleShare}
             className="block w-full px-4 py-2.5 text-right text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
@@ -136,6 +162,9 @@ export default function ProfileMenu() {
           </button>
         </div>
       )}
+
+      {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
+      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
     </div>
   );
 }

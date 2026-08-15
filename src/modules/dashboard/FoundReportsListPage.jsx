@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
 import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { listFoundReports } from './dashboardApi.js';
 import { FoundReportRow } from './RecordRows.jsx';
 import BackLink from '../shared/BackLink.jsx';
+import ProgressBar from '../shared/ProgressBar.jsx';
+import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 
 /**
  * The full found-reports list, on its own page instead of the dashboard's
@@ -15,16 +16,8 @@ import BackLink from '../shared/BackLink.jsx';
  */
 export default function FoundReportsListPage() {
   const { preferredSpecies } = useAuth();
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { items: reports, loading, progress } = useLoadWithProgress(listFoundReports, []);
   const labels = petLabels(preferredSpecies);
-
-  useEffect(() => {
-    listFoundReports().then((data) => {
-      setReports(data);
-      setLoading(false);
-    });
-  }, []);
 
   const visibleReports = reports.filter(
     (r) =>
@@ -41,7 +34,8 @@ export default function FoundReportsListPage() {
         {visibleReports.length > 0 && <span className="text-sm font-normal text-slate-400"> ({visibleReports.length})</span>}
       </h1>
 
-      {loading && <p className="text-slate-500">טוען...</p>}
+      {progress && <ProgressBar current={progress.current} total={progress.total} />}
+      {loading && !progress && <p className="text-slate-500">טוען...</p>}
       {!loading && visibleReports.length === 0 && <p className="text-sm text-slate-400">אין דיווחים עדיין.</p>}
 
       <ul className="space-y-2">

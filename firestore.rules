@@ -77,12 +77,23 @@ service cloud.firestore {
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
     }
 
-    // Shared config (match weights, the customizable color list) - read by
-    // everyone (forms/matching use these), written only from the
-    // admin-only settings screens that edit them.
+    // Shared config (match weights, the customizable color list, the
+    // about-dialog text) - read by everyone (forms/matching/AboutDialog use
+    // these), written only from the admin-only settings screens that edit
+    // them (AboutDialog's edit control included).
     match /config/{docId} {
       allow read: if signedIn();
       allow write: if isAdmin();
+    }
+
+    // Feedback conversation threads (see feedback/feedbackApi.js) - a
+    // regular user can only see/reply to their own threads; an admin can
+    // see and reply to everyone's, since that's the whole point of an
+    // admin inbox. Creating a thread always ties it to your own uid.
+    match /feedbackThreads/{threadId} {
+      allow read, update: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
     }
   }
 }

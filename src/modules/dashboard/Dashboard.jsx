@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { APP_VERSION } from '../../version.js';
-import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js';
+import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, SPECIES } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import SpeciesToggle from '../shared/SpeciesToggle.jsx';
-import { listLostCases } from './dashboardApi.js';
+import { listLostCases, countFoundReports } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
-import Copyright from '../shared/Copyright.jsx';
+import AppFooter from '../shared/AppFooter.jsx';
+import ProgressBar from '../shared/ProgressBar.jsx';
+import HelpDialog from '../shared/HelpDialog.jsx';
+import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 
 // A found report doesn't need its own eagerly-loaded browsing list on every
 // dashboard visit - matching already runs its own independent query against
@@ -18,22 +20,23 @@ import Copyright from '../shared/Copyright.jsx';
 // view. Loading only lost cases by default cuts the dashboard's default
 // read in half; "כל הדיווחים על חיות שנמצאו" is one tap away instead.
 export default function Dashboard() {
-  const { user, preferredSpecies, setPreferredSpecies } = useAuth();
-  const [lostCases, setLostCases] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { preferredSpecies, setPreferredSpecies } = useAuth();
+  const { items: lostCases, loading, progress } = useLoadWithProgress(listLostCases, []);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  const [foundCount, setFoundCount] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const labels = petLabels(preferredSpecies);
-
-  useEffect(() => {
-    listLostCases().then((cases) => {
-      setLostCases(cases);
-      setLoading(false);
-    });
-  }, []);
 
   useEffect(() => {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
+
+  // Just a count query (no documents fetched) - cheap enough to run
+  // eagerly, unlike the full list this links to.
+  useEffect(() => {
+    setFoundCount(null);
+    countFoundReports(preferredSpecies).then(setFoundCount);
+  }, [preferredSpecies]);
 
   // Archived and resolved cases move to their own archive view (see
   // ArchivePage.jsx) instead of a same-page toggle - a resolved case
@@ -49,21 +52,28 @@ export default function Dashboard() {
         (c) =>
           c.status !== RECORD_STATUS.ARCHIVED &&
           c.status !== RECORD_STATUS.RESOLVED &&
-          (c.species || 'cat') === preferredSpecies
+          (c.species || SPECIES.CAT) === preferredSpecies
       ),
     [lostCases, preferredSpecies]
   );
 
   return (
     <div className="p-4">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h1 className="text-xl font-bold text-slate-800">
-            איתור חיות מחמד <span className="text-xs font-normal text-slate-400">{APP_VERSION}</span>
-          </h1>
-          <p className="truncate text-sm text-slate-500">{user?.displayName}</p>
+      <header className="mb-6 grid grid-cols-3 items-center gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowHelp(true)}
+            aria-label="עזרה"
+            className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-500"
+          >
+            ℹ️
+          </button>
         </div>
-        <ProfileMenu />
+        <h1 className="truncate text-center text-xl font-bold text-slate-800">חיות אבודות</h1>
+        <div className="flex justify-end">
+          <ProfileMenu />
+        </div>
       </header>
 
       <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} />
@@ -90,11 +100,13 @@ export default function Dashboard() {
         או: הוספה חכמה - נזהה אוטומטית אם זה אבד או נמצא
       </Link>
 
-      {loading && <p className="text-slate-500">טוען...</p>}
+      {progress && <ProgressBar current={progress.current} total={progress.total} />}
+      {loading && !progress && <p className="text-slate-500">טוען...</p>}
 
       <div className="mb-4 flex items-center justify-between gap-4">
         <Link to="/found" className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
           {labels.allFoundReportsLink}
+          {foundCount != null && foundCount > 0 && <span className="text-slate-400"> ({foundCount})</span>}
         </Link>
         <Link to="/archive" className="text-xs text-slate-500 underline">
           ארכיון
@@ -116,9 +128,9 @@ export default function Dashboard() {
         </ul>
       </section>
 
-      <div className="mt-8">
-        <Copyright />
-      </div>
+      <AppFooter />
+
+      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
