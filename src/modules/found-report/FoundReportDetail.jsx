@@ -21,6 +21,7 @@ import {
 } from '../shared/collections.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { petLabels } from '../shared/petLabels.js';
 import { displayFoundReportName } from './foundFieldMapping.js';
 import { shortSnippet } from '../shared/textSnippet.js';
@@ -75,6 +76,10 @@ export default function FoundReportDetail() {
   const [newPhotos, setNewPhotos] = useState([]);
   const [newPhotosFirst, setNewPhotosFirst] = useState(false);
   const [pendingExtraction, setPendingExtraction] = useState(null);
+  // Post-save nudge, same as the create forms' - fires on ANY save that
+  // ends with color "אחר", not just an AI-driven one (a re-scan's applied
+  // suggestion, or the person just picking "אחר" by hand both count).
+  const [colorCheckPending, setColorCheckPending] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -208,11 +213,28 @@ export default function FoundReportDetail() {
       setNewPhotos([]);
       setNewPhotosFirst(false);
       setPendingExtraction(null);
-      setEditing(false);
-      await load();
+      if (fields.color === 'אחר') {
+        setColorCheckPending(true);
+      } else {
+        setEditing(false);
+        await load();
+      }
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleColorCheckSave(newColor) {
+    await updateFoundReport(reportId, { ...fields, color: newColor }, []);
+    setColorCheckPending(false);
+    setEditing(false);
+    await load();
+  }
+
+  async function handleColorCheckSkip() {
+    setColorCheckPending(false);
+    setEditing(false);
+    await load();
   }
 
   if (!report) return <p className="p-4 text-slate-500">טוען...</p>;
@@ -559,6 +581,9 @@ export default function FoundReportDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {colorCheckPending && (
+        <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
+      )}
       {showDetails && (
         <RecordDetailsDialog
           title={displayFoundReportName(report)}

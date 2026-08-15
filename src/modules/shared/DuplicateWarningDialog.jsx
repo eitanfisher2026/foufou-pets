@@ -7,13 +7,20 @@ import RecordDetailsDialog from './RecordDetailsDialog.jsx';
 import PhotoLightbox from './PhotoLightbox.jsx';
 import { formatDateTime } from './formatDateTime.js';
 
+const MATCH_REASON_LABELS = { sourceUrl: 'אותו קישור מקור', contactPhone: 'אותו מספר טלפון' };
+
+function matchReasonText(m) {
+  if (!m.matchedOn?.length) return '';
+  return m.matchedOn.map((r) => MATCH_REASON_LABELS[r]).join(' + ');
+}
+
 /**
- * Shown when one or more existing records share the exact same source URL
- * as the one being entered now (see duplicateCheckApi.js). Reviewing a
- * match opens a read-only details popup right here (same data the match
- * objects already carry, no extra fetch and no navigating away) rather than
- * opening the existing record's own page, so the in-progress form behind
- * this dialog is never touched.
+ * Shown when one or more existing records share the same source URL or the
+ * same contact phone number as the one being entered now (see
+ * duplicateCheckApi.js). Reviewing a match opens a read-only details popup
+ * right here (same data the match objects already carry, no extra fetch and
+ * no navigating away) rather than opening the existing record's own page,
+ * so the in-progress form behind this dialog is never touched.
  *
  * `recordType` is fixed ('lost'|'found') when the caller already knows
  * which collection it's creating in; left unset when it doesn't yet (the
@@ -40,9 +47,9 @@ export default function DuplicateWarningDialog({ recordType, matches, onContinue
     <>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onCancel}>
         <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-lg" onClick={(e) => e.stopPropagation()}>
-          <h2 className="mb-2 text-lg font-bold text-slate-800">יש כבר רשומה עם אותו קישור מקור</h2>
+          <h2 className="mb-2 text-lg font-bold text-slate-800">יש כבר רשומה דומה</h2>
           <p className="mb-4 text-sm text-slate-600">
-            כנראה שכבר קיימת רשומה שנוצרה מאותו פוסט. אפשר לבדוק אותה לפני שממשיכים, כדי למנוע כפילות.
+            כנראה שהמידע הזה כבר דווח בעבר. אפשר לבדוק את הרשומה הקיימת לפני שממשיכים, כדי למנוע כפילות.
           </p>
 
           <ul className="mb-4 space-y-2">
@@ -55,6 +62,7 @@ export default function DuplicateWarningDialog({ recordType, matches, onContinue
                 >
                   {displayName(m)} - פרטים מלאים
                 </button>
+                {matchReasonText(m) && <p className="mt-0.5 text-xs text-slate-500">{matchReasonText(m)}</p>}
                 {m.neighborhood && <p className="mt-0.5 text-xs text-slate-400">{m.neighborhood}</p>}
                 {(creatorOf(m) || m.createdAt) && (
                   <p className="mt-0.5 text-xs text-slate-400">

@@ -16,7 +16,7 @@ import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPrevi
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
-import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
+import { findDuplicatesBySourceUrl, findDuplicates } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
@@ -168,11 +168,11 @@ export default function FoundReportForm() {
   // is deliberately step one of a check that may grow more conditions.
   async function handleSubmit(e) {
     e.preventDefault();
-    if (fields.sourceUrl?.trim()) {
+    if (fields.sourceUrl?.trim() || fields.contactPhone?.trim()) {
       setSubmitting(true);
       let matches = [];
       try {
-        matches = await findDuplicatesBySourceUrl('found', fields.sourceUrl);
+        matches = await findDuplicates('found', { sourceUrl: fields.sourceUrl, contactPhone: fields.contactPhone });
       } finally {
         setSubmitting(false);
       }

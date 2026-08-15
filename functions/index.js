@@ -57,6 +57,7 @@ const CAT_COLORS = [
   'שחור',
   'אפור',
   'כתום/ג׳ינג׳י',
+  'קרם',
   'חום',
   'ג׳ינג׳י לבן',
   'אפור לבן',
@@ -262,6 +263,7 @@ const CAT_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't 
   - "לבן" (white) is a solid white coat, the same way - reserve "ג'ינג'י לבן"/"אפור לבן"/"שחור-לבן" for a coat that's clearly two-toned, not a mostly-white coat with a tiny colored fleck.
   - "אפור" (gray) is a cool, neutral gray with no red/orange/yellow undertone at all - like slate or ash. If the coat has any warm reddish, orange, or golden tint, it is not gray, even if it looks pale, faded, or grayish in low light.
   - "כתום/ג'ינג'י" (orange/ginger) is a warm reddish-orange to amber hue, often with tabby striping - this is one of the most common cat colors and is frequently misread as gray or brown in bad lighting, so look specifically for warm undertone before ruling it out.
+  - "קרם" (cream) is a very pale, warm ivory/beige tone - distinctly warmer than אפור (which has no warm undertone at all) and much paler/softer than כתום/ג'ינג'י (a vivid, saturated orange). This is a common Persian/longhair color - don't default to אפור or אחר just because the coat looks pale or washed out; check for a warm undertone first.
   - "חום" (brown) is a warm but muted brown/chocolate tone - warmer than gray, less vivid/red than כתום/ג'ינג'י.
   - "ג'ינג'י לבן" and "אפור לבן" are for a coat with clearly separate patches of white plus (respectively) orange or gray - not a single blended pale color.
   - "טאבי (מנומר)" describes a striped/mottled coat pattern and can apply on top of any base color (including an orange tabby) - use it when the pattern itself, not the hue, is the most identifying feature; otherwise the base hue (e.g. כתום/ג'ינג'י) is usually the more useful classification.`;

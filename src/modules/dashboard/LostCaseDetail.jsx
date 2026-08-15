@@ -17,6 +17,7 @@ import {
 import Field from '../shared/Field.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
+import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { petLabels } from '../shared/petLabels.js';
 import {
   getLostCase,
@@ -117,6 +118,10 @@ export default function LostCaseDetail() {
   const [newPhotos, setNewPhotos] = useState([]);
   const [newPhotosFirst, setNewPhotosFirst] = useState(false);
   const [pendingExtraction, setPendingExtraction] = useState(null);
+  // Post-save nudge, same as the create forms' - fires on ANY save that
+  // ends with color "אחר", not just an AI-driven one (a re-scan's applied
+  // suggestion, or the person just picking "אחר" by hand both count).
+  const [colorCheckPending, setColorCheckPending] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -332,11 +337,28 @@ export default function LostCaseDetail() {
       setNewPhotos([]);
       setNewPhotosFirst(false);
       setPendingExtraction(null);
-      setEditing(false);
-      await load();
+      if (fields.color === 'אחר') {
+        setColorCheckPending(true);
+      } else {
+        setEditing(false);
+        await load();
+      }
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleColorCheckSave(newColor) {
+    await updateLostCase(caseId, { ...fields, color: newColor }, []);
+    setColorCheckPending(false);
+    setEditing(false);
+    await load();
+  }
+
+  async function handleColorCheckSkip() {
+    setColorCheckPending(false);
+    setEditing(false);
+    await load();
   }
 
   if (!lostCase) return <p className="p-4 text-slate-500">טוען...</p>;
@@ -765,6 +787,9 @@ export default function LostCaseDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {colorCheckPending && (
+        <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
+      )}
       {pendingCloseStatus && (
         <ClosureDialog
           initialDate={lostCase.closureDate}

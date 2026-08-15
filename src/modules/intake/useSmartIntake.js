@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import { detectSpecies } from '../screenshot-ingestion/readScreenshots.js';
 import { extractMainPhoto } from '../shared/cropPhoto.js';
-import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
+import { findDuplicates } from '../shared/duplicateCheckApi.js';
 import { getColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions } from '../shared/breedOptionsApi.js';
 import { SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
@@ -102,8 +102,8 @@ export function useSmartIntake() {
   async function createFromType(result, type, uploadedFiles, sourceUrlOverride, speciesOverride) {
     const species = speciesOverride ?? detectedSpecies ?? preferredSpecies;
     const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
-    if (finalSourceUrl?.trim()) {
-      const matches = await findDuplicatesBySourceUrl(type, finalSourceUrl);
+    if (finalSourceUrl?.trim() || result.contactPhone?.trim()) {
+      const matches = await findDuplicates(type, { sourceUrl: finalSourceUrl, contactPhone: result.contactPhone });
       if (matches.length > 0) {
         pendingCreateRef.current = { result, type, uploadedFiles, sourceUrlOverride, species };
         setDuplicateRecordType(type);

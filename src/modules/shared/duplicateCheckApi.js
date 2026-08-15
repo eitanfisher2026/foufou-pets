@@ -21,6 +21,58 @@ export async function findDuplicatesBySourceUrl(recordType, sourceUrl) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+// Digits-only comparison so "054-485-3364", "0544853364" and "+972-54-485-3364"
+// all match each other - contactPhone is free text, never format-enforced,
+// so a raw string match would miss the large majority of real duplicates.
+function normalizePhone(phone) {
+  let digits = (phone || '').replace(/\D/g, '');
+  if (digits.startsWith('972')) digits = '0' + digits.slice(3);
+  return digits;
+}
+
+// Below this many digits a match is more likely a coincidence (a short
+// partial number, or two people who each left a near-empty field) than a
+// real duplicate - not worth flagging.
+const MIN_PHONE_DIGITS = 7;
+
+/**
+ * Second duplicate signal, alongside source URL: a contact phone number
+ * that already appears on another record of the same type. There's no
+ * indexed normalized-phone field to query directly (contactPhone is plain
+ * free text), so this fetches every record with a non-empty phone and
+ * compares client-side - fine at this app's scale, and works retroactively
+ * on every existing record with no migration needed.
+ */
+export async function findDuplicatesByContactPhone(recordType, contactPhone) {
+  const digits = normalizePhone(contactPhone);
+  if (digits.length < MIN_PHONE_DIGITS) return [];
+  const collectionName = recordType === 'lost' ? COLLECTIONS.LOST_CASES : COLLECTIONS.FOUND_REPORTS;
+  const snap = await getDocs(query(collection(db, collectionName), where('contactPhone', '!=', '')));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter((r) => normalizePhone(r.contactPhone) === digits);
+}
+
+/**
+ * Combines the source-url and contact-phone signals into one deduped list -
+ * either one matching is reason enough to warn, and a record that matches
+ * on both only appears once, tagged with everything it matched on so the
+ * warning dialog can say why.
+ */
+export async function findDuplicates(recordType, { sourceUrl, contactPhone } = {}) {
+  const [byUrl, byPhone] = await Promise.all([
+    findDuplicatesBySourceUrl(recordType, sourceUrl),
+    findDuplicatesByContactPhone(recordType, contactPhone),
+  ]);
+  const byId = new Map();
+  for (const m of byUrl) byId.set(m.id, { ...m, matchedOn: ['sourceUrl'] });
+  for (const m of byPhone) {
+    const existing = byId.get(m.id);
+    byId.set(m.id, existing ? { ...existing, matchedOn: [...existing.matchedOn, 'contactPhone'] } : { ...m, matchedOn: ['contactPhone'] });
+  }
+  return [...byId.values()];
+}
+
 /**
  * Same check, but for the smart-add flow where lost-vs-found isn't known
  * yet at the moment a link is pulled in (that's only decided once
@@ -34,7 +86,7 @@ export async function findDuplicatesBySourceUrlAnyType(sourceUrl) {
     findDuplicatesBySourceUrl('found', sourceUrl),
   ]);
   return [
-    ...lost.map((m) => ({ ...m, recordType: 'lost' })),
-    ...found.map((m) => ({ ...m, recordType: 'found' })),
+    ...lost.map((m) => ({ ...m, recordType: 'lost', matchedOn: ['sourceUrl'] })),
+    ...found.map((m) => ({ ...m, recordType: 'found', matchedOn: ['sourceUrl'] })),
   ];
 }
