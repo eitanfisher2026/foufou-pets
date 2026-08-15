@@ -15,16 +15,18 @@ import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
  * Archived/resolved reports live in the archive page instead, not here.
  */
 export default function FoundReportsListPage() {
-  const { preferredSpecies } = useAuth();
-  const { items: reports, loading, progress } = useLoadWithProgress(listFoundReports, []);
+  const { preferredSpecies, roleLoading } = useAuth();
+  // Same server-side species filter and roleLoading gate as the dashboard's
+  // lost-case list (see Dashboard.jsx/dashboardApi.js) - only the current
+  // species is ever fetched, re-fetched on toggle switch.
+  const { items: reports, loading, progress } = useLoadWithProgress(
+    () => listFoundReports(preferredSpecies),
+    [preferredSpecies],
+    !roleLoading
+  );
   const labels = petLabels(preferredSpecies);
 
-  const visibleReports = reports.filter(
-    (r) =>
-      r.status !== RECORD_STATUS.ARCHIVED &&
-      r.status !== RECORD_STATUS.RESOLVED &&
-      (r.species || 'cat') === preferredSpecies
-  );
+  const visibleReports = reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED);
 
   return (
     <div className="p-4">

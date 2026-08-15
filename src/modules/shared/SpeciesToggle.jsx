@@ -16,7 +16,7 @@ const SPECIES_ICONS = {
  */
 export default function SpeciesToggle({ value, onChange }) {
   return (
-    <div className="mb-4 inline-flex gap-0.5 rounded-full bg-slate-100 p-1">
+    <div className="mb-4 inline-flex gap-0.5 rounded-full bg-slate-300 p-1">
       {Object.values(SPECIES).map((species) => (
         <button
           key={species}

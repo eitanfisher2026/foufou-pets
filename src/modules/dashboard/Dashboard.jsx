@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, SPECIES } from '../shared/collections.js';
+import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import SpeciesToggle from '../shared/SpeciesToggle.jsx';
 import { listLostCases, countFoundReports } from './dashboardApi.js';
@@ -20,8 +20,21 @@ import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 // view. Loading only lost cases by default cuts the dashboard's default
 // read in half; "כל הדיווחים על חיות שנמצאו" is one tap away instead.
 export default function Dashboard() {
-  const { preferredSpecies, setPreferredSpecies } = useAuth();
-  const { items: lostCases, loading, progress } = useLoadWithProgress(listLostCases, []);
+  const { preferredSpecies, setPreferredSpecies, roleLoading } = useAuth();
+  // Firestore does the species filtering now (see dashboardApi.js) rather
+  // than fetching both species and filtering client-side - re-runs
+  // whenever the toggle switches, so switching species re-fetches just
+  // that species instead of re-filtering an already-fetched mixed list.
+  // Held off (`enabled: !roleLoading`) until the signed-in user's saved
+  // species preference has actually loaded - preferredSpecies starts at
+  // its default ('cat') for a moment on every load, and fetching against
+  // that default only to immediately re-fetch once the real value arrives
+  // is exactly the double round-trip that made this feel slow to load.
+  const { items: lostCases, loading, progress } = useLoadWithProgress(
+    () => listLostCases(preferredSpecies),
+    [preferredSpecies],
+    !roleLoading
+  );
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [foundCount, setFoundCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
@@ -32,29 +45,23 @@ export default function Dashboard() {
   }, []);
 
   // Just a count query (no documents fetched) - cheap enough to run
-  // eagerly, unlike the full list this links to.
+  // eagerly, unlike the full list this links to. Same roleLoading gate as
+  // the list above, and for the same reason.
   useEffect(() => {
+    if (roleLoading) return;
     setFoundCount(null);
     countFoundReports(preferredSpecies).then(setFoundCount);
-  }, [preferredSpecies]);
+  }, [preferredSpecies, roleLoading]);
 
   // Archived and resolved cases move to their own archive view (see
   // ArchivePage.jsx) instead of a same-page toggle - a resolved case
   // (already found) doesn't need attention any more than an archived one
   // does, so it doesn't belong cluttering the default working list either.
-  // Species filtering matches the toggle above: this person is working in
-  // one species at a time (see petLabels.js/SpeciesToggle.jsx), so a dog
-  // case shouldn't clutter the list while working the cat queue, and vice
-  // versa. A record from before species tracking existed defaults to cat.
+  // Species itself is no longer filtered here - listLostCases(species)
+  // above only ever returns the current species to begin with.
   const visibleLostCases = useMemo(
-    () =>
-      lostCases.filter(
-        (c) =>
-          c.status !== RECORD_STATUS.ARCHIVED &&
-          c.status !== RECORD_STATUS.RESOLVED &&
-          (c.species || SPECIES.CAT) === preferredSpecies
-      ),
-    [lostCases, preferredSpecies]
+    () => lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED),
+    [lostCases]
   );
 
   return (

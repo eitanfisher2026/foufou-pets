@@ -11,13 +11,19 @@ const ANIMATION_DURATION_MS = 600;
 const MIN_STEP_MS = 15;
 const MAX_STEP_MS = 80;
 
-export function useLoadWithProgress(fetchFn, deps = []) {
+// `enabled = false` holds the hook in its initial loading state without
+// fetching anything - for a fetch that depends on a value which itself
+// loads asynchronously (e.g. the signed-in user's saved species
+// preference), this avoids firing once with a still-default value and
+// then again moments later with the real one once it arrives.
+export function useLoadWithProgress(fetchFn, deps = [], enabled = true) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(null); // { current, total } while animating, else null
   const timerRef = useRef(null);
 
   useEffect(() => {
+    if (!enabled) return;
     let cancelled = false;
     setLoading(true);
     setProgress(null);
@@ -65,7 +71,7 @@ export function useLoadWithProgress(fetchFn, deps = []) {
       if (timerRef.current) clearInterval(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
+  }, [...deps, enabled]);
 
   return { items, loading, progress };
 }

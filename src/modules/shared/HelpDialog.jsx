@@ -1,13 +1,46 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../auth/AuthProvider.jsx';
+import { getHelpContent, saveHelpContent } from './helpContentApi.js';
+
 /**
- * Static "how does this work" explainer, reached via the ℹ️ button next to
- * the dashboard header. Content is fixed in code (not admin-editable like
- * AboutDialog.jsx) - this is onboarding copy, not something that needs to
- * change without a deploy.
+ * "How does this work" explainer, reached via the ℹ️ button next to the
+ * dashboard header. Admin-editable (Firestore-backed, config/helpContent),
+ * same edit/save/cancel pattern as AboutDialog.jsx - a regular user just
+ * reads it.
  */
 export default function HelpDialog({ onClose }) {
+  const { isAdmin } = useAuth();
+  const [text, setText] = useState(null);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    getHelpContent().then(setText);
+  }, []);
+
+  function startEditing() {
+    setDraft(text || '');
+    setEditing(true);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await saveHelpContent(draft);
+      setText(draft);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-lg" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-l from-blue-500 to-indigo-500 px-4 py-3 text-white">
           <h2 className="flex items-center gap-2 text-base font-bold">
             <span>ℹ️</span> איך זה עובד?
@@ -17,49 +50,47 @@ export default function HelpDialog({ onClose }) {
           </button>
         </div>
 
-        <div className="space-y-4 p-4 text-sm text-slate-700">
-          <p>
-            <strong>חיות אבודות</strong> עוזר לך לנהל חיפוש אחר חיית מחמד אבודה, ולהתאים בינה לבין דיווחים על חיות
-            שנראו/נמצאו.
-          </p>
-
-          <div>
-            <p className="mb-1 font-bold text-slate-800">שלושה שלבים:</p>
-            <ol className="list-inside list-decimal space-y-1">
-              <li>
-                <strong>דיווח על אבידה</strong> - כשחתול/כלב שלכם אבד, פותחים תיק חיפוש חדש
-              </li>
-              <li>
-                <strong>דיווח על מציאה</strong> - כשרואים או מוצאים חיה, מדווחים עליה כאן
-              </li>
-              <li>
-                <strong>בדיקת התאמות</strong> - בכל תיק חיפוש אפשר ללחוץ "בדיקת התאמות" כדי להשוות מול הדיווחים שנמצאו
-              </li>
-            </ol>
-          </div>
-
-          <div>
-            <p className="mb-1 font-bold text-slate-800">איך ממלאים דיווח:</p>
-            <ul className="list-inside list-disc space-y-1">
-              <li>הכי מהיר: העלאת צילום מסך של הפוסט מפייסבוק - נזהה אוטומטית חלק גדול מהפרטים</li>
-              <li>אפשר גם למלא טופס ידני מלא, בלי צילום מסך</li>
-              <li>"הוספה חכמה" בעמוד הראשי מזהה אוטומטית גם אם זו אבידה או מציאה, וגם אם זה חתול או כלב</li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="mb-1 font-bold text-slate-800">תפריט הפרופיל (התמונה למעלה מימין):</p>
-            <ul className="list-inside list-disc space-y-1">
-              <li>הגדרות (למנהלים)</li>
-              <li>שיתוף האפליקציה והתקנה על מסך הבית</li>
-              <li>שליחת משוב</li>
-              <li>אודות</li>
-            </ul>
-          </div>
-
-          <p className="text-slate-500">
-            <strong>טיפ:</strong> ככל שיהיה יותר מידע בדיווח (צבע, סימנים מיוחדים, מיקום), כך ההתאמה תהיה מדויקת יותר.
-          </p>
+        <div className="p-4">
+          {text === null ? (
+            <p className="text-sm text-slate-400">טוען...</p>
+          ) : editing ? (
+            <>
+              <textarea
+                className="input w-full"
+                rows={16}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="כתבו כאן את תוכן העזרה..."
+              />
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  {saving ? 'שומר...' : '💾 שמירה'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditing(false)}
+                  disabled={saving}
+                  className="flex-1 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+                >
+                  ביטול
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{text}</p>
+              {isAdmin && (
+                <button type="button" onClick={startEditing} className="mt-3 text-xs text-blue-600 underline">
+                  ✏️ עריכה
+                </button>
+              )}
+            </>
+          )}
         </div>
 
         <div className="border-t border-slate-100 px-4 py-3 text-center">
