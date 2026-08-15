@@ -52,6 +52,9 @@ function estimateCostUsd(usage, priceInput = PRICE_PER_MTOK_INPUT, priceOutput =
 // function simple/fast and avoids a Firestore dependency for something
 // that changes rarely, same pattern as the static include/exclude word
 // lists in Roy News).
+// Base color only - the striped/mottled "tabby" pattern lives in
+// CAT_PATTERNS below instead (a cat can be color="תלת-גוני" AND
+// pattern="קליקו" at once - that's expected, not a conflict).
 const CAT_COLORS = [
   'לבן',
   'שחור',
@@ -61,8 +64,7 @@ const CAT_COLORS = [
   'חום',
   'ג׳ינג׳י לבן',
   'אפור לבן',
-  'טאבי (מנומר)',
-  'תלת-גוני (קליקו)',
+  'תלת-גוני',
   'שחור-לבן',
   'אחר',
 ];
@@ -117,10 +119,17 @@ const DOG_BREEDS = [
 ];
 const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
+// Cat-only coat pattern, separate from base color. "אחיד" (solid/no
+// distinct pattern) is the common default, not a stand-in for "couldn't
+// tell" - most cats simply have no special pattern.
+const CAT_PATTERNS = ['אחיד', 'טאבי (מנומר)', 'קליקו', 'טורטי', 'טוקסידו', 'פוינט (קצוות כהות)', 'אחר'];
+
 // Fields every extraction needs regardless of species - the large majority
-// of the schema. Color, breed, and hasClippedEar are NOT here: they differ
-// enough per species (different enums, or not applicable at all) that they
-// live in CAT_ONLY_PROPERTIES/DOG_ONLY_PROPERTIES below instead, and get
+// of the schema. Color, breed, furType, hasClippedEar, and (cat-only)
+// pattern are NOT here: they differ enough per species (different enums,
+// or not applicable at all - cats don't get a "curly" fur option, dogs
+// don't get a pattern field) that they live in
+// CAT_ONLY_PROPERTIES/DOG_ONLY_PROPERTIES below instead, and get
 // combined with this common set into two static per-species schemas at
 // module load (see CAT_SCHEMA/DOG_SCHEMA) - one place maintains the shared
 // fields, no risk of the two species schemas drifting apart on anything
@@ -151,7 +160,6 @@ const COMMON_PROPERTIES = {
   // species (see CAT_AGE_CLASSES in collections.js), not cat-specific
   // despite the name.
   ageClass: { anyOf: [{ type: 'string', enum: ['kitten', 'adult'] }, { type: 'null' }] },
-  furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'long', 'curly'] }, { type: 'null' }] },
   hasFluffyTail: { type: ['boolean', 'null'] },
   markings: { type: 'string' },
   hasCollar: { type: ['boolean', 'null'] },
@@ -195,7 +203,6 @@ const COMMON_REQUIRED = [
   'size',
   'weightKg',
   'ageClass',
-  'furType',
   'hasFluffyTail',
   'markings',
   'hasCollar',
@@ -222,15 +229,22 @@ const COMMON_REQUIRED = [
 const CAT_ONLY_PROPERTIES = {
   color: { type: 'string', enum: CAT_COLORS },
   breed: { type: 'string', enum: CAT_BREEDS },
+  // No "curly" option for cats - see CAT_FUR_TYPES in collections.js.
+  furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'long'] }, { type: 'null' }] },
   // Cat-specific: whether a clipped/notched ear tip is visible (the
   // standard TNR marking) - not a meaningful concept for a dog at all, so
   // the dog schema below drops this field entirely rather than keeping it
   // always-null.
   hasClippedEar: { type: ['boolean', 'null'] },
+  // Coat pattern, separate from base color - dogs don't get this field at
+  // all (their pattern-ish info, like brindle/merle, is already folded
+  // into DOG_COLORS as combo colors instead).
+  pattern: { type: 'string', enum: CAT_PATTERNS },
 };
 const DOG_ONLY_PROPERTIES = {
   color: { type: 'string', enum: DOG_COLORS },
   breed: { type: 'string', enum: DOG_BREEDS },
+  furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'long', 'curly'] }, { type: 'null' }] },
 };
 
 function buildSchema(speciesProperties, speciesRequired) {
@@ -244,8 +258,8 @@ function buildSchema(speciesProperties, speciesRequired) {
 
 // Built once at module load (these are genuinely static - "a static schema
 // for dog and a static schema for cat"), not per request.
-const CAT_SCHEMA = buildSchema(CAT_ONLY_PROPERTIES, ['color', 'breed', 'hasClippedEar']);
-const DOG_SCHEMA = buildSchema(DOG_ONLY_PROPERTIES, ['color', 'breed']);
+const CAT_SCHEMA = buildSchema(CAT_ONLY_PROPERTIES, ['color', 'breed', 'furType', 'hasClippedEar', 'pattern']);
+const DOG_SCHEMA = buildSchema(DOG_ONLY_PROPERTIES, ['color', 'breed', 'furType']);
 const SCHEMAS_BY_SPECIES = { cat: CAT_SCHEMA, dog: DOG_SCHEMA };
 
 function buildHeader(species) {
@@ -266,7 +280,7 @@ const CAT_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't 
   - "קרם" (cream) is a very pale, warm ivory/beige tone - distinctly warmer than אפור (which has no warm undertone at all) and much paler/softer than כתום/ג'ינג'י (a vivid, saturated orange). This is a common Persian/longhair color - don't default to אפור or אחר just because the coat looks pale or washed out; check for a warm undertone first.
   - "חום" (brown) is a warm but muted brown/chocolate tone - warmer than gray, less vivid/red than כתום/ג'ינג'י.
   - "ג'ינג'י לבן" and "אפור לבן" are for a coat with clearly separate patches of white plus (respectively) orange or gray - not a single blended pale color.
-  - "טאבי (מנומר)" describes a striped/mottled coat pattern and can apply on top of any base color (including an orange tabby) - use it when the pattern itself, not the hue, is the most identifying feature; otherwise the base hue (e.g. כתום/ג'ינג'י) is usually the more useful classification.`;
+  - "תלת-גוני" is for a coat with three distinct colors patched together (typically white, black, and orange/ginger) - a striped/mottled texture on top of this is captured separately by "pattern" (see below), not by color.`;
 const DOG_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't undersell an obviously black dog by reaching for "אחר" or a patched option just because of a few tiny white hairs or a small chin/chest fleck; use "שחור-לבן" only once the white patching is clearly substantial (a real chest patch, socks, a bib), not a minor fleck.
   - "לבן" (white) is a solid white coat, the same way - reserve "חום-לבן"/"שחור-לבן" for a coat that's clearly two-toned, not a mostly-white coat with a tiny colored fleck.
   - "חום" (brown) is a warm but muted brown/chocolate tone.
@@ -284,10 +298,15 @@ const DOG_BREED_BULLET = `- "breed" is only for a specific, named breed from the
 
 const CLIPPED_EAR_BULLET = `- "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.`;
 
-const PHYSICAL_TRAITS = `- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge. "weightKg" is a real number of kilograms only when the post explicitly states a weight (common for a dog post, e.g. "כלב בגודל 20 ק\"ג בערך") - never estimate a weight visually from a photo alone, leave it null in that case; a wrong number here actively misleads a numeric comparison later, unlike "size" which is deliberately just a rough visual bucket.
-- "ageClass" is separate from size - "kitten" for a clearly young kitten or puppy (this one value covers both), "adult" otherwise, or null if unclear. A small adult animal is "adult", not "kitten".
-- "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Sphynx cat, or a Xoloitzcuintli/Chinese Crested dog), "short" (an ordinary coat that lies close to the body - the large majority of house cats and dogs like a Labrador or Boxer, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Persian/Maine Coon cat, or a Golden Retriever/Collie/Shih Tzu dog), "curly" (fur is wavy or curly rather than straight, regardless of length - e.g. a Devon Rex/Cornish Rex cat, or a Poodle/Bichon dog). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.
-- "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).`;
+const SIZE_AGE_BULLETS = `- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge. "weightKg" is a real number of kilograms only when the post explicitly states a weight (common for a dog post, e.g. "כלב בגודל 20 ק\"ג בערך") - never estimate a weight visually from a photo alone, leave it null in that case; a wrong number here actively misleads a numeric comparison later, unlike "size" which is deliberately just a rough visual bucket.
+- "ageClass" is separate from size - "kitten" for a clearly young kitten or puppy (this one value covers both), "adult" otherwise, or null if unclear. A small adult animal is "adult", not "kitten".`;
+
+const CAT_FUR_BULLET = `- "furType" is your best classification of the coat itself into exactly one of 3 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Sphynx cat), "short" (an ordinary coat that lies close to the body - the large majority of cats, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Persian/Maine Coon cat). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.`;
+const DOG_FUR_BULLET = `- "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Xoloitzcuintli/Chinese Crested dog), "short" (an ordinary coat that lies close to the body - the large majority of dogs like a Labrador or Boxer, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Golden Retriever/Collie/Shih Tzu dog), "curly" (fur is wavy or curly rather than straight, regardless of length - e.g. a Poodle/Bichon dog). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.`;
+
+const COLLAR_BULLET = `- "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).`;
+
+const PATTERN_BULLET = `- "pattern" is the cat's coat pattern, classified separately from its base color ("color" above), into exactly one of the given options. Most cats are simply "אחיד" (solid/no distinct pattern) - the correct default whenever the coat is just one blended color, or a color+white combination, with no further pattern on top. Use "טאבי (מנומר)" for a striped/mottled coat. Use "קליקו" for a classic patched coat with distinct black and orange/ginger patches together with white (a cat can be color="תלת-גוני" and pattern="קליקו" at the same time - that's expected, not a conflict). Use "טורטי" for a mottled mix of black and orange/cream patches with little or no white - a subtler, less distinctly patched cousin of calico. Use "טוקסידו" for a mostly-solid coat (usually black) with a distinct, roughly symmetric white bib/chest/paws/belly, resembling formal wear. Use "פוינט (קצוות כהות)" for a pale/cream body with clearly darker color concentrated at the face, ears, legs, and tail (the classic Siamese look). Use "אחר" only if the coat shows a real, distinct pattern that doesn't fit any of these.`;
 
 const REST_OF_PROMPT = `- "microchipNumber" is only for an explicit chip/microchip number written in the post text (e.g. "מספר שבב: 985141...") - never inferred or guessed. Leave "" if no chip number is stated, which is the default/common case.
 - "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
@@ -321,8 +340,11 @@ function buildSystemPrompt(species) {
     buildHeader(species),
     buildColorBullet(species),
     species === 'dog' ? DOG_BREED_BULLET : CAT_BREED_BULLET,
-    PHYSICAL_TRAITS,
+    SIZE_AGE_BULLETS,
+    species === 'dog' ? DOG_FUR_BULLET : CAT_FUR_BULLET,
+    COLLAR_BULLET,
     species === 'cat' ? CLIPPED_EAR_BULLET : '',
+    species === 'cat' ? PATTERN_BULLET : '',
     REST_OF_PROMPT,
   ].filter(Boolean);
   return parts.join('\n');

@@ -15,12 +15,13 @@ import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
+import { usePatternOptions } from '../shared/usePatternOptions.js';
 import { petLabels } from '../shared/petLabels.js';
 import { findDuplicatesBySourceUrl, findDuplicates } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
-import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS } from '../shared/collections.js';
+import { CAT_SIZES, CAT_FUR_TYPES, DOG_FUR_TYPES, COLLAR_COLORS, SPECIES } from '../shared/collections.js';
 import { createLostCase, updateLostCase } from './lostReportApi.js';
 import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
 
@@ -37,6 +38,8 @@ export default function LostReportForm() {
   const labels = petLabels(fields.species);
   const colorOptions = useColorOptions(fields.species);
   const breedOptions = useBreedOptions(fields.species);
+  const patternOptions = usePatternOptions();
+  const furTypeOptions = fields.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
@@ -267,6 +270,19 @@ export default function LostReportForm() {
           />
         </Field>
 
+        {fields.species === SPECIES.CAT && (
+          <Field label="תבנית פרווה" inline>
+            <SelectField
+              className="w-36"
+              label="בחירת תבנית פרווה"
+              placeholder="בחר/י תבנית"
+              value={fields.pattern}
+              onChange={(v) => setField('pattern', v)}
+              options={patternOptions}
+            />
+          </Field>
+        )}
+
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
@@ -349,13 +365,13 @@ export default function LostReportForm() {
           <input className="input w-36" value={fields.microchipNumber} onChange={(e) => setField('microchipNumber', e.target.value)} />
         </Field>
 
-        <Field label="סוג פרווה" inline>
+        <Field label={labels.furTypeLabel} inline>
           <SelectField
             className="w-36"
-            label="בחירת סוג פרווה"
+            label={labels.furTypeLabel}
             value={fields.furType}
             onChange={(v) => setField('furType', v)}
-            options={CAT_FUR_TYPES}
+            options={furTypeOptions}
           />
         </Field>
 

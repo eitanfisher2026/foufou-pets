@@ -22,6 +22,15 @@ export const SPECIES_LABELS = {
 // what forms actually show; see shared/colorOptionsApi.js. This constant is
 // what a fresh project starts with before anyone has customized it. "אחר"
 // (other) is a fixed catch-all, always last, never part of the editable list.
+// Base color only, not pattern - "תלת-גוני" (tricolor) stays here since it's
+// still a base coloring fact, but the striped/mottled "tabby" pattern moved
+// out entirely to CAT_PATTERNS below (a cat can be color="תלת-גוני" AND
+// pattern="קליקו" at once - that's expected, not a conflict). Bicolor
+// combos with white (ג׳ינג׳י לבן/אפור לבן/שחור-לבן) stay as their own
+// named colors rather than decomposing into color+pattern too - those
+// combos are how people actually identify a cat at a glance ("the cat
+// isn't black and isn't white"), which the AI reads just as reliably as a
+// single hue.
 export const CAT_COLORS = [
   'לבן',
   'שחור',
@@ -31,9 +40,24 @@ export const CAT_COLORS = [
   'חום',
   'ג׳ינג׳י לבן',
   'אפור לבן',
-  'טאבי (מנומר)',
-  'תלת-גוני (קליקו)',
+  'תלת-גוני',
   'שחור-לבן',
+  'אחר',
+];
+
+// Cat-only coat pattern, separate from base color - see CAT_COLORS above
+// for why. Live-editable via config/patternOptions, same convention as
+// colors/breeds (see patternOptionsApi.js). "אחיד" (solid/no distinct
+// pattern) is the common default, not the absence of an answer - most
+// cats simply have no special pattern, so this is a real, required
+// classification rather than a nullable field.
+export const CAT_PATTERNS = [
+  'אחיד',
+  'טאבי (מנומר)',
+  'קליקו',
+  'טורטי',
+  'טוקסידו',
+  'פוינט (קצוות כהות)',
   'אחר',
 ];
 
@@ -130,11 +154,22 @@ export const CAT_AGE_CLASSES = [
 
 // Real coat taxonomy has more nuance (length/texture/density/double coat),
 // but for reliable classification from a photo by a non-expert (or by AI),
-// 4 buckets covering length + the one texture that's visually unmistakable
-// (curly/wavy) is the practical limit for either species - a fluffy/bushy
-// tail is tracked as its own separate trait below since it can stand out
-// even on an otherwise short-coated animal.
+// a few buckets covering length (+ for dogs, the one texture that's
+// visually unmistakable: curly/wavy) is the practical limit - a
+// fluffy/bushy tail is tracked as its own separate trait below since it
+// can stand out even on an otherwise short-coated animal. Cats don't get
+// a "curly" option: a genuinely curly-coated cat (Devon/Cornish Rex) is
+// rare enough in these reports that it's not worth the confusion of an
+// option that almost never applies, unlike a Poodle for dogs.
 export const CAT_FUR_TYPES = [
+  { value: 'hairless', label: 'ללא פרווה / כמעט ללא פרווה' },
+  { value: 'short', label: 'רגיל' },
+  { value: 'long', label: 'שיער ארוך' },
+];
+
+// Dogs keep the "curly" texture option cats don't (Poodle/Bichon etc. are
+// common enough to warrant it) - see CAT_FUR_TYPES above.
+export const DOG_FUR_TYPES = [
   { value: 'hairless', label: 'ללא פרווה / כמעט ללא פרווה' },
   { value: 'short', label: 'רגיל' },
   { value: 'long', label: 'שיער ארוך' },

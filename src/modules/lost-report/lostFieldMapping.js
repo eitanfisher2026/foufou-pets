@@ -10,6 +10,8 @@ export const EMPTY_LOST_FIELDS = {
   species: SPECIES.CAT,
   name: '',
   color: '',
+  // Cat-only - stays '' for dogs, RecordDetailsDialog hides the empty row.
+  pattern: '',
   breed: '',
   size: '',
   ageClass: '',
@@ -84,6 +86,7 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     ...prev,
     name: extracted.petName || prev.name,
     color: extracted.color || prev.color,
+    pattern: extracted.pattern || prev.pattern,
     breed: extracted.breed || prev.breed,
     size: extracted.size || prev.size,
     ageClass: extracted.ageClass || prev.ageClass,

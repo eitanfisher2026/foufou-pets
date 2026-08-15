@@ -243,6 +243,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
     { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
+    { key: 'pattern', label: 'תבנית פרווה (חתולים)', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'pattern', foundField: 'pattern', mismatchPenalty: 10, defaultValue: 'אחיד' },
     { key: 'city', label: 'עיר', weight: 10, enabled: true, comparisonType: 'textOverlap', lostField: 'city', foundField: 'city' },
     { key: 'hasCollar', label: 'קולר/רתמה', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'hasCollar', foundField: 'hasCollar', mismatchPenalty: 5 },
     { key: 'collarColor', label: 'צבע הקולר', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'collarColor', foundField: 'collarColor' },
@@ -263,6 +264,7 @@ export const DEFAULT_MATCH_CONFIG = {
 export const COMPARABLE_FIELDS = [
   { field: 'markings', label: 'סימנים מיוחדים' },
   { field: 'color', label: 'צבע' },
+  { field: 'pattern', label: 'תבנית פרווה (חתולים)' },
   { field: 'breed', label: 'גזע' },
   { field: 'size', label: 'גודל' },
   { field: 'ageClass', label: 'גור/מבוגר' },

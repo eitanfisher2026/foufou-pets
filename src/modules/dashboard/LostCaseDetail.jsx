@@ -10,6 +10,7 @@ import {
   LOST_CASE_STATUS_LABELS,
   CAT_SIZES,
   CAT_FUR_TYPES,
+  DOG_FUR_TYPES,
   COLLAR_COLORS,
   SPECIES,
   SPECIES_LABELS,
@@ -17,6 +18,7 @@ import {
 import Field from '../shared/Field.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
+import { usePatternOptions } from '../shared/usePatternOptions.js';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { petLabels } from '../shared/petLabels.js';
 import {
@@ -61,6 +63,7 @@ import SelectField from '../shared/SelectField.jsx';
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החיה' },
   { targetKey: 'color', extractedKey: 'color', label: 'צבע' },
+  { targetKey: 'pattern', extractedKey: 'pattern', label: 'תבנית פרווה' },
   { targetKey: 'breed', extractedKey: 'breed', label: 'גזע' },
   { targetKey: 'markings', extractedKey: 'markings', label: 'סימנים מיוחדים' },
   { targetKey: 'hasClippedEar', extractedKey: 'hasClippedEar', label: 'אוזן קטומה' },
@@ -138,6 +141,8 @@ export default function LostCaseDetail() {
   const { confirm, dialog } = useConfirm();
   const colorOptions = useColorOptions(lostCase?.species);
   const breedOptions = useBreedOptions(lostCase?.species);
+  const patternOptions = usePatternOptions();
+  const furTypeOptions = lostCase?.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const labels = petLabels(lostCase?.species);
 
   useEffect(() => {
@@ -474,6 +479,18 @@ export default function LostCaseDetail() {
                 options={colorOptions}
               />
             </Field>
+            {lostCase.species === SPECIES.CAT && (
+              <Field label="תבנית פרווה" inline>
+                <SelectField
+                  className="w-36"
+                  label="בחירת תבנית פרווה"
+                  placeholder="בחר/י תבנית"
+                  value={fields.pattern || ''}
+                  onChange={(v) => setField('pattern', v)}
+                  options={patternOptions}
+                />
+              </Field>
+            )}
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
                 type="checkbox"
@@ -555,13 +572,13 @@ export default function LostCaseDetail() {
                 onChange={(e) => setField('microchipNumber', e.target.value)}
               />
             </Field>
-            <Field label="סוג פרווה" inline>
+            <Field label={labels.furTypeLabel} inline>
               <SelectField
                 className="w-36"
-                label="בחירת סוג פרווה"
+                label={labels.furTypeLabel}
                 value={fields.furType || ''}
                 onChange={(v) => setField('furType', v)}
-                options={CAT_FUR_TYPES}
+                options={furTypeOptions}
               />
             </Field>
             <Field label="גודל" inline>

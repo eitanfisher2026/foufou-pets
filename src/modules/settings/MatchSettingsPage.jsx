@@ -10,7 +10,8 @@ import {
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
-import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, CAT_BREEDS, DOG_BREEDS } from '../shared/collections.js';
+import { getPatternOptions, savePatternOptions } from '../shared/patternOptionsApi.js';
+import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, CAT_BREEDS, DOG_BREEDS, CAT_PATTERNS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import SelectField from '../shared/SelectField.jsx';
@@ -35,6 +36,8 @@ const AI_KNOWN_BREEDS = {
   [SPECIES.CAT]: new Set(CAT_BREEDS.filter((b) => b !== OTHER)),
   [SPECIES.DOG]: new Set(DOG_BREEDS.filter((b) => b !== OTHER)),
 };
+// Cat-only, unlike colors/breeds above - dogs don't get a pattern field.
+const AI_KNOWN_PATTERNS = new Set(CAT_PATTERNS.filter((p) => p !== OTHER));
 
 function getAiSyncIssues(species, colorOptions, breedOptions) {
   const knownColors = AI_KNOWN_COLORS[species];
@@ -45,6 +48,12 @@ function getAiSyncIssues(species, colorOptions, breedOptions) {
   const breedsInSync = breedOptions.length === knownBreeds.size && breedOptions.every((b) => knownBreeds.has(b));
   if (!breedsInSync) issues.push(`רשימת הגזעים (${SPECIES_LABELS[species]})`);
   return issues;
+}
+
+function getPatternAiSyncIssue(patternOptions) {
+  const inSync =
+    patternOptions.length === AI_KNOWN_PATTERNS.size && patternOptions.every((p) => AI_KNOWN_PATTERNS.has(p));
+  return inSync ? [] : ['רשימת תבניות הפרווה (חתולים)'];
 }
 
 /**
@@ -68,9 +77,12 @@ export default function MatchSettingsPage() {
   const [dogColorOptions, setDogColorOptions] = useState(null);
   const [catBreedOptions, setCatBreedOptions] = useState(null);
   const [dogBreedOptions, setDogBreedOptions] = useState(null);
+  // Cat-only, so no per-species pair like colors/breeds above.
+  const [patternOptions, setPatternOptions] = useState(null);
   const [listSpecies, setColorSpecies] = useState(SPECIES.CAT);
   const [colorInput, setColorInput] = useState('');
   const [breedInput, setBreedInput] = useState('');
+  const [patternInput, setPatternInput] = useState('');
   const [saveError, setSaveError] = useState('');
   const { confirm, dialog } = useConfirm();
 
@@ -85,6 +97,7 @@ export default function MatchSettingsPage() {
     getColorOptions(SPECIES.DOG).then((colors) => setDogColorOptions(colors.filter((c) => c !== OTHER)));
     getBreedOptions(SPECIES.CAT).then((breeds) => setCatBreedOptions(breeds.filter((b) => b !== OTHER)));
     getBreedOptions(SPECIES.DOG).then((breeds) => setDogBreedOptions(breeds.filter((b) => b !== OTHER)));
+    getPatternOptions().then((patterns) => setPatternOptions(patterns.filter((p) => p !== OTHER)));
   }, []);
 
   function addColorOption() {
@@ -112,6 +125,17 @@ export default function MatchSettingsPage() {
 
   function removeBreedOption(breed) {
     setBreedOptions((prev) => prev.filter((b) => b !== breed));
+  }
+
+  function addPatternOption() {
+    const value = patternInput.trim();
+    if (!value || patternOptions.includes(value)) return;
+    setPatternOptions((prev) => [...prev, value]);
+    setPatternInput('');
+  }
+
+  function removePatternOption(pattern) {
+    setPatternOptions((prev) => prev.filter((p) => p !== pattern));
   }
 
   function updateParam(index, patch) {
@@ -180,6 +204,7 @@ export default function MatchSettingsPage() {
         saveColorOptions(SPECIES.DOG, dogColorOptions),
         saveBreedOptions(SPECIES.CAT, catBreedOptions),
         saveBreedOptions(SPECIES.DOG, dogBreedOptions),
+        savePatternOptions(patternOptions),
       ]);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
@@ -196,7 +221,7 @@ export default function MatchSettingsPage() {
 
   async function handleReset() {
     const ok = await confirm(
-      'לאפס את כל הגדרות ההתאמה לברירת המחדל, כולל רשימות הצבעים והגזעים? כל שינוי שנעשה כאן יימחק.',
+      'לאפס את כל הגדרות ההתאמה לברירת המחדל, כולל רשימות הצבעים, הגזעים ותבניות הפרווה? כל שינוי שנעשה כאן יימחק.',
       { confirmLabel: 'איפוס' }
     );
     if (!ok) return;
@@ -204,21 +229,24 @@ export default function MatchSettingsPage() {
     const dogColorDefaults = DOG_COLORS.filter((c) => c !== OTHER);
     const catBreedDefaults = CAT_BREEDS.filter((b) => b !== OTHER);
     const dogBreedDefaults = DOG_BREEDS.filter((b) => b !== OTHER);
+    const patternDefaults = CAT_PATTERNS.filter((p) => p !== OTHER);
     const [defaults] = await Promise.all([
       resetMatchConfig(),
       saveColorOptions(SPECIES.CAT, catColorDefaults),
       saveColorOptions(SPECIES.DOG, dogColorDefaults),
       saveBreedOptions(SPECIES.CAT, catBreedDefaults),
       saveBreedOptions(SPECIES.DOG, dogBreedDefaults),
+      savePatternOptions(patternDefaults),
     ]);
     setConfig(defaults);
     setCatColorOptions(catColorDefaults);
     setDogColorOptions(dogColorDefaults);
     setCatBreedOptions(catBreedDefaults);
     setDogBreedOptions(dogBreedDefaults);
+    setPatternOptions(patternDefaults);
   }
 
-  if (!config || !catColorOptions || !dogColorOptions || !catBreedOptions || !dogBreedOptions) {
+  if (!config || !catColorOptions || !dogColorOptions || !catBreedOptions || !dogBreedOptions || !patternOptions) {
     return <p className="p-4 text-slate-500">טוען...</p>;
   }
 
@@ -226,6 +254,7 @@ export default function MatchSettingsPage() {
   const aiSyncIssues = [
     ...getAiSyncIssues(SPECIES.CAT, catColorOptions, catBreedOptions),
     ...getAiSyncIssues(SPECIES.DOG, dogColorOptions, dogBreedOptions),
+    ...getPatternAiSyncIssue(patternOptions),
   ];
 
   return (
@@ -434,6 +463,55 @@ export default function MatchSettingsPage() {
           <button
             type="button"
             onClick={addBreedOption}
+            className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
+          >
+            הוספה
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-slate-400">
+          שינויים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.
+        </p>
+      </div>
+
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת תבניות הפרווה האפשריות (חתולים)</h2>
+      <p className="mb-3 text-sm text-slate-500">
+        אלו האפשרויות שמופיעות בתפריט "תבנית פרווה" בטפסי חתול - שדה נפרד מ"צבע", לתבנית עצמה (טאבי, קליקו, טורטי,
+        טוקסידו, פוינט וכו'). לא רלוונטי לכלבים - השדה לא מופיע בטפסי כלב כלל. "אחיד" הוא ברירת המחדל לחתול ללא תבנית
+        מיוחדת, ו"אחר" תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
+      </p>
+      <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="mb-2 flex flex-wrap gap-2">
+          {patternOptions.map((pattern) => (
+            <span key={pattern} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+              {pattern}
+              <button
+                type="button"
+                onClick={() => removePatternOption(pattern)}
+                className="text-red-600"
+                aria-label={`הסרת ${pattern}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+          <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="input flex-1"
+            value={patternInput}
+            onChange={(e) => setPatternInput(e.target.value)}
+            placeholder="שם תבנית חדשה"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addPatternOption();
+              }
+            }}
+          />
+          <button
+            type="button"
+            onClick={addPatternOption}
             className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
           >
             הוספה

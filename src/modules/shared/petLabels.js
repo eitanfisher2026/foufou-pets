@@ -31,6 +31,10 @@ export function petLabels(species) {
     allFoundReportsLink: isDog ? 'צפייה בכל הדיווחים על כלבים שנמצאו' : 'צפייה בכל הדיווחים על חתולים שנמצאו',
     openCasesSection: isDog ? 'תיקי חיפוש - כלבים' : 'תיקי חיפוש - חתולים',
     breedLabel: isDog ? 'גזע' : 'גזע (אם ידוע)',
+    // Cats only get length categories (hairless/short/long) now - no
+    // "curly" option - so "length" is the more accurate word for them;
+    // dogs keep "type" since curly is a real texture distinction there.
+    furTypeLabel: isDog ? 'סוג פרווה' : 'אורך פרווה',
     groupPlaceholder: isDog ? 'למשל "כלבים אבודים ונמצאים - תל אביב"' : 'למשל "חתולים אבודים ונמצאים - תל אביב"',
   };
 }

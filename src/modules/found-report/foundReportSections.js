@@ -1,4 +1,12 @@
-import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, CAT_CONDITIONS, SPECIES_LABELS } from '../shared/collections.js';
+import {
+  CAT_SIZES,
+  CAT_AGE_CLASSES,
+  CAT_FUR_TYPES,
+  DOG_FUR_TYPES,
+  CAT_CONDITIONS,
+  SPECIES,
+  SPECIES_LABELS,
+} from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { petLabels } from '../shared/petLabels.js';
@@ -21,6 +29,7 @@ export function buildFoundReportSections(report) {
         { label: 'מין', value: SPECIES_LABELS[report.species] },
         { label: labels.conditionLabel, value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
         { label: 'צבע', value: report.color },
+        { label: 'תבנית פרווה', value: report.pattern },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },
         { label: 'קולר/רתמה', value: report.hasCollar === true ? 'כן' : report.hasCollar === false ? 'לא' : '' },
         { label: 'צבע הקולר', value: report.collarColor },
@@ -34,7 +43,10 @@ export function buildFoundReportSections(report) {
         },
         { label: 'סימנים מיוחדים', value: report.markings },
         { label: labels.breedLabel, value: report.breed },
-        { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === report.furType)?.label },
+        {
+          label: labels.furTypeLabel,
+          value: (report.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES).find((f) => f.value === report.furType)?.label,
+        },
         { label: 'גודל', value: CAT_SIZES.find((s) => s.value === report.size)?.label },
         { label: 'משקל (ק״ג)', value: report.weightKg },
         { label: 'מספר שבב', value: report.microchipNumber },

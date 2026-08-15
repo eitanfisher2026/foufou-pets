@@ -1,4 +1,12 @@
-import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, SPECIES_LABELS, CLOSURE_REASON_LABELS } from '../shared/collections.js';
+import {
+  CAT_SIZES,
+  CAT_AGE_CLASSES,
+  CAT_FUR_TYPES,
+  DOG_FUR_TYPES,
+  SPECIES,
+  SPECIES_LABELS,
+  CLOSURE_REASON_LABELS,
+} from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { petLabels } from '../shared/petLabels.js';
@@ -21,6 +29,7 @@ export function buildLostCaseSections(lostCase) {
         { label: 'שם', value: displayLostCaseName(lostCase) },
         { label: 'מין', value: SPECIES_LABELS[lostCase.species] },
         { label: 'צבע', value: lostCase.color },
+        { label: 'תבנית פרווה', value: lostCase.pattern },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
         { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },
         { label: 'צבע הקולר', value: lostCase.collarColor },
@@ -34,7 +43,11 @@ export function buildLostCaseSections(lostCase) {
         },
         { label: 'סימנים מיוחדים', value: lostCase.markings },
         { label: labels.breedLabel, value: lostCase.breed },
-        { label: 'סוג פרווה', value: CAT_FUR_TYPES.find((f) => f.value === lostCase.furType)?.label },
+        {
+          label: labels.furTypeLabel,
+          value: (lostCase.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES).find((f) => f.value === lostCase.furType)
+            ?.label,
+        },
         { label: 'גודל', value: CAT_SIZES.find((s) => s.value === lostCase.size)?.label },
         { label: 'משקל (ק״ג)', value: lostCase.weightKg },
         { label: 'מספר שבב', value: lostCase.microchipNumber },

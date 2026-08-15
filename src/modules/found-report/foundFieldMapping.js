@@ -10,6 +10,8 @@ export const EMPTY_FOUND_FIELDS = {
   species: SPECIES.CAT,
   title: '',
   color: '',
+  // Cat-only - stays '' for dogs, RecordDetailsDialog hides the empty row.
+  pattern: '',
   breed: '',
   size: '',
   ageClass: '',
@@ -73,6 +75,7 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
     // petName is worth more than a generic color description when present.
     title: prev.title || extracted.petName || extracted.colorDescription,
     color: extracted.color || prev.color,
+    pattern: extracted.pattern || prev.pattern,
     breed: extracted.breed || prev.breed,
     size: extracted.size || prev.size,
     ageClass: extracted.ageClass || prev.ageClass,
