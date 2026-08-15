@@ -141,10 +141,14 @@ export const DOG_BREEDS = [
 
 // The "breed not identified" default a dog record gets - both from the AI
 // extraction (its breed enum always includes this as the safe fallback
-// choice) and as the value BreedCheckDialog nudges the user away from. Cats
-// don't need an equivalent constant - there's no post-creation breed nudge
-// for cats (see useSmartIntake.js).
+// choice) and as the value BreedCheckDialog nudges the user away from.
 export const DEFAULT_DOG_BREED = DOG_BREEDS[0];
+
+// Same idea for cats, but only used to pre-fill a brand-new manual form
+// (see LostReportForm.jsx/FoundReportForm.jsx) - not a post-creation nudge
+// like DEFAULT_DOG_BREED, since the overwhelming majority of cat reports
+// really are street/mixed cats and don't need a second look.
+export const DEFAULT_CAT_BREED = CAT_BREEDS[0];
 
 // Shared between cats and dogs, and between lost cases and found reports -
 // all four describe the same animal using the same vocabulary, which also

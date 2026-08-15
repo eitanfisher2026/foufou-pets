@@ -421,23 +421,27 @@ export default function FoundReportDetail() {
                 options={breedOptions}
               />
             </Field>
-            <Field label="משקל (ק״ג, אם ידוע)" inline>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                className="input w-36"
-                value={fields.weightKg || ''}
-                onChange={(e) => setField('weightKg', e.target.value)}
-              />
-            </Field>
-            <Field label="מספר שבב (אם ידוע)" inline>
-              <input
-                className="input w-36"
-                value={fields.microchipNumber || ''}
-                onChange={(e) => setField('microchipNumber', e.target.value)}
-              />
-            </Field>
+            {report.species === SPECIES.DOG && (
+              <>
+                <Field label="משקל (ק״ג, אם ידוע)" inline>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    className="input w-36"
+                    value={fields.weightKg || ''}
+                    onChange={(e) => setField('weightKg', e.target.value)}
+                  />
+                </Field>
+                <Field label="מספר שבב (אם ידוע)" inline>
+                  <input
+                    className="input w-36"
+                    value={fields.microchipNumber || ''}
+                    onChange={(e) => setField('microchipNumber', e.target.value)}
+                  />
+                </Field>
+              </>
+            )}
             <Field label={labels.furTypeLabel} inline>
               <SelectField
                 className="w-36"

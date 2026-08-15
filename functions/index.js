@@ -125,10 +125,11 @@ const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן',
 const CAT_PATTERNS = ['אחיד', 'טאבי (מנומר)', 'קליקו', 'טורטי', 'טוקסידו', 'פוינט (קצוות כהות)', 'אחר'];
 
 // Fields every extraction needs regardless of species - the large majority
-// of the schema. Color, breed, furType, hasClippedEar, and (cat-only)
-// pattern are NOT here: they differ enough per species (different enums,
-// or not applicable at all - cats don't get a "curly" fur option, dogs
-// don't get a pattern field) that they live in
+// of the schema. Color, breed, furType, hasClippedEar, (cat-only) pattern,
+// and (dog-only) weightKg/microchipNumber are NOT here: they differ enough
+// per species (different enums, or not applicable at all - a cat's weight
+// and chip number are rarely known/asked-about in these posts, unlike a
+// dog's) that they live in
 // CAT_ONLY_PROPERTIES/DOG_ONLY_PROPERTIES below instead, and get
 // combined with this common set into two static per-species schemas at
 // module load (see CAT_SCHEMA/DOG_SCHEMA) - one place maintains the shared
@@ -155,7 +156,6 @@ const COMMON_PROPERTIES = {
   // combined with an array-form type ("Enum value 'small' does not match
   // declared type '['string', 'null']'").
   size: { anyOf: [{ type: 'string', enum: ['small', 'medium', 'large'] }, { type: 'null' }] },
-  weightKg: { anyOf: [{ type: 'number' }, { type: 'null' }] },
   // "kitten" also covers a puppy - one internal value shared across
   // species (see CAT_AGE_CLASSES in collections.js), not cat-specific
   // despite the name.
@@ -165,7 +165,6 @@ const COMMON_PROPERTIES = {
   hasCollar: { type: ['boolean', 'null'] },
   collarColor: { anyOf: [{ type: 'string', enum: COLLAR_COLORS }, { type: 'null' }] },
   collarHasBell: { type: ['boolean', 'null'] },
-  microchipNumber: { type: 'string' },
   city: { type: 'string' },
   neighborhood: { type: 'string' },
   location: { type: 'string' },
@@ -201,14 +200,12 @@ const COMMON_REQUIRED = [
   'petName',
   'colorDescription',
   'size',
-  'weightKg',
   'ageClass',
   'hasFluffyTail',
   'markings',
   'hasCollar',
   'collarColor',
   'collarHasBell',
-  'microchipNumber',
   'city',
   'neighborhood',
   'location',
@@ -245,6 +242,10 @@ const DOG_ONLY_PROPERTIES = {
   color: { type: 'string', enum: DOG_COLORS },
   breed: { type: 'string', enum: DOG_BREEDS },
   furType: { anyOf: [{ type: 'string', enum: ['hairless', 'short', 'long', 'curly'] }, { type: 'null' }] },
+  // Not asked for cats - weight and chip number are rarely known/stated
+  // for a street cat, unlike a dog.
+  weightKg: { anyOf: [{ type: 'number' }, { type: 'null' }] },
+  microchipNumber: { type: 'string' },
 };
 
 function buildSchema(speciesProperties, speciesRequired) {
@@ -259,7 +260,7 @@ function buildSchema(speciesProperties, speciesRequired) {
 // Built once at module load (these are genuinely static - "a static schema
 // for dog and a static schema for cat"), not per request.
 const CAT_SCHEMA = buildSchema(CAT_ONLY_PROPERTIES, ['color', 'breed', 'furType', 'hasClippedEar', 'pattern']);
-const DOG_SCHEMA = buildSchema(DOG_ONLY_PROPERTIES, ['color', 'breed', 'furType']);
+const DOG_SCHEMA = buildSchema(DOG_ONLY_PROPERTIES, ['color', 'breed', 'furType', 'weightKg', 'microchipNumber']);
 const SCHEMAS_BY_SPECIES = { cat: CAT_SCHEMA, dog: DOG_SCHEMA };
 
 function buildHeader(species) {
@@ -298,8 +299,10 @@ const DOG_BREED_BULLET = `- "breed" is only for a specific, named breed from the
 
 const CLIPPED_EAR_BULLET = `- "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.`;
 
-const SIZE_AGE_BULLETS = `- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge. "weightKg" is a real number of kilograms only when the post explicitly states a weight (common for a dog post, e.g. "כלב בגודל 20 ק\"ג בערך") - never estimate a weight visually from a photo alone, leave it null in that case; a wrong number here actively misleads a numeric comparison later, unlike "size" which is deliberately just a rough visual bucket.
+const SIZE_AGE_BULLETS = `- "size" is your best guess at the animal's physical size (small, medium, or large) from the photos, or null if no photo gives any real basis to judge.
 - "ageClass" is separate from size - "kitten" for a clearly young kitten or puppy (this one value covers both), "adult" otherwise, or null if unclear. A small adult animal is "adult", not "kitten".`;
+
+const DOG_WEIGHT_CHIP_BULLET = `- "weightKg" is a real number of kilograms only when the post explicitly states a weight (e.g. "כלב בגודל 20 ק\"ג בערך") - never estimate a weight visually from a photo alone, leave it null in that case; a wrong number here actively misleads a numeric comparison later, unlike "size" which is deliberately just a rough visual bucket. "microchipNumber" is only for an explicit chip/microchip number written in the post text (e.g. "מספר שבב: 985141...") - never inferred or guessed. Leave "" if no chip number is stated, which is the default/common case.`;
 
 const CAT_FUR_BULLET = `- "furType" is your best classification of the coat itself into exactly one of 3 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Sphynx cat), "short" (an ordinary coat that lies close to the body - the large majority of cats, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Persian/Maine Coon cat). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.`;
 const DOG_FUR_BULLET = `- "furType" is your best classification of the coat itself into exactly one of 4 categories, based on what's visible in the photos: "hairless" (little to no fur - e.g. a Xoloitzcuintli/Chinese Crested dog), "short" (an ordinary coat that lies close to the body - the large majority of dogs like a Labrador or Boxer, including a coat that's a bit fuller around the neck/tail without being dramatically long), "long" (fur is clearly, noticeably long over most of the body, well beyond an ordinary short coat - e.g. a Golden Retriever/Collie/Shih Tzu dog), "curly" (fur is wavy or curly rather than straight, regardless of length - e.g. a Poodle/Bichon dog). There is no separate "medium" category - a borderline coat that's fuller than average but not dramatically long is "short", not "long"; reserve "long" for a coat that's unmistakably long. Null if no photo gives a clear enough view of the coat to judge. "hasFluffyTail" is separate and independent - true only if the tail specifically is unusually thick/bushy/plume-like even relative to the rest of the coat (this can be true even on an otherwise short-coated animal), false if the tail is clearly visible and clearly not unusually fluffy, null if the tail isn't clearly visible.`;
@@ -308,8 +311,7 @@ const COLLAR_BULLET = `- "collarColor" is the color of the collar/harness itself
 
 const PATTERN_BULLET = `- "pattern" is the cat's coat pattern, classified separately from its base color ("color" above), into exactly one of the given options. Most cats are simply "אחיד" (solid/no distinct pattern) - the correct default whenever the coat is just one blended color, or a color+white combination, with no further pattern on top. Use "טאבי (מנומר)" for a striped/mottled coat. Use "קליקו" for a classic patched coat with distinct black and orange/ginger patches together with white (a cat can be color="תלת-גוני" and pattern="קליקו" at the same time - that's expected, not a conflict). Use "טורטי" for a mottled mix of black and orange/cream patches with little or no white - a subtler, less distinctly patched cousin of calico. Use "טוקסידו" for a mostly-solid coat (usually black) with a distinct, roughly symmetric white bib/chest/paws/belly, resembling formal wear. Use "פוינט (קצוות כהות)" for a pale/cream body with clearly darker color concentrated at the face, ears, legs, and tail (the classic Siamese look). Use "אחר" only if the coat shows a real, distinct pattern that doesn't fit any of these.`;
 
-const REST_OF_PROMPT = `- "microchipNumber" is only for an explicit chip/microchip number written in the post text (e.g. "מספר שבב: 985141...") - never inferred or guessed. Leave "" if no chip number is stated, which is the default/common case.
-- "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
+const REST_OF_PROMPT = `- "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
 - "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.
 - "condition" is the animal's current physical custody, based on what the post text actually says happened to it - not just that it was photographed: "held_by_finder" if the poster currently has the animal in their own possession/care/home (e.g. "אצלי", "ביניתיים אצלי", "לקחתי אותה הביתה", "טיפלתי בו"), including when the post also mentions a vet visit but the animal is back with the poster or still in the poster's short-term care afterward - a vet visit alone doesn't change this if the animal ends up with the finder. "at_vet" only if the animal was left at / transferred to a clinic or shelter and is not with the poster anymore (e.g. "הועבר למרפאה ונשאר שם", "בטיפול הוטרינר"). "seen_only" is the default and by far the most common case - the animal was merely sighted/photographed in public, was not caught, and nobody claims to be holding it.
 - "sourceGroupName" is the Facebook/WhatsApp group or page name shown in the screenshot's header (not a person's name).
@@ -342,6 +344,7 @@ function buildSystemPrompt(species) {
     species === 'dog' ? DOG_BREED_BULLET : CAT_BREED_BULLET,
     SIZE_AGE_BULLETS,
     species === 'dog' ? DOG_FUR_BULLET : CAT_FUR_BULLET,
+    species === 'dog' ? DOG_WEIGHT_CHIP_BULLET : '',
     COLLAR_BULLET,
     species === 'cat' ? CLIPPED_EAR_BULLET : '',
     species === 'cat' ? PATTERN_BULLET : '',

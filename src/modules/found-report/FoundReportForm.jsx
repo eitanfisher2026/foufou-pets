@@ -29,6 +29,7 @@ import {
   CAT_CONDITIONS,
   SPECIES,
   CAT_PATTERN_DESCRIPTIONS,
+  DEFAULT_CAT_BREED,
 } from '../shared/collections.js';
 import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
@@ -42,7 +43,16 @@ export default function FoundReportForm() {
   // (see AuthProvider/SpeciesToggle on the dashboard) - no picker here, since
   // switching modes mid-form would be surprising. A screenshot's own
   // AI-detected species can still override it (see mergeExtractedFoundFields).
-  const [fields, setFields] = useState(() => ({ ...EMPTY_FOUND_FIELDS, species: preferredSpecies }));
+  // Cats start pre-filled with the "street cat" breed default (the
+  // overwhelming common case) rather than blank - a real AI-identified
+  // breed still overrides it. Dogs stay blank, since a purebred/recognizable
+  // dog is common enough that defaulting away from a real choice would be
+  // more likely to paper over a case worth actually picking.
+  const [fields, setFields] = useState(() => ({
+    ...EMPTY_FOUND_FIELDS,
+    species: preferredSpecies,
+    breed: preferredSpecies === SPECIES.CAT ? DEFAULT_CAT_BREED : EMPTY_FOUND_FIELDS.breed,
+  }));
   const labels = petLabels(fields.species);
   const colorOptions = useColorOptions(fields.species);
   const breedOptions = useBreedOptions(fields.species);
@@ -383,20 +393,28 @@ export default function FoundReportForm() {
           />
         </Field>
 
-        <Field label="משקל (ק״ג, אם ידוע)" inline>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            className="input w-36"
-            value={fields.weightKg}
-            onChange={(e) => setField('weightKg', e.target.value)}
-          />
-        </Field>
+        {fields.species === SPECIES.DOG && (
+          <>
+            <Field label="משקל (ק״ג, אם ידוע)" inline>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                className="input w-36"
+                value={fields.weightKg}
+                onChange={(e) => setField('weightKg', e.target.value)}
+              />
+            </Field>
 
-        <Field label="מספר שבב (אם ידוע)" inline>
-          <input className="input w-36" value={fields.microchipNumber} onChange={(e) => setField('microchipNumber', e.target.value)} />
-        </Field>
+            <Field label="מספר שבב (אם ידוע)" inline>
+              <input
+                className="input w-36"
+                value={fields.microchipNumber}
+                onChange={(e) => setField('microchipNumber', e.target.value)}
+              />
+            </Field>
+          </>
+        )}
 
         <Field label={labels.furTypeLabel} inline>
           <SelectField
