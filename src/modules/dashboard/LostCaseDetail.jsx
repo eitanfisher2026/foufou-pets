@@ -14,6 +14,7 @@ import {
   COLLAR_COLORS,
   SPECIES,
   SPECIES_LABELS,
+  CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
@@ -142,6 +143,7 @@ export default function LostCaseDetail() {
   const colorOptions = useColorOptions(lostCase?.species);
   const breedOptions = useBreedOptions(lostCase?.species);
   const patternOptions = usePatternOptions();
+  const patternSelectOptions = patternOptions.map((p) => ({ value: p, label: p, description: CAT_PATTERN_DESCRIPTIONS[p] }));
   const furTypeOptions = lostCase?.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const labels = petLabels(lostCase?.species);
 
@@ -487,7 +489,7 @@ export default function LostCaseDetail() {
                   placeholder="בחר/י תבנית"
                   value={fields.pattern || ''}
                   onChange={(v) => setField('pattern', v)}
-                  options={patternOptions}
+                  options={patternSelectOptions}
                 />
               </Field>
             )}

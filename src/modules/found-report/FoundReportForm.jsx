@@ -21,7 +21,15 @@ import { findDuplicatesBySourceUrl, findDuplicates } from '../shared/duplicateCh
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
-import { CAT_SIZES, CAT_FUR_TYPES, DOG_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
+import {
+  CAT_SIZES,
+  CAT_FUR_TYPES,
+  DOG_FUR_TYPES,
+  COLLAR_COLORS,
+  CAT_CONDITIONS,
+  SPECIES,
+  CAT_PATTERN_DESCRIPTIONS,
+} from '../shared/collections.js';
 import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
 
@@ -39,6 +47,7 @@ export default function FoundReportForm() {
   const colorOptions = useColorOptions(fields.species);
   const breedOptions = useBreedOptions(fields.species);
   const patternOptions = usePatternOptions();
+  const patternSelectOptions = patternOptions.map((p) => ({ value: p, label: p, description: CAT_PATTERN_DESCRIPTIONS[p] }));
   const furTypeOptions = fields.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
@@ -302,7 +311,7 @@ export default function FoundReportForm() {
               placeholder="בחר/י תבנית"
               value={fields.pattern}
               onChange={(v) => setField('pattern', v)}
-              options={patternOptions}
+              options={patternSelectOptions}
             />
           </Field>
         )}

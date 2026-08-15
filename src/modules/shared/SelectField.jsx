@@ -1,9 +1,11 @@
 import { useState } from 'react';
 
 // Accepts either plain strings (colors, breeds - display text doubles as the
-// value) or { value, label } pairs (size/age/fur-type/condition/closure-
-// reason, where the stored value and the shown label differ) - callers just
-// pass whatever list they already have, no per-call-site mapping needed.
+// value) or { value, label, description? } objects (size/age/fur-type/
+// condition/closure-reason, where the stored value and the shown label
+// differ, or a term like "פוינט" needs a plain-language explanation under
+// it) - callers just pass whatever list they already have, no per-call-site
+// mapping needed.
 function normalizeOption(opt) {
   return typeof opt === 'string' ? { value: opt, label: opt } : opt;
 }
@@ -102,7 +104,10 @@ export default function SelectField({
                   >
                     {value === o.value && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />}
                   </span>
-                  <span className="text-slate-800">{o.label}</span>
+                  <span className="flex flex-col items-start">
+                    <span className="text-slate-800">{o.label}</span>
+                    {o.description && <span className="text-xs text-slate-400">{o.description}</span>}
+                  </span>
                 </button>
               ))}
             </div>

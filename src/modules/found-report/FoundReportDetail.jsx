@@ -19,6 +19,7 @@ import {
   CAT_CONDITIONS,
   SPECIES,
   SPECIES_LABELS,
+  CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
@@ -97,6 +98,7 @@ export default function FoundReportDetail() {
   const colorOptions = useColorOptions(report?.species);
   const breedOptions = useBreedOptions(report?.species);
   const patternOptions = usePatternOptions();
+  const patternSelectOptions = patternOptions.map((p) => ({ value: p, label: p, description: CAT_PATTERN_DESCRIPTIONS[p] }));
   const furTypeOptions = report?.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const labels = petLabels(report?.species);
 
@@ -355,7 +357,7 @@ export default function FoundReportDetail() {
                   placeholder="בחר/י תבנית"
                   value={fields.pattern || ''}
                   onChange={(v) => setField('pattern', v)}
-                  options={patternOptions}
+                  options={patternSelectOptions}
                 />
               </Field>
             )}

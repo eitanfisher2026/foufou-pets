@@ -61,6 +61,20 @@ export const CAT_PATTERNS = [
   'אחר',
 ];
 
+// Plain-language explanation shown under each pattern option in the picker -
+// cat-fancy terms like "טוקסידו"/"פוינט" aren't obvious by name alone. Keyed
+// separately from CAT_PATTERNS (not baked into it) since a custom pattern
+// someone adds via the settings panel is just a name, with no description
+// to show.
+export const CAT_PATTERN_DESCRIPTIONS = {
+  'אחיד': 'צבע אחיד בלבד, בלי תבנית מיוחדת',
+  'טאבי (מנומר)': 'פסים או כתמים על פני כל הגוף',
+  קליקו: 'כתמים לבנים, שחורים וכתומים יחד',
+  טורטי: 'ערבוב של שחור וכתום/קרם זה בתוך זה, כמעט בלי לבן',
+  טוקסידו: 'בעיקר שחור, עם חזה/בטן/כפות לבנות בצורה סימטרית - כמו חליפה',
+  'פוינט (קצוות כהות)': 'גוף בהיר (בדרך כלל לבן/קרם) עם פנים ואוזניים בצבע כהה משמעותית מהגוף (לרוב גם רגליים וזנב) - כמו סיאמי או ראגדול',
+};
+
 // Dog coat colors/patterns don't overlap well with CAT_COLORS (no
 // tabby/calico, but brindle/merle/tan-points that cats don't have) - a
 // separate list, same "אחר" catch-all convention.
