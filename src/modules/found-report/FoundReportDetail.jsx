@@ -23,6 +23,8 @@ import { useColorOptions } from '../shared/useColorOptions.js';
 import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
 import { displayFoundReportName } from './foundFieldMapping.js';
+import { shortSnippet } from '../shared/textSnippet.js';
+import EditableTitle from '../shared/EditableTitle.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
@@ -92,28 +94,33 @@ export default function FoundReportDetail() {
     load();
   }, [reportId]);
 
+  // Compares against the last-loaded/last-saved report, not just whether
+  // edit mode is open - entering edit mode without touching anything
+  // shouldn't trigger an "unsaved changes" prompt on the way back out.
+  const isDirty = editing && (newPhotos.length > 0 || JSON.stringify(fields) !== JSON.stringify(report));
+
   // Editing this form means scrolling past a lot of fields to reach Save -
   // losing that on an accidental tab close/refresh is a real, already-
   // reported way to lose real edits (e.g. after fixing a bad main photo).
   useEffect(() => {
-    if (!editing) return;
+    if (!isDirty) return;
     function handleBeforeUnload(e) {
       e.preventDefault();
       e.returnValue = '';
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [editing]);
+  }, [isDirty]);
 
   async function handleBackToHome() {
-    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+    if (isDirty && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
       return;
     }
     navigate('/');
   }
 
   async function handleBackInHistory() {
-    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+    if (isDirty && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
       return;
     }
     navigate(-1);
@@ -123,6 +130,15 @@ export default function FoundReportDetail() {
     const data = await getFoundReport(reportId);
     setReport(data);
     setFields(data);
+  }
+
+  // Quick rename from the pencil on the view header - saves just the
+  // title, without needing to open full edit mode. Updates both report and
+  // fields so a subsequent "עריכה" starts from the renamed value too.
+  async function handleQuickRename(newTitle) {
+    await updateFoundReport(reportId, { ...report, title: newTitle }, []);
+    setReport((prev) => ({ ...prev, title: newTitle }));
+    setFields((prev) => (prev ? { ...prev, title: newTitle } : prev));
   }
 
   function setField(key, value) {
@@ -219,9 +235,12 @@ export default function FoundReportDetail() {
           <MainPhoto photo={report.photos?.[0]} onView={setLightboxUrl} />
           <div className="mb-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">
-                {displayFoundReportName(report)}
-              </h1>
+              <EditableTitle
+                value={report.title}
+                displayText={displayFoundReportName(report)}
+                defaultDraft={shortSnippet(report.markings)}
+                onSave={handleQuickRename}
+              />
               <RecordStatusSelect
                 status={report.status || RECORD_STATUS.ACTIVE}
                 labels={FOUND_REPORT_STATUS_LABELS}
@@ -275,11 +294,11 @@ export default function FoundReportDetail() {
             onNewPhotosFirstChange={setNewPhotosFirst}
           />
           <FormSection title={labels.petDetailsSection}>
-            <Field label="מין" inline>
-              <span className="text-sm text-slate-600">{SPECIES_LABELS[report.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
-            </Field>
             <Field label={`${labels.nameLabel} (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)`}>
               <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
+            </Field>
+            <Field label="מין" inline>
+              <span className="text-sm text-slate-600">{SPECIES_LABELS[report.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
             </Field>
             <Field label={labels.conditionLabel} inline>
               <SelectField

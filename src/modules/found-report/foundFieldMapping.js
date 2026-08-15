@@ -1,4 +1,5 @@
 import { appendLine, appendDetail } from '../shared/textMerge.js';
+import { shortSnippet } from '../shared/textSnippet.js';
 import { SPECIES } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 
@@ -108,10 +109,11 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
 
 /**
  * A found report with no title (the common case for a bare screenshot with
- * no caption at all) shouldn't just read a generic fallback - one shared
- * helper instead of the same hardcoded fallback string repeated at every
- * place a report's title gets displayed.
+ * no caption at all) shouldn't just read a generic fallback when there's a
+ * perfectly good description to show instead - same reasoning and same
+ * snippet helper as displayLostCaseName, so an unnamed animal on either
+ * side gets the same kind of fallback.
  */
 export function displayFoundReportName(report) {
-  return report?.title || petLabels(report?.species).animal;
+  return report?.title || shortSnippet(report?.markings) || petLabels(report?.species).animal;
 }

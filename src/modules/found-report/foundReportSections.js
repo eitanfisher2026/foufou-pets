@@ -2,6 +2,7 @@ import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, CAT_CONDITIONS, SPECIES_LABE
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { petLabels } from '../shared/petLabels.js';
+import { displayFoundReportName } from './foundFieldMapping.js';
 
 /**
  * Builds the same [{ title, rows }] sections RecordDetailsDialog expects,
@@ -16,8 +17,8 @@ export function buildFoundReportSections(report) {
     {
       title: labels.petDetailsSection,
       rows: [
+        { label: 'שם', value: displayFoundReportName(report) },
         { label: 'מין', value: SPECIES_LABELS[report.species] },
-        { label: 'כותרת', value: report.title },
         { label: labels.conditionLabel, value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
         { label: 'צבע', value: report.color },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === report.ageClass)?.label },

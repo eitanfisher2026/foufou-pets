@@ -2,6 +2,7 @@ import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, SPECIES_LABELS, CLOSURE_REAS
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { petLabels } from '../shared/petLabels.js';
+import { displayLostCaseName } from './lostFieldMapping.js';
 
 /**
  * Builds the same [{ title, rows }] sections RecordDetailsDialog expects,
@@ -17,8 +18,8 @@ export function buildLostCaseSections(lostCase) {
     {
       title: labels.petDetailsSection,
       rows: [
+        { label: 'שם', value: displayLostCaseName(lostCase) },
         { label: 'מין', value: SPECIES_LABELS[lostCase.species] },
-        { label: 'שם', value: lostCase.name },
         { label: 'צבע', value: lostCase.color },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
         { label: 'קולר/רתמה', value: lostCase.hasCollar === true ? 'כן' : lostCase.hasCollar === false ? 'לא' : '' },

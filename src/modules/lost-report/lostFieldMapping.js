@@ -1,4 +1,5 @@
 import { appendLine, appendDetail } from '../shared/textMerge.js';
+import { shortSnippet } from '../shared/textSnippet.js';
 import { SPECIES } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 
@@ -118,19 +119,6 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
     microchipNumber: extracted.microchipNumber || prev.microchipNumber,
     aiCostUsd: (prev.aiCostUsd || 0) + (extracted._aiUsage?.estimatedCostUsd || 0),
   };
-}
-
-const MAX_FALLBACK_NAME_LENGTH = 30;
-
-// markings can be several lines long (one distinct mark per line) - only
-// the first line, trimmed to a title-sized snippet, is fit to stand in for
-// a name.
-function shortSnippet(text) {
-  if (!text) return '';
-  const firstLine = text.split('\n')[0].trim();
-  return firstLine.length > MAX_FALLBACK_NAME_LENGTH
-    ? firstLine.slice(0, MAX_FALLBACK_NAME_LENGTH).trim() + '…'
-    : firstLine;
 }
 
 /**

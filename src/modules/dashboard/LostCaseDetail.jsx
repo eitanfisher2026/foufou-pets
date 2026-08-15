@@ -29,6 +29,8 @@ import {
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { buildLostCaseSections } from '../lost-report/lostCaseSections.js';
+import { shortSnippet } from '../shared/textSnippet.js';
+import EditableTitle from '../shared/EditableTitle.jsx';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import { buildFoundReportSections } from '../found-report/foundReportSections.js';
 import {
@@ -141,28 +143,33 @@ export default function LostCaseDetail() {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
 
+  // Compares against the last-loaded/last-saved case, not just whether
+  // edit mode is open - entering edit mode without touching anything
+  // shouldn't trigger an "unsaved changes" prompt on the way back out.
+  const isDirty = editing && (newPhotos.length > 0 || JSON.stringify(fields) !== JSON.stringify(lostCase));
+
   // Editing this form means scrolling past a lot of fields to reach Save -
   // losing that on an accidental tab close/refresh is a real, already-
   // reported way to lose real edits (e.g. after fixing a bad main photo).
   useEffect(() => {
-    if (!editing) return;
+    if (!isDirty) return;
     function handleBeforeUnload(e) {
       e.preventDefault();
       e.returnValue = '';
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [editing]);
+  }, [isDirty]);
 
   async function handleBackToHome() {
-    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+    if (isDirty && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
       return;
     }
     navigate('/');
   }
 
   async function handleBackInHistory() {
-    if (editing && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
+    if (isDirty && !(await confirm('יש שינויים שלא נשמרו. לצאת בכל זאת?', { confirmLabel: 'לצאת בלי לשמור', danger: true }))) {
       return;
     }
     navigate(-1);
@@ -175,6 +182,15 @@ export default function LostCaseDetail() {
     const existingMatches = await getMatches(caseId);
     setMatches(existingMatches);
     await loadReportSnapshots(existingMatches);
+  }
+
+  // Quick rename from the pencil on the view header - saves just the name,
+  // without needing to open full edit mode. Updates both lostCase and
+  // fields so a subsequent "עריכה" starts from the renamed value too.
+  async function handleQuickRename(newName) {
+    await updateLostCase(caseId, { ...lostCase, name: newName }, []);
+    setLostCase((prev) => ({ ...prev, name: newName }));
+    setFields((prev) => (prev ? { ...prev, name: newName } : prev));
   }
 
   async function loadReportSnapshots(matchList) {
@@ -344,7 +360,12 @@ export default function LostCaseDetail() {
           <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
           <div className="mb-4">
             <div className="mb-1 flex flex-wrap items-center gap-2">
-              <h1 className="min-w-0 break-words text-xl font-bold text-slate-800">{displayLostCaseName(lostCase)}</h1>
+              <EditableTitle
+                value={lostCase.name}
+                displayText={displayLostCaseName(lostCase)}
+                defaultDraft={shortSnippet(lostCase.markings)}
+                onSave={handleQuickRename}
+              />
               <RecordStatusSelect
                 status={lostCase.status || RECORD_STATUS.ACTIVE}
                 labels={LOST_CASE_STATUS_LABELS}
@@ -415,11 +436,11 @@ export default function LostCaseDetail() {
             onNewPhotosFirstChange={setNewPhotosFirst}
           />
           <FormSection title={labels.petDetailsSection}>
-            <Field label="מין" inline>
-              <span className="text-sm text-slate-600">{SPECIES_LABELS[lostCase.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
-            </Field>
             <Field label={labels.nameLabel}>
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
+            </Field>
+            <Field label="מין" inline>
+              <span className="text-sm text-slate-600">{SPECIES_LABELS[lostCase.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
             </Field>
             <Field label="צבע" inline>
               <SelectField
