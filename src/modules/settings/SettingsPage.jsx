@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { backfillDisplayNames } from '../shared/displayNameBackfill.js';
+import Copyright from '../shared/Copyright.jsx';
 import { APP_VERSION } from '../../version.js';
 
 export default function SettingsPage() {
@@ -78,7 +79,8 @@ export default function SettingsPage() {
         )}
       </section>
 
-      <p className="text-center text-xs text-slate-300">{APP_VERSION}</p>
+      <p className="mb-1 text-center text-xs text-slate-300">{APP_VERSION}</p>
+      <Copyright />
     </div>
   );
 }

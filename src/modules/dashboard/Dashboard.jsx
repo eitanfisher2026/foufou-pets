@@ -9,6 +9,7 @@ import { listLostCases } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
+import Copyright from '../shared/Copyright.jsx';
 
 // A found report doesn't need its own eagerly-loaded browsing list on every
 // dashboard visit - matching already runs its own independent query against
@@ -114,6 +115,10 @@ export default function Dashboard() {
           ))}
         </ul>
       </section>
+
+      <div className="mt-8">
+        <Copyright />
+      </div>
     </div>
   );
 }
