@@ -19,6 +19,7 @@ export async function createFoundReport(fields, photoFiles, reporter) {
     species: fields.species || SPECIES.CAT,
     title: fields.title || '',
     color: fields.color || '',
+    pattern: fields.pattern || '',
     breed: fields.breed || '',
     size: fields.size || '',
     ageClass: fields.ageClass || '',
@@ -78,6 +79,7 @@ export async function updateFoundReport(reportId, fields, newPhotoFiles = []) {
     {
       title: fields.title || '',
       color: fields.color || '',
+      pattern: fields.pattern || '',
       breed: fields.breed || '',
       size: fields.size || '',
       ageClass: fields.ageClass || '',
