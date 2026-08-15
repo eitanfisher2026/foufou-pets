@@ -10,6 +10,7 @@ import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { petLabels } from '../shared/petLabels.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
+import BreedCheckDialog from '../shared/BreedCheckDialog.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { findDuplicatesBySourceUrlAnyType } from '../shared/duplicateCheckApi.js';
 import { useSmartIntake } from './useSmartIntake.js';
@@ -36,10 +37,14 @@ export default function SmartIntakeForm() {
     creating,
     cancelReading,
     setSourceUrl,
+    detectedSpecies,
     duplicateMatches,
     duplicateRecordType,
     continueCreateAnyway,
     cancelDuplicateCreate,
+    breedCheck,
+    saveBreedCheck,
+    skipBreedCheck,
     colorCheck,
     saveColorCheck,
     skipColorCheck,
@@ -180,14 +185,14 @@ export default function SmartIntakeForm() {
               onClick={() => createFromType(extracted, 'lost', files)}
               className="flex-1 rounded-xl bg-red-600 px-4 py-2 font-medium text-white"
             >
-              {petLabels(extracted.species).lostButton}
+              {petLabels(detectedSpecies).lostButton}
             </button>
             <button
               type="button"
               onClick={() => createFromType(extracted, 'found', files)}
               className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 font-medium text-white"
             >
-              {petLabels(extracted.species).foundButton}
+              {petLabels(detectedSpecies).foundButton}
             </button>
           </div>
         </div>
@@ -209,6 +214,10 @@ export default function SmartIntakeForm() {
           onContinue={() => setLinkDuplicateMatches(null)}
           onCancel={() => navigate('/')}
         />
+      )}
+
+      {breedCheck && (
+        <BreedCheckDialog breedOptions={breedCheck.breedOptions} onSave={saveBreedCheck} onSkip={skipBreedCheck} />
       )}
 
       {colorCheck && (

@@ -53,14 +53,29 @@ export const DOG_COLORS = [
 ];
 
 // Default/fallback list only - same "live editable list in Firestore"
-// pattern as colors (config/breedOptions, see breedOptionsApi.js). Cats
-// don't get an equivalent picklist - breed stays free text there (see
-// lostFieldMapping.js) since the overwhelming majority of street cats have
-// no identifiable breed. A dog is far more often purebred or a recognizable
-// mix, so breed is a genuinely useful identifying signal worth a real
-// picklist. Skewed toward breeds common in Israel; "אחר" is the fixed
-// catch-all, and the settings panel can extend the rest without a code
-// change.
+// pattern as colors (config/breedOptions, see breedOptionsApi.js). "אחר" is
+// the fixed catch-all, and the settings panel can extend the rest without a
+// code change. Both species get a real picklist now (a first "mixed/street"
+// entry covers the overwhelming default case for either), but they're kept
+// as two separate lists rather than one merged one: the two vocabularies
+// barely overlap, and the AI extraction schema enum-constrains each species
+// to only its own list.
+export const CAT_BREEDS = [
+  'מעורב / חתול רחוב',
+  'פרסי',
+  'מיין קון',
+  'בן-גל (בנגל)',
+  'סיאמי',
+  'בריטי לשיער קצר',
+  'ראגדול',
+  'ספינקס',
+  'אבסיני',
+  'נורווגי יער',
+  'אמריקן שורטהייר',
+  'אחר',
+];
+
+// Skewed toward breeds common in Israel.
 export const DOG_BREEDS = [
   'מעורב (לא ידוע)',
   'לברדור',
@@ -84,6 +99,13 @@ export const DOG_BREEDS = [
   'קוואליר קינג צ׳ארלס ספניאל',
   'אחר',
 ];
+
+// The "breed not identified" default a dog record gets - both from the AI
+// extraction (its breed enum always includes this as the safe fallback
+// choice) and as the value BreedCheckDialog nudges the user away from. Cats
+// don't need an equivalent constant - there's no post-creation breed nudge
+// for cats (see useSmartIntake.js).
+export const DEFAULT_DOG_BREED = DOG_BREEDS[0];
 
 // Shared between cats and dogs, and between lost cases and found reports -
 // all four describe the same animal using the same vocabulary, which also

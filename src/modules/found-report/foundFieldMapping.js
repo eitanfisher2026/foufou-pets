@@ -65,14 +65,8 @@ export function mergeExtractedFoundFields(extracted, prev = EMPTY_FOUND_FIELDS) 
   markings = appendLine(markings, extracted.colorDescription);
   if (extracted.hasFluffyTail) markings = appendLine(markings, 'זנב שעיר/פלומתי במיוחד');
 
-  // See lostFieldMapping.js's mergeExtractedLostFields for the same
-  // species-merge reasoning - an already-confirmed species in `prev` wins
-  // over a fresh extraction guess.
-  const species = extracted.species === 'cat' || extracted.species === 'dog' ? extracted.species : prev.species;
-
   return {
     ...prev,
-    species,
     // Only falls back when the title is still blank - never overwrites a
     // title someone already typed. A found cat can still have a known name
     // (e.g. a post that names the cat, or a chip/tag the finder read) -

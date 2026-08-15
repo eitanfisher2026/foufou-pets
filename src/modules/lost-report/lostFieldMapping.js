@@ -80,18 +80,8 @@ export function mergeExtractedLostFields(extracted, prev = EMPTY_LOST_FIELDS) {
   markings = appendLine(markings, extracted.colorDescription);
   if (extracted.hasFluffyTail) markings = appendLine(markings, 'זנב שעיר/פלומתי במיוחד');
 
-  // Only overrides an already-picked species if the previous value was
-  // still the default 'cat' with no explicit user choice behind it yet -
-  // callers that already have a human-confirmed species (e.g. re-scanning
-  // an existing case) pass that in via `prev` and it wins over a fresh
-  // guess. See useSmartIntake.js/ShareTargetIntake.jsx for where a
-  // confident 'cat'/'dog' extraction skips the human species picker
-  // entirely.
-  const species = extracted.species === 'cat' || extracted.species === 'dog' ? extracted.species : prev.species;
-
   return {
     ...prev,
-    species,
     name: extracted.petName || prev.name,
     color: extracted.color || prev.color,
     breed: extracted.breed || prev.breed,

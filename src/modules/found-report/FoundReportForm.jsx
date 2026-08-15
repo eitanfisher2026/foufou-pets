@@ -14,13 +14,13 @@ import { extractFacebookUrl } from '../shared/facebookLink.js';
 import { base64ToFile } from '../shared/base64ToFile.js';
 import { fetchFacebookPreview } from '../screenshot-ingestion/fetchFacebookPreview.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
-import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
+import { useBreedOptions } from '../shared/useBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
 import { findDuplicatesBySourceUrl } from '../shared/duplicateCheckApi.js';
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
-import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS, SPECIES } from '../shared/collections.js';
+import { CAT_SIZES, CAT_FUR_TYPES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js';
 import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
 
@@ -36,7 +36,7 @@ export default function FoundReportForm() {
   const [fields, setFields] = useState(() => ({ ...EMPTY_FOUND_FIELDS, species: preferredSpecies }));
   const labels = petLabels(fields.species);
   const colorOptions = useColorOptions(fields.species);
-  const dogBreedOptions = useDogBreedOptions();
+  const breedOptions = useBreedOptions(fields.species);
   const [photos, setPhotos] = useState([]);
   const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
@@ -123,7 +123,7 @@ export default function FoundReportForm() {
   async function handleAnalyze() {
     if (screenshotFiles.length === 0) return;
     try {
-      const result = await read(screenshotFiles, postText);
+      const result = await read(screenshotFiles, postText, fields.species);
       setFields((prev) => mergeExtractedFoundFields(result, prev));
       setExtracted(true);
 
@@ -348,23 +348,14 @@ export default function FoundReportForm() {
         </Field>
 
         <Field label={labels.breedLabel} inline>
-          {fields.species === SPECIES.DOG ? (
-            <SelectField
-              className="w-36"
-              label="בחירת גזע"
-              placeholder="בחר/י גזע"
-              value={fields.breed}
-              onChange={(v) => setField('breed', v)}
-              options={dogBreedOptions}
-            />
-          ) : (
-            <input
-              className="input w-36"
-              value={fields.breed}
-              onChange={(e) => setField('breed', e.target.value)}
-              placeholder="אם ידוע"
-            />
-          )}
+          <SelectField
+            className="w-36"
+            label="בחירת גזע"
+            placeholder="בחר/י גזע"
+            value={fields.breed}
+            onChange={(v) => setField('breed', v)}
+            options={breedOptions}
+          />
         </Field>
 
         <Field label="משקל (ק״ג, אם ידוע)" inline>

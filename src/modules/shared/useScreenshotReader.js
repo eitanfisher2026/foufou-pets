@@ -15,12 +15,12 @@ export function useScreenshotReader() {
   const [error, setError] = useState('');
   const cancelledRef = useRef(false);
 
-  async function read(files, postText = '') {
+  async function read(files, postText = '', species) {
     setReading(true);
     setError('');
     cancelledRef.current = false;
     try {
-      const result = await readScreenshots(files, postText);
+      const result = await readScreenshots(files, postText, species);
       if (cancelledRef.current) throw new Error('cancelled');
       return result;
     } catch (err) {

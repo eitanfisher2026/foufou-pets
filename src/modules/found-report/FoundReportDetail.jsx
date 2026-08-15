@@ -20,7 +20,7 @@ import {
   SPECIES_LABELS,
 } from '../shared/collections.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
-import { useDogBreedOptions } from '../shared/useDogBreedOptions.js';
+import { useBreedOptions } from '../shared/useBreedOptions.js';
 import { petLabels } from '../shared/petLabels.js';
 import { displayFoundReportName } from './foundFieldMapping.js';
 import { shortSnippet } from '../shared/textSnippet.js';
@@ -87,7 +87,7 @@ export default function FoundReportDetail() {
   } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
   const colorOptions = useColorOptions(report?.species);
-  const dogBreedOptions = useDogBreedOptions();
+  const breedOptions = useBreedOptions(report?.species);
   const labels = petLabels(report?.species);
 
   useEffect(() => {
@@ -181,7 +181,7 @@ export default function FoundReportDetail() {
     if (files.length === 0) return;
     setNewPhotos((prev) => [...prev, ...files]);
     try {
-      const result = await extractFromPhotos(files);
+      const result = await extractFromPhotos(files, '', report.species);
       setPendingExtraction(result);
       // The AI call already happened and was billed - track its cost
       // regardless of whether the suggested fields end up applied.
@@ -371,23 +371,14 @@ export default function FoundReportDetail() {
               />
             </Field>
             <Field label={labels.breedLabel} inline>
-              {report.species === SPECIES.DOG ? (
-                <SelectField
-                  className="w-36"
-                  label="בחירת גזע"
-                  placeholder="בחר/י גזע"
-                  value={fields.breed || ''}
-                  onChange={(v) => setField('breed', v)}
-                  options={dogBreedOptions}
-                />
-              ) : (
-                <input
-                  className="input w-36"
-                  value={fields.breed || ''}
-                  onChange={(e) => setField('breed', e.target.value)}
-                  placeholder="אם ידוע"
-                />
-              )}
+              <SelectField
+                className="w-36"
+                label="בחירת גזע"
+                placeholder="בחר/י גזע"
+                value={fields.breed || ''}
+                onChange={(v) => setField('breed', v)}
+                options={breedOptions}
+              />
             </Field>
             <Field label="משקל (ק״ג, אם ידוע)" inline>
               <input

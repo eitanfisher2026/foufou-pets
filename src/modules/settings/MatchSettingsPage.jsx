@@ -9,8 +9,8 @@ import {
   CONFIDENCE_COLOR_PALETTE,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
-import { getDogBreedOptions, saveDogBreedOptions } from '../shared/breedOptionsApi.js';
-import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, DOG_BREEDS } from '../shared/collections.js';
+import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
+import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, CAT_BREEDS, DOG_BREEDS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import SelectField from '../shared/SelectField.jsx';
@@ -25,18 +25,25 @@ const OTHER = 'אחר';
 // from (an enum in its extraction schema) belong in this list - most of
 // this panel (weights, comparison method, disqualifying, color-similarity
 // groups) is pure scoring configuration the AI never needs to know about.
-// Breed isn't here: the AI's breed field is free text, not a picklist, so
-// there's nothing to drift out of sync with.
+// Breed is here too now: both species' breed fields are real AI-enum
+// picklists (see functions/index.js), not free text.
 const AI_KNOWN_COLORS = {
   [SPECIES.CAT]: new Set(CAT_COLORS.filter((c) => c !== OTHER)),
   [SPECIES.DOG]: new Set(DOG_COLORS.filter((c) => c !== OTHER)),
 };
+const AI_KNOWN_BREEDS = {
+  [SPECIES.CAT]: new Set(CAT_BREEDS.filter((b) => b !== OTHER)),
+  [SPECIES.DOG]: new Set(DOG_BREEDS.filter((b) => b !== OTHER)),
+};
 
-function getAiSyncIssues(species, colorOptions) {
-  const known = AI_KNOWN_COLORS[species];
+function getAiSyncIssues(species, colorOptions, breedOptions) {
+  const knownColors = AI_KNOWN_COLORS[species];
+  const knownBreeds = AI_KNOWN_BREEDS[species];
   const issues = [];
-  const colorsInSync = colorOptions.length === known.size && colorOptions.every((c) => known.has(c));
+  const colorsInSync = colorOptions.length === knownColors.size && colorOptions.every((c) => knownColors.has(c));
   if (!colorsInSync) issues.push(`רשימת הצבעים (${SPECIES_LABELS[species]})`);
+  const breedsInSync = breedOptions.length === knownBreeds.size && breedOptions.every((b) => knownBreeds.has(b));
+  if (!breedsInSync) issues.push(`רשימת הגזעים (${SPECIES_LABELS[species]})`);
   return issues;
 }
 
@@ -59,21 +66,25 @@ export default function MatchSettingsPage() {
   // same principle as parameters/color-groups already following.
   const [catColorOptions, setCatColorOptions] = useState(null);
   const [dogColorOptions, setDogColorOptions] = useState(null);
+  const [catBreedOptions, setCatBreedOptions] = useState(null);
   const [dogBreedOptions, setDogBreedOptions] = useState(null);
-  const [colorSpecies, setColorSpecies] = useState(SPECIES.CAT);
+  const [listSpecies, setColorSpecies] = useState(SPECIES.CAT);
   const [colorInput, setColorInput] = useState('');
   const [breedInput, setBreedInput] = useState('');
   const [saveError, setSaveError] = useState('');
   const { confirm, dialog } = useConfirm();
 
-  const colorOptions = colorSpecies === SPECIES.DOG ? dogColorOptions : catColorOptions;
-  const setColorOptions = colorSpecies === SPECIES.DOG ? setDogColorOptions : setCatColorOptions;
+  const colorOptions = listSpecies === SPECIES.DOG ? dogColorOptions : catColorOptions;
+  const setColorOptions = listSpecies === SPECIES.DOG ? setDogColorOptions : setCatColorOptions;
+  const breedOptions = listSpecies === SPECIES.DOG ? dogBreedOptions : catBreedOptions;
+  const setBreedOptions = listSpecies === SPECIES.DOG ? setDogBreedOptions : setCatBreedOptions;
 
   useEffect(() => {
     getMatchConfig().then(setConfig);
     getColorOptions(SPECIES.CAT).then((colors) => setCatColorOptions(colors.filter((c) => c !== OTHER)));
     getColorOptions(SPECIES.DOG).then((colors) => setDogColorOptions(colors.filter((c) => c !== OTHER)));
-    getDogBreedOptions().then((breeds) => setDogBreedOptions(breeds.filter((b) => b !== OTHER)));
+    getBreedOptions(SPECIES.CAT).then((breeds) => setCatBreedOptions(breeds.filter((b) => b !== OTHER)));
+    getBreedOptions(SPECIES.DOG).then((breeds) => setDogBreedOptions(breeds.filter((b) => b !== OTHER)));
   }, []);
 
   function addColorOption() {
@@ -94,13 +105,13 @@ export default function MatchSettingsPage() {
 
   function addBreedOption() {
     const value = breedInput.trim();
-    if (!value || dogBreedOptions.includes(value)) return;
-    setDogBreedOptions((prev) => [...prev, value]);
+    if (!value || breedOptions.includes(value)) return;
+    setBreedOptions((prev) => [...prev, value]);
     setBreedInput('');
   }
 
   function removeBreedOption(breed) {
-    setDogBreedOptions((prev) => prev.filter((b) => b !== breed));
+    setBreedOptions((prev) => prev.filter((b) => b !== breed));
   }
 
   function updateParam(index, patch) {
@@ -167,7 +178,8 @@ export default function MatchSettingsPage() {
         saveMatchConfig(config),
         saveColorOptions(SPECIES.CAT, catColorOptions),
         saveColorOptions(SPECIES.DOG, dogColorOptions),
-        saveDogBreedOptions(dogBreedOptions),
+        saveBreedOptions(SPECIES.CAT, catBreedOptions),
+        saveBreedOptions(SPECIES.DOG, dogBreedOptions),
       ]);
       setSavedNotice(true);
       setTimeout(() => setSavedNotice(false), 2500);
@@ -188,29 +200,32 @@ export default function MatchSettingsPage() {
       { confirmLabel: 'איפוס' }
     );
     if (!ok) return;
-    const catDefaults = CAT_COLORS.filter((c) => c !== OTHER);
-    const dogDefaults = DOG_COLORS.filter((c) => c !== OTHER);
-    const breedDefaults = DOG_BREEDS.filter((b) => b !== OTHER);
+    const catColorDefaults = CAT_COLORS.filter((c) => c !== OTHER);
+    const dogColorDefaults = DOG_COLORS.filter((c) => c !== OTHER);
+    const catBreedDefaults = CAT_BREEDS.filter((b) => b !== OTHER);
+    const dogBreedDefaults = DOG_BREEDS.filter((b) => b !== OTHER);
     const [defaults] = await Promise.all([
       resetMatchConfig(),
-      saveColorOptions(SPECIES.CAT, catDefaults),
-      saveColorOptions(SPECIES.DOG, dogDefaults),
-      saveDogBreedOptions(breedDefaults),
+      saveColorOptions(SPECIES.CAT, catColorDefaults),
+      saveColorOptions(SPECIES.DOG, dogColorDefaults),
+      saveBreedOptions(SPECIES.CAT, catBreedDefaults),
+      saveBreedOptions(SPECIES.DOG, dogBreedDefaults),
     ]);
     setConfig(defaults);
-    setCatColorOptions(catDefaults);
-    setDogColorOptions(dogDefaults);
-    setDogBreedOptions(breedDefaults);
+    setCatColorOptions(catColorDefaults);
+    setDogColorOptions(dogColorDefaults);
+    setCatBreedOptions(catBreedDefaults);
+    setDogBreedOptions(dogBreedDefaults);
   }
 
-  if (!config || !catColorOptions || !dogColorOptions || !dogBreedOptions) {
+  if (!config || !catColorOptions || !dogColorOptions || !catBreedOptions || !dogBreedOptions) {
     return <p className="p-4 text-slate-500">טוען...</p>;
   }
 
   const enabledWeightSum = config.parameters.filter((p) => p.enabled).reduce((sum, p) => sum + Number(p.weight || 0), 0);
   const aiSyncIssues = [
-    ...getAiSyncIssues(SPECIES.CAT, catColorOptions),
-    ...getAiSyncIssues(SPECIES.DOG, dogColorOptions),
+    ...getAiSyncIssues(SPECIES.CAT, catColorOptions, catBreedOptions),
+    ...getAiSyncIssues(SPECIES.DOG, dogColorOptions, dogBreedOptions),
   ];
 
   return (
@@ -277,7 +292,7 @@ export default function MatchSettingsPage() {
             type="button"
             onClick={() => setColorSpecies(s)}
             className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium ${
-              colorSpecies === s ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 text-slate-600'
+              listSpecies === s ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 text-slate-600'
             }`}
           >
             {SPECIES_LABELS[s]}
@@ -366,14 +381,29 @@ export default function MatchSettingsPage() {
         + הוספת קבוצת צבעים
       </button>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת גזעי הכלבים האפשריים</h2>
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת הגזעים האפשריים</h2>
       <p className="mb-3 text-sm text-slate-500">
-        אלו האפשרויות שמופיעות בתפריט "גזע" בטפסי כלב. חתולים לא מקבלים רשימה כזו - גזע חתול נשאר טקסט חופשי, כי
-        רוב חתולי הרחוב הם מעורבים ללא גזע מזוהה. "אחר" תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
+        אלו האפשרויות שמופיעות בתפריט "גזע" בטפסי הדיווח, וגם מה שה-AI מתבקש לבחור מתוכן כשהוא קורא צילום מסך. הרשומה
+        הראשונה בכל רשימה (למשל "מעורב / חתול רחוב") היא ברירת המחדל לחיה ללא גזע מזוהה. "אחר" תמיד קיים כברירת מחדל
+        קבועה ולא ניתן להסרה. לחתולים וכלבים יש רשימות נפרדות.
       </p>
+      <div className="mb-3 flex gap-2">
+        {Object.values(SPECIES).map((s) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => setColorSpecies(s)}
+            className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium ${
+              listSpecies === s ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 text-slate-600'
+            }`}
+          >
+            {SPECIES_LABELS[s]}
+          </button>
+        ))}
+      </div>
       <div className="rounded-xl border border-slate-200 bg-white p-3">
         <div className="mb-2 flex flex-wrap gap-2">
-          {dogBreedOptions.map((breed) => (
+          {breedOptions.map((breed) => (
             <span key={breed} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
               {breed}
               <button
