@@ -59,9 +59,9 @@ export default function Dashboard() {
 
   return (
     <div className="p-4">
-      <header className="relative mb-6 flex h-9 items-center justify-center">
+      <header className="mb-6 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <h1 className="whitespace-nowrap text-xl font-bold text-slate-800">חיות אבודות</h1>
+          <h1 className="whitespace-nowrap text-xl font-bold text-slate-800">איתור חיות מחמד</h1>
           <button
             type="button"
             onClick={() => setShowHelp(true)}
@@ -71,9 +71,7 @@ export default function Dashboard() {
             ℹ️
           </button>
         </div>
-        <div className="absolute inset-y-0 left-0 flex items-center">
-          <ProfileMenu />
-        </div>
+        <ProfileMenu />
       </header>
 
       <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} />
