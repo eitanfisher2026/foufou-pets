@@ -87,6 +87,7 @@ export function buildFoundReportSections(report) {
       title: 'פרטי רשומה',
       startClosed: true,
       rows: [
+        { label: 'מספר רשומה', value: report.recordNumber, dir: 'ltr' },
         // No reportedByUid fallback - a raw account ID means nothing to a
         // person reading this; if the name/email snapshot is missing (see
         // createFoundReport), better to just hide the row than show a

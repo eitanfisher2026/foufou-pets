@@ -99,6 +99,7 @@ export function buildLostCaseSections(lostCase) {
       title: 'פרטי רשומה',
       startClosed: true,
       rows: [
+        { label: 'מספר רשומה', value: lostCase.recordNumber, dir: 'ltr' },
         // No ownerId fallback - a raw account ID means nothing to a person
         // reading this; if the name/email snapshot is missing (see
         // createLostCase), better to just hide the row than show a

@@ -3,6 +3,7 @@ import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import { COLLECTIONS, RECORD_STATUS, SPECIES } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
+import { nextRecordNumber } from '../shared/recordNumberApi.js';
 
 /**
  * Creates a found/seen-cat report. Keeps the uploader's identity
@@ -15,8 +16,11 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
  * read access to another person's user profile doc.
  */
 export async function createFoundReport(fields, photoFiles, reporter) {
+  const species = fields.species || SPECIES.CAT;
+  const recordNumber = await nextRecordNumber('found', species);
   const reportRef = await addDoc(collection(db, COLLECTIONS.FOUND_REPORTS), {
-    species: fields.species || SPECIES.CAT,
+    recordNumber,
+    species,
     title: fields.title || '',
     color: fields.color || '',
     pattern: fields.pattern || '',

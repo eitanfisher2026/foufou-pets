@@ -3,6 +3,7 @@ import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
 import { COLLECTIONS, RECORD_STATUS, SPECIES } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
+import { nextRecordNumber } from '../shared/recordNumberApi.js';
 
 /**
  * Creates a lost-cat case: writes the Firestore doc first (to get an id for
@@ -12,8 +13,11 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
  * needing read access to another person's user profile doc.
  */
 export async function createLostCase(fields, photoFiles, owner) {
+  const species = fields.species || SPECIES.CAT;
+  const recordNumber = await nextRecordNumber('lost', species);
   const caseRef = await addDoc(collection(db, COLLECTIONS.LOST_CASES), {
-    species: fields.species || SPECIES.CAT,
+    recordNumber,
+    species,
     name: fields.name || '',
     color: fields.color || '',
     pattern: fields.pattern || '',

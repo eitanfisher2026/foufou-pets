@@ -86,6 +86,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Sequential per-type record numbers (LC/LD/FC/FD, see
+    // recordNumberApi.js) - a shared counter incremented by whoever creates
+    // a lost case or found report, which can be any signed-in user, not
+    // just an admin, so this can't reuse the admin-only /config rule above.
+    match /recordCounters/{type} {
+      allow read, write: if signedIn();
+    }
+
     // Feedback conversation threads (see feedback/feedbackApi.js) - a
     // regular user can only see/reply to their own threads; an admin can
     // see and reply to everyone's, since that's the whole point of an
