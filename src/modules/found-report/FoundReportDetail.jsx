@@ -685,20 +685,14 @@ export default function FoundReportDetail() {
         <>
           <button
             onClick={handleCheckMatches}
-            disabled={checking || (matches.length > 0 && newMatches.length === 0)}
+            disabled={checking || matches.length > 0}
             className={
-              !checking && matches.length > 0 && newMatches.length === 0
+              !checking && matches.length > 0
                 ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
                 : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
             }
           >
-            {checking
-              ? 'בודקים התאמות...'
-              : matches.length === 0
-                ? 'בדיקת התאמות מול תיקי חיפוש'
-                : newMatches.length > 0
-                  ? `בדיקת התאמה ל-${newMatches.length}`
-                  : `✓ ההתאמות נבדקו (${matches.length})`}
+            {checking ? 'בודקים התאמות...' : matches.length > 0 ? '✓ הבדיקה עדכנית' : 'בדיקת התאמות מול תיקי חיפוש'}
           </button>
           {matches.length > 0 && (
             <button
@@ -715,7 +709,8 @@ export default function FoundReportDetail() {
           {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-              הכי טובה: <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
+              {newMatches.length > 0 ? `${newMatches.length} חדשות לבדיקה · הכי טובה` : 'כל ההתאמות טופלו · הכי טובה'}
+              <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
             </p>
           )}
 
