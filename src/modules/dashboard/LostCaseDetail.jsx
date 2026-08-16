@@ -37,6 +37,7 @@ import { shortSnippet } from '../shared/textSnippet.js';
 import EditableTitle from '../shared/EditableTitle.jsx';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import { buildFoundReportSections } from '../found-report/foundReportSections.js';
+import { deleteFoundReport } from '../found-report/foundReportApi.js';
 import {
   checkMatchesForLostCase,
   checkSingleMatch,
@@ -295,6 +296,14 @@ export default function LostCaseDetail() {
   // time this fires, so there's nothing left to do on this page.
   function handleMatchResolved() {
     navigate('/');
+  }
+
+  // A found report deleted from one of its match cards here (e.g. a
+  // badly-loaded/corrupted record spotted while reviewing matches) is just
+  // gone - no need to reload the whole page, its match simply drops out of
+  // the list.
+  function handleFoundReportDeleted(foundReportId) {
+    setMatches((prev) => prev.filter((m) => m.foundReportId !== foundReportId));
   }
 
   async function handleRemoveExistingPhoto(photo) {
@@ -815,6 +824,9 @@ export default function LostCaseDetail() {
                   onRecheck={handleRecheckSingleMatch}
                   rechecking={recheckingId === m.foundReportId}
                   onResolved={handleMatchResolved}
+                  onDeleted={handleFoundReportDeleted}
+                  user={user}
+                  isEditorOrAdmin={isEditorOrAdmin}
                 />
               ))}
             </ul>
@@ -842,6 +854,9 @@ export default function LostCaseDetail() {
                       onRecheck={handleRecheckSingleMatch}
                       rechecking={recheckingId === m.foundReportId}
                       onResolved={handleMatchResolved}
+                      onDeleted={handleFoundReportDeleted}
+                      user={user}
+                      isEditorOrAdmin={isEditorOrAdmin}
                     />
                   ))}
                 </ul>
@@ -867,6 +882,9 @@ export default function LostCaseDetail() {
                       confidenceColors={confidenceColors}
                       caseId={caseId}
                       onResolved={handleMatchResolved}
+                      onDeleted={handleFoundReportDeleted}
+                      user={user}
+                      isEditorOrAdmin={isEditorOrAdmin}
                     />
                   ))}
                 </ul>
@@ -915,9 +933,34 @@ function MatchCard({
   onRecheck,
   rechecking,
   onResolved,
+  onDeleted,
+  user,
+  isEditorOrAdmin,
 }) {
   const [showCatDetails, setShowCatDetails] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // A regular user can only delete a found report they reported
+  // themselves; editors/admins can delete any of them - same rule
+  // FoundReportDetail.jsx applies when deleting a report from its own page.
+  const canManageReport = report && (isEditorOrAdmin || report.reportedByUid === user.uid);
+
+  async function handleDelete() {
+    const ok = await confirm(
+      `למחוק את הדיווח "${displayFoundReportName(report)}" לצמיתות? כל הפרטים, התמונות וההתאמות שלו יימחקו ולא ניתן יהיה לשחזר אותם.`,
+      { confirmLabel: 'מחיקת הדיווח' }
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteFoundReport(match.foundReportId, report.photos || []);
+      onDeleted?.(match.foundReportId);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
@@ -994,6 +1037,17 @@ function MatchCard({
         </Link>
       </div>
 
+      {canManageReport && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="mt-2 text-xs text-red-600 underline disabled:opacity-50"
+        >
+          {deleting ? 'מוחקים...' : 'מחיקת הדיווח (רשומה שגויה)'}
+        </button>
+      )}
+
       <button
         type="button"
         onClick={() => setShowNotify(true)}
@@ -1022,6 +1076,7 @@ function MatchCard({
           onResolved={onResolved}
         />
       )}
+      {confirmDialog}
     </li>
   );
 }
