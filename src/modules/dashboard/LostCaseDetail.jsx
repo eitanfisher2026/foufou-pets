@@ -233,14 +233,16 @@ export default function LostCaseDetail() {
 
   async function handleReset() {
     const ok = await confirm(
-      'לאפס את כל ההתאמות הקיימות עבור התיק הזה - כולל סטטוסים שנקבעו ידנית? כל הדיווחים יסומנו כחדשים ויהיה צריך לסרוק אותם שוב.',
-      { confirmLabel: 'איפוס', danger: true }
+      'לאפס את כל ההתאמות הקיימות עבור התיק הזה - כולל סטטוסים שנקבעו ידנית - ולסרוק הכל מחדש מיד?',
+      { confirmLabel: 'איפוס וסריקה מחדש', danger: true }
     );
     if (!ok) return;
     setChecking(true);
     try {
       await clearMatches(caseId);
+      await checkMatchesForLostCase(caseId);
       await load();
+      flashJustChecked();
     } finally {
       setChecking(false);
     }
@@ -786,7 +788,7 @@ export default function LostCaseDetail() {
           disabled={checking}
           className="mb-6 mt-2 w-full text-center text-xs text-slate-400 underline disabled:opacity-50"
         >
-          איפוס כל ההתאמות (כולל סטטוסים) - הכל יחזור להיות חדש
+          איפוס כל ההתאמות (כולל סטטוסים) וסריקה מחדש
         </button>
       )}
       {matches.length === 0 && <div className="mb-6" />}
