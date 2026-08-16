@@ -723,11 +723,14 @@ export default function FoundReportDetail() {
           <h2 className="mb-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-700">
             תיקי חיפוש תואמים אפשריים ({matches.length})
             {newMatches.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                {newMatches.length} ממתינות לבדיקה
-              </span>
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{newMatches.length} חדשות</span>
             )}
           </h2>
+          {newMatches.length > 0 && (
+            <p className="mb-2 text-xs text-slate-400">
+              כדי לסמן התאמה כטופלה, בחרו לה סטטוס ברשימה למטה - לחיצה על הכפתור למעלה רק מריצה שוב את הבדיקה מול המאגר.
+            </p>
+          )}
           {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
