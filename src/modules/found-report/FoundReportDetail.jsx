@@ -30,6 +30,7 @@ import { petLabels } from '../shared/petLabels.js';
 import { displayFoundReportName } from './foundFieldMapping.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { buildLostCaseSections } from '../lost-report/lostCaseSections.js';
+import { deleteLostCase } from '../lost-report/lostReportApi.js';
 import { shortSnippet } from '../shared/textSnippet.js';
 import EditableTitle from '../shared/EditableTitle.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
@@ -203,7 +204,7 @@ export default function FoundReportDetail() {
 
   async function handleReset() {
     const ok = await confirm(
-      'לאפס את כל ההתאמות הקיימות עבור הדיווח הזה - כולל סטטוסים שנקבעו ידנית? כל תיקי החיפוש יסומנו כחדשים ויהיה צריך לבדוק אותם שוב.',
+      'לאפס את כל ההתאמות הקיימות עבור הדיווח הזה - כולל סטטוסים שנקבעו ידנית? כל תיקי החיפוש יסומנו כחדשים ויהיה צריך לסרוק אותם שוב.',
       { confirmLabel: 'איפוס', danger: true }
     );
     if (!ok) return;
@@ -242,6 +243,13 @@ export default function FoundReportDetail() {
   // on this page.
   function handleMatchResolved() {
     navigate('/');
+  }
+
+  // A lost case deleted from one of its match cards here (e.g. a bad
+  // record that loaded wrong) is just gone - no need to reload the whole
+  // page, its match simply drops out of the list.
+  function handleLostCaseDeleted(lostCaseId) {
+    setMatches((prev) => prev.filter((m) => m.lostCase.id !== lostCaseId));
   }
 
   // Quick rename from the pencil on the view header - saves just the
@@ -722,12 +730,12 @@ export default function FoundReportDetail() {
             }
           >
             {checking
-              ? 'בודקים התאמות...'
+              ? 'סורקים התאמות...'
               : justChecked
-                ? '✓ הבדיקה הושלמה'
+                ? '✓ הסריקה הושלמה'
                 : newCandidateCount > 0
-                  ? `בדיקת ${newCandidateCount} חדשים`
-                  : 'אין חדשים לבדיקה'}
+                  ? `סריקת ${newCandidateCount} חדשים`
+                  : 'אין חדשים לסריקה'}
           </button>
           {matches.length > 0 && (
             <button
@@ -749,7 +757,7 @@ export default function FoundReportDetail() {
 
           {matches.length === 0 ? (
             <p className="text-sm text-slate-400">
-              {newCandidateCount > 0 ? 'לא בוצעה בדיקה עדיין - לחצו למעלה כדי לבדוק.' : 'אין תיקי חיפוש במאגר להשוואה.'}
+              {newCandidateCount > 0 ? 'לא בוצעה סריקה עדיין - לחצו למעלה כדי לסרוק.' : 'אין תיקי חיפוש במאגר להשוואה.'}
             </p>
           ) : (
             <>
@@ -767,6 +775,9 @@ export default function FoundReportDetail() {
                       onRecheck={handleRecheckSingleMatch}
                       rechecking={recheckingId === m.lostCase.id}
                       onResolved={handleMatchResolved}
+                      onDeleted={handleLostCaseDeleted}
+                      user={user}
+                      isEditorOrAdmin={isEditorOrAdmin}
                     />
                   ))}
                 </ul>
@@ -792,6 +803,9 @@ export default function FoundReportDetail() {
                           onRecheck={handleRecheckSingleMatch}
                           rechecking={recheckingId === m.lostCase.id}
                           onResolved={handleMatchResolved}
+                          onDeleted={handleLostCaseDeleted}
+                          user={user}
+                          isEditorOrAdmin={isEditorOrAdmin}
                         />
                       ))}
                     </ul>
@@ -815,6 +829,9 @@ export default function FoundReportDetail() {
                           onViewPhoto={setLightboxUrl}
                           confidenceColors={confidenceColors}
                           onResolved={handleMatchResolved}
+                          onDeleted={handleLostCaseDeleted}
+                          user={user}
+                          isEditorOrAdmin={isEditorOrAdmin}
                         />
                       ))}
                     </ul>
@@ -853,10 +870,44 @@ export default function FoundReportDetail() {
 // whose it might be. The message they'd send needs to be addressed to
 // them and describe the LOST pet + its owner's contact info, not the other
 // way around (see buildNotifyFinderMessage in notifyMessage.js).
-function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, onRecheck, rechecking, onResolved }) {
+function ReverseMatchCard({
+  match,
+  report,
+  onStatusChange,
+  onViewPhoto,
+  confidenceColors,
+  onRecheck,
+  rechecking,
+  onResolved,
+  onDeleted,
+  user,
+  isEditorOrAdmin,
+}) {
   const { lostCase } = match;
   const [showCaseDetails, setShowCaseDetails] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // A regular user can only delete a lost case they created themselves;
+  // editors/admins can delete any of them - same rule LostCaseDetail.jsx
+  // applies when deleting a case from its own page.
+  const canManageLostCase = isEditorOrAdmin || lostCase.ownerId === user.uid;
+
+  async function handleDelete() {
+    const ok = await confirm(
+      `למחוק את תיק החיפוש "${displayLostCaseName(lostCase)}" לצמיתות? כל הפרטים, התמונות וההתאמות שלו יימחקו ולא ניתן יהיה לשחזר אותם.`,
+      { confirmLabel: 'מחיקת התיק' }
+    );
+    if (!ok) return;
+    setDeleting(true);
+    try {
+      await deleteLostCase(lostCase.id, lostCase.photos || []);
+      onDeleted?.(lostCase.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
@@ -871,7 +922,7 @@ function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confiden
             disabled={rechecking}
             className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
           >
-            {rechecking ? 'מרענן...' : 'רענן בדיקה'}
+            {rechecking ? 'סורק מחדש...' : 'סריקה חוזרת'}
           </button>
         )}
       </div>
@@ -927,6 +978,17 @@ function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confiden
         </Link>
       </div>
 
+      {canManageLostCase && (
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={deleting}
+          className="mt-2 text-xs text-red-600 underline disabled:opacity-50"
+        >
+          {deleting ? 'מוחקים...' : 'מחיקת תיק החיפוש (רשומה שגויה)'}
+        </button>
+      )}
+
       <button
         type="button"
         onClick={() => setShowNotify(true)}
@@ -956,6 +1018,7 @@ function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confiden
           onResolved={onResolved}
         />
       )}
+      {confirmDialog}
     </li>
   );
 }

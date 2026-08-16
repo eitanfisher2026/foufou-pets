@@ -233,7 +233,7 @@ export default function LostCaseDetail() {
 
   async function handleReset() {
     const ok = await confirm(
-      'לאפס את כל ההתאמות הקיימות עבור התיק הזה - כולל סטטוסים שנקבעו ידנית? כל הדיווחים יסומנו כחדשים ויהיה צריך לבדוק אותם שוב.',
+      'לאפס את כל ההתאמות הקיימות עבור התיק הזה - כולל סטטוסים שנקבעו ידנית? כל הדיווחים יסומנו כחדשים ויהיה צריך לסרוק אותם שוב.',
       { confirmLabel: 'איפוס', danger: true }
     );
     if (!ok) return;
@@ -768,12 +768,12 @@ export default function LostCaseDetail() {
         }
       >
         {checking
-          ? 'בודקים התאמות...'
+          ? 'סורקים התאמות...'
           : justChecked
-            ? '✓ הבדיקה הושלמה'
+            ? '✓ הסריקה הושלמה'
             : newCandidateCount > 0
-              ? `בדיקת ${newCandidateCount} חדשות`
-              : 'אין חדשות לבדיקה'}
+              ? `סריקת ${newCandidateCount} חדשות`
+              : 'אין חדשות לסריקה'}
       </button>
       {matches.length > 0 && (
         <button
@@ -795,7 +795,7 @@ export default function LostCaseDetail() {
 
       {matches.length === 0 ? (
         <p className="text-sm text-slate-400">
-          {newCandidateCount > 0 ? 'לא בוצעה בדיקה עדיין - לחצו למעלה כדי לבדוק.' : 'אין דיווחים במאגר להשוואה.'}
+          {newCandidateCount > 0 ? 'לא בוצעה סריקה עדיין - לחצו למעלה כדי לסרוק.' : 'אין דיווחים במאגר להשוואה.'}
         </p>
       ) : (
         <>
@@ -931,7 +931,7 @@ function MatchCard({
           disabled={rechecking}
           className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
         >
-          {rechecking ? 'מרענן...' : 'רענן בדיקה'}
+          {rechecking ? 'סורק מחדש...' : 'סריקה חוזרת'}
         </button>
       </div>
       <div className="mb-2 flex justify-end">
