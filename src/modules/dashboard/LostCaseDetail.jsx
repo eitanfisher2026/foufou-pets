@@ -53,6 +53,7 @@ import FormSection from '../shared/FormSection.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
+import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
@@ -772,6 +773,7 @@ export default function LostCaseDetail() {
               key={m.foundReportId}
               match={m}
               report={reportsById[m.foundReportId]}
+              lostCase={lostCase}
               onStatusChange={handleStatusChange}
               onViewPhoto={setLightboxUrl}
               confidenceColors={confidenceColors}
@@ -797,6 +799,7 @@ export default function LostCaseDetail() {
                   key={m.foundReportId}
                   match={m}
                   report={reportsById[m.foundReportId]}
+                  lostCase={lostCase}
                   onStatusChange={handleStatusChange}
                   onViewPhoto={setLightboxUrl}
                   confidenceColors={confidenceColors}
@@ -836,8 +839,9 @@ export default function LostCaseDetail() {
   );
 }
 
-function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, caseId, onRecheck, rechecking }) {
+function MatchCard({ match, report, lostCase, onStatusChange, onViewPhoto, confidenceColors, caseId, onRecheck, rechecking }) {
   const [showCatDetails, setShowCatDetails] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
 
   return (
     <li className="rounded-xl border border-slate-200 bg-white p-4">
@@ -914,6 +918,14 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
         </Link>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setShowNotify(true)}
+        className="mt-2 w-full rounded-lg bg-emerald-50 py-2 text-sm font-medium text-emerald-700"
+      >
+        📱 עדכון הבעלים בוואטסאפ
+      </button>
+
       {showCatDetails && report && (
         <RecordDetailsDialog
           title={displayFoundReportName(report)}
@@ -921,6 +933,15 @@ function MatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColor
           photos={report.photos}
           onViewPhoto={onViewPhoto}
           sections={buildFoundReportSections(report)}
+        />
+      )}
+
+      {showNotify && (
+        <NotifyOwnerDialog
+          lostCase={lostCase}
+          report={report}
+          onClose={() => setShowNotify(false)}
+          onSent={() => onStatusChange(match.foundReportId, REPORT_STATUS.CONTACTED)}
         />
       )}
     </li>
