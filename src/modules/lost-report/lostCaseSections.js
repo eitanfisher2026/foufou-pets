@@ -85,6 +85,8 @@ export function buildLostCaseSections(lostCase) {
     },
     {
       title: 'מקור מידע',
+      startClosed: true,
+      keepIfEmpty: true,
       rows: [
         { label: 'מקור המידע (קבוצה)', value: lostCase.sourceGroupName },
         { label: 'מי כתב את הפוסט', value: lostCase.originalPosterName },

@@ -111,6 +111,14 @@ export default function SearchDialog({ species, initialCriteria, onSearch, onClo
                         value={criteria[field.key] || ''}
                         onChange={(e) => setField(field.key, e.target.value)}
                       />
+                    ) : field.type === 'date' ? (
+                      <input
+                        type="date"
+                        dir="ltr"
+                        className="input w-full max-w-[9rem]"
+                        value={criteria[field.key] || ''}
+                        onChange={(e) => setField(field.key, e.target.value)}
+                      />
                     ) : (
                       <SelectField
                         className="w-full max-w-[9rem]"

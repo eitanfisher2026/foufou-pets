@@ -7,10 +7,10 @@ import { SPECIES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js
  * dialog is one render loop over this list rather than hand-written JSX
  * per field. Deliberately NOT the same field set as lostCaseSections.js/
  * foundReportSections.js (the "פרטים מלאים" view) - those include plenty
- * that make no sense to filter by (creation date, source links, who
- * created it), and some rows there are pre-formatted for reading rather
- * than raw filterable values. This is a separate, smaller, curated list of
- * the fields actually worth searching on, using the exact same live option
+ * that make no sense to filter by (source links, exact microchip lookups),
+ * and some rows there are pre-formatted for reading rather than raw
+ * filterable values. This is a separate, smaller, curated list of the
+ * fields actually worth searching on, using the exact same live option
  * sources the create/edit forms already use (colors/breeds/patterns), so a
  * color someone adds in settings is searchable immediately too.
  *
@@ -19,10 +19,12 @@ import { SPECIES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js
  * come from hooks and can't be listed as plain data here). `options` is
  * for the static lists that don't depend on live config. `type: 'text'`
  * fields do a substring match; `type: 'boolean'` is a tri-state
- * yes/no/either select; anything else is an exact match against a picked
- * option value. `recordTypeOnly` hides a field entirely when it doesn't
- * apply to the record type currently being searched (e.g. "מצב" only
- * makes sense for found reports).
+ * yes/no/either select; `type: 'date'` compares against the record's own
+ * createdAt (createdFrom/createdTo bound an inclusive range); anything
+ * else is an exact match against a picked option value. `recordTypeOnly`
+ * hides a field entirely when it doesn't apply to the record type
+ * currently being searched (e.g. "מצב" only makes sense for found
+ * reports).
  */
 export const SEARCH_FIELDS = [
   { key: 'color', label: 'צבע', optionsKey: 'colorOptions', group: 'traits' },
@@ -41,7 +43,9 @@ export const SEARCH_FIELDS = [
   { key: 'contactName', label: 'שם איש קשר', type: 'text', group: 'contact' },
   { key: 'contactPhone', label: 'טלפון', type: 'text', group: 'contact' },
   { key: 'recordNumber', label: 'מספר רשומה', type: 'text', group: 'identifiers' },
-  { key: 'microchipNumber', label: 'מספר שבב', type: 'text', group: 'identifiers' },
+  { key: 'createdBy', label: 'נוצר על ידי (שם חלקי)', type: 'text', group: 'identifiers' },
+  { key: 'createdFrom', label: 'נוצר מתאריך', type: 'date', group: 'identifiers' },
+  { key: 'createdTo', label: 'נוצר עד תאריך', type: 'date', group: 'identifiers' },
 ];
 
 export const SEARCH_FIELD_GROUPS = [
@@ -74,6 +78,11 @@ export function matchesSearch(record, criteria) {
       if (field.key === 'keyword') {
         const haystack = normalize(`${record.name || ''} ${record.title || ''} ${record.markings || ''} ${record.notes || ''}`);
         if (!haystack.includes(normalize(value))) return false;
+      } else if (field.key === 'createdBy') {
+        // "who created it" is named differently on each record type
+        // (lost cases have an owner, found reports have a reporter).
+        const haystack = normalize(`${record.ownerName || ''} ${record.reporterName || ''}`);
+        if (!haystack.includes(normalize(value))) return false;
       } else if (!normalize(record[field.key]).includes(normalize(value))) {
         return false;
       }
@@ -82,6 +91,14 @@ export function matchesSearch(record, criteria) {
 
     if (field.type === 'boolean') {
       if (Boolean(record[field.key]) !== (value === 'yes')) return false;
+      continue;
+    }
+
+    if (field.type === 'date') {
+      if (!record.createdAt) return false;
+      const created = record.createdAt.toDate ? record.createdAt.toDate() : new Date(record.createdAt);
+      if (field.key === 'createdFrom' && created < new Date(value)) return false;
+      if (field.key === 'createdTo' && created > new Date(`${value}T23:59:59.999`)) return false;
       continue;
     }
 

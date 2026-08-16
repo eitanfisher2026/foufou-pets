@@ -73,6 +73,8 @@ export function buildFoundReportSections(report) {
     },
     {
       title: 'מקור מידע',
+      startClosed: true,
+      keepIfEmpty: true,
       rows: [
         { label: 'מקור המידע (קבוצה)', value: report.sourceGroupName },
         { label: 'מי כתב את הפוסט', value: report.originalPosterName },
