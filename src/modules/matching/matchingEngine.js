@@ -49,12 +49,15 @@ export const DEFAULT_BREED_GROUPS = {
 
 // "מעורב/חתול רחוב" and "מעורב (לא ידוע)" are what a cat/dog record gets
 // when no breed was identified (see DEFAULT_CAT_BREED/DEFAULT_DOG_BREED in
-// collections.js) - not a real breed identification, so a pairing where
-// either side has it can't meaningfully agree OR disagree on breed, same
-// reasoning as "אחר" being excluded from color comparison below.
-const EXCLUDED_BREEDS_BY_SPECIES = {
-  [SPECIES.CAT]: [DEFAULT_CAT_BREED, 'אחר'],
-  [SPECIES.DOG]: [DEFAULT_DOG_BREED, 'אחר'],
+// collections.js) - only skipped as uninformative when BOTH sides have it
+// (neither side actually claims a breed, so there's nothing to compare).
+// The moment either side names a real, specific breed, the comparison is
+// live: it only agrees with that exact breed (or a grouped one) - even a
+// "מעורב" on the other side counts as a real disagreement then, not a free
+// pass. Same shape as compareExactSkipDefault, just species-keyed.
+const DEFAULT_BREED_BY_SPECIES = {
+  [SPECIES.CAT]: DEFAULT_CAT_BREED,
+  [SPECIES.DOG]: DEFAULT_DOG_BREED,
 };
 
 // A raw "45/100" or "100%" reads as false precision - two cats that don't
@@ -152,17 +155,18 @@ function compareColor(a, b, ctx) {
   return { ratio: 0 };
 }
 
-// Same shape and reasoning as compareColor: exact match scores full, two
-// breeds placed in the same configured group for this pair's species
-// (config.breedGroups) score partial credit for being easy to mix up in a
-// photo, and any other disagreement scores a hard 0. "מעורב"/"אחר" on
-// either side means no real breed was identified, so that pairing is
-// skipped entirely rather than treated as a mismatch (see
-// EXCLUDED_BREEDS_BY_SPECIES above).
+// Skipped only when BOTH sides are the species' "no breed identified"
+// default (see DEFAULT_BREED_BY_SPECIES above) - neither side is actually
+// claiming a breed then, so there's nothing to compare. The moment either
+// side names a real breed, the comparison is live and strict: exact match
+// scores full, two breeds placed in the same configured group for this
+// pair's species (config.breedGroups) score partial credit for being easy
+// to mix up in a photo, and anything else - including the other side being
+// the generic "מעורב" default - scores a hard 0, same as a genuinely
+// different breed would.
 function compareBreed(a, b, ctx) {
   if (!a || !b) return null;
-  const excluded = ctx?.excludedBreeds || [];
-  if (excluded.includes(a) || excluded.includes(b)) return null;
+  if (a === ctx?.defaultBreed && b === ctx?.defaultBreed) return null;
   if (a === b) return { ratio: 1 };
   const groupsBySpecies = ctx?.breedGroups || DEFAULT_BREED_GROUPS;
   const groups = groupsBySpecies[ctx?.species] || [];
@@ -339,7 +343,8 @@ export const COMPARISON_TYPE_LABELS = {
   booleanTrait: 'סימן נדיר (קיים/לא קיים - "לא קיים" משני הצדדים לא נחשב כהתאמה)',
   exactSkipDefault: 'התאמה מדויקת, מלבד ערך ברירת מחדל (התאמה על הערך הנפוץ/הרגיל לא נחשבת)',
   colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
-  breedMatch: 'גזע (מתעלם מ"מעורב"/"אחר" (אין גזע מזוהה), סולח על זוגות גזעים שהוגדרו כדומים/קלים לבלבול)',
+  breedMatch:
+    'גזע (מדלג רק אם משני הצדדים "מעורב" (אין גזע מזוהה) - ברגע שצד אחד ציין גזע ספציפי, ההשוואה מדויקת וגם "מעורב" בצד השני נחשב אי-התאמה, מלבד זוגות גזעים שהוגדרו כדומים/קלים לבלבול)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
@@ -406,7 +411,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       lenient,
       colorGroups: config.colorGroups,
       breedGroups: config.breedGroups,
-      excludedBreeds: EXCLUDED_BREEDS_BY_SPECIES[species] || [],
+      defaultBreed: DEFAULT_BREED_BY_SPECIES[species],
       species,
       defaultValue: p.defaultValue,
     };
