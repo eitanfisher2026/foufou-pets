@@ -683,17 +683,27 @@ export default function FoundReportDetail() {
 
       {!showEditForm && (
         <>
-          <button
-            onClick={handleCheckMatches}
-            disabled={checking || matches.length > 0}
-            className={
-              !checking && matches.length > 0
-                ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
-                : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
-            }
-          >
-            {checking ? 'בודקים התאמות...' : matches.length > 0 ? '✓ הבדיקה עדכנית' : 'בדיקת התאמות מול תיקי חיפוש'}
-          </button>
+          {checking ? (
+            <div className="w-full rounded-xl bg-slate-800 px-4 py-3 text-center font-medium text-white">בודקים התאמות...</div>
+          ) : matches.length === 0 ? (
+            <button
+              onClick={handleCheckMatches}
+              className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white"
+            >
+              בדיקת התאמות מול תיקי חיפוש
+            </button>
+          ) : newMatches.length > 0 ? (
+            <a
+              href="#new-matches-list"
+              className="block w-full rounded-xl bg-amber-50 px-4 py-3 text-center font-medium text-amber-700"
+            >
+              🔶 {newMatches.length} התאמות חדשות ממתינות לבדיקה - למטה
+            </a>
+          ) : (
+            <div className="w-full rounded-xl bg-slate-100 px-4 py-3 text-center font-medium text-slate-400">
+              ✓ כל ההתאמות נבדקו
+            </div>
+          )}
           {matches.length > 0 && (
             <button
               onClick={handleClearAndRecheckMatches}
@@ -709,13 +719,12 @@ export default function FoundReportDetail() {
           {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
-              {newMatches.length > 0 ? `${newMatches.length} חדשות לבדיקה · הכי טובה` : 'כל ההתאמות טופלו · הכי טובה'}
-              <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
+              הכי טובה: <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
             </p>
           )}
 
           {newMatches.length > 0 ? (
-            <ul className="space-y-3">
+            <ul id="new-matches-list" className="space-y-3">
               {newMatches.map((m) => (
                 <ReverseMatchCard
                   key={m.lostCase.id}
