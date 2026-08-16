@@ -1,5 +1,8 @@
 import { useState } from 'react';
 import { buildNotifyMessage, buildWhatsAppUrl } from './notifyMessage.js';
+import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
+import { updateFoundReportStatus } from '../found-report/foundReportApi.js';
+import { RECORD_STATUS, CLOSURE_REASON } from './collections.js';
 
 /**
  * Lets whoever's looking at a match (the owner themselves, or a volunteer/
@@ -9,18 +12,45 @@ import { buildNotifyMessage, buildWhatsAppUrl } from './notifyMessage.js';
  * REPORT_STATUS.CONTACTED) - the dialog itself stays open afterward, since
  * opening WhatsApp happens in a separate tab/app and someone may still want
  * to copy the text or re-send.
+ *
+ * The "confirmed match" checkbox is a separate, optional step - closing
+ * both records out (lost case -> resolved/returned-to-owner, found report
+ * -> resolved) is a bigger, less reversible action than just sending a
+ * message, so it only fires when explicitly checked, never as a side
+ * effect of just opening WhatsApp or copying the text.
  */
-export default function NotifyOwnerDialog({ lostCase, report, onClose, onSent }) {
+export default function NotifyOwnerDialog({ lostCase, report, foundReportId, onClose, onSent, onResolved }) {
   const [phone, setPhone] = useState(lostCase?.contactPhone || '');
   const [message, setMessage] = useState(() => buildNotifyMessage(lostCase, report));
   const [copied, setCopied] = useState(false);
   const [sent, setSent] = useState(false);
+  const [markResolved, setMarkResolved] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [resolved, setResolved] = useState(false);
 
-  function handleSend() {
+  async function handleSend() {
     window.open(buildWhatsAppUrl(phone, message), '_blank', 'noopener,noreferrer');
     if (!sent) {
       setSent(true);
       onSent?.();
+    }
+    if (markResolved && !resolved) {
+      setResolving(true);
+      try {
+        await Promise.all([
+          updateLostCaseClosure(lostCase.id, RECORD_STATUS.RESOLVED, {
+            closureDate: new Date().toISOString().slice(0, 10),
+            closureReason: CLOSURE_REASON.RETURNED_TO_OWNER,
+            closedBy: '',
+            closingComment: 'סומן כהתאמה שנמצאה דרך התראת וואטסאפ',
+          }),
+          updateFoundReportStatus(foundReportId, RECORD_STATUS.RESOLVED),
+        ]);
+        setResolved(true);
+        onResolved?.();
+      } finally {
+        setResolving(false);
+      }
     }
   }
 
@@ -65,13 +95,33 @@ export default function NotifyOwnerDialog({ lostCase, report, onClose, onSent })
           {!phone.trim() && (
             <p className="text-xs text-amber-600">אין מספר טלפון לבעלים - וואטסאפ ייפתח בלי איש קשר, תצטרכו לבחור אחד ידנית.</p>
           )}
+
+          <label className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={markResolved}
+              onChange={(e) => setMarkResolved(e.target.checked)}
+            />
+            <span>
+              <span className="font-medium">סימון ההתאמה כמאושרת</span>
+              <br />
+              <span className="text-xs text-slate-500">
+                יסגור גם את תיק החיפוש (נמצא/הוחזר לבעלים) וגם את הדיווח שנמצא - רק כשלוחצים "פתיחה בוואטסאפ" למטה.
+              </span>
+            </span>
+          </label>
+
           {sent && <p className="text-xs text-emerald-600">הסטטוס של ההתאמה עודכן ל"נוצר קשר".</p>}
+          {resolving && <p className="text-xs text-slate-500">סוגר את שתי הרשומות...</p>}
+          {resolved && <p className="text-xs text-emerald-600">שני הרשומות סומנו כהתאמה שנמצאה וסגורות.</p>}
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={handleSend}
-              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white"
+              disabled={resolving}
+              className="flex-1 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             >
               📱 פתיחה בוואטסאפ
             </button>

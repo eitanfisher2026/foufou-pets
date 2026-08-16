@@ -4,7 +4,7 @@ import { db } from '../../firebase.js';
 const DOC_PATH = ['config', 'aboutContent'];
 
 const DEFAULT_TEXT =
-  'חיות אבודות היא מערכת לניהול חיפוש אחר חיות מחמד אבודות, ולהתאמה בין דיווחים על אבידה לבין דיווחים על חיות שנראו או נמצאו.';
+  'איתור חיות מחמד היא מערכת לניהול חיפוש אחר חיות מחמד אבודות, ולהתאמה בין דיווחים על אבידה לבין דיווחים על חיות שנראו או נמצאו.';
 
 /**
  * Admin-editable "about" text, stored at config/aboutContent (same

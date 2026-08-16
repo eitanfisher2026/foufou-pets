@@ -31,7 +31,7 @@ export function buildNotifyMessage(lostCase, report) {
     lines.push('', `פרטי קשר של מי שמצא/ה: ${[report.contactName, report.contactPhone].filter(Boolean).join(' - ')}`);
   }
 
-  lines.push('', 'בהצלחה! 🙏');
+  lines.push('', 'בהצלחה! 🙏', '', 'נשלח דרך אפליקציית איתור חיות מחמד (FouFou-Pets) 🐾', 'https://foufou-pets.web.app');
   return lines.join('\n');
 }
 

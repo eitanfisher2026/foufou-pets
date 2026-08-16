@@ -287,6 +287,13 @@ export default function LostCaseDetail() {
     navigate('/');
   }
 
+  // Same reasoning as handleConfirmClosure - once a match is confirmed via
+  // NotifyOwnerDialog's checkbox, both records are already closed by the
+  // time this fires, so there's nothing left to do on this page.
+  function handleMatchResolved() {
+    navigate('/');
+  }
+
   async function handleRemoveExistingPhoto(photo) {
     const remaining = await removeLostCasePhoto(caseId, photo, lostCase.photos || []);
     setLostCase((prev) => ({ ...prev, photos: remaining }));
@@ -780,6 +787,7 @@ export default function LostCaseDetail() {
               caseId={caseId}
               onRecheck={handleRecheckSingleMatch}
               rechecking={recheckingId === m.foundReportId}
+              onResolved={handleMatchResolved}
             />
           ))}
         </ul>
@@ -804,6 +812,7 @@ export default function LostCaseDetail() {
                   onViewPhoto={setLightboxUrl}
                   confidenceColors={confidenceColors}
                   caseId={caseId}
+                  onResolved={handleMatchResolved}
                 />
               ))}
             </ul>
@@ -839,7 +848,18 @@ export default function LostCaseDetail() {
   );
 }
 
-function MatchCard({ match, report, lostCase, onStatusChange, onViewPhoto, confidenceColors, caseId, onRecheck, rechecking }) {
+function MatchCard({
+  match,
+  report,
+  lostCase,
+  onStatusChange,
+  onViewPhoto,
+  confidenceColors,
+  caseId,
+  onRecheck,
+  rechecking,
+  onResolved,
+}) {
   const [showCatDetails, setShowCatDetails] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
 
@@ -940,8 +960,10 @@ function MatchCard({ match, report, lostCase, onStatusChange, onViewPhoto, confi
         <NotifyOwnerDialog
           lostCase={lostCase}
           report={report}
+          foundReportId={match.foundReportId}
           onClose={() => setShowNotify(false)}
           onSent={() => onStatusChange(match.foundReportId, REPORT_STATUS.CONTACTED)}
+          onResolved={onResolved}
         />
       )}
     </li>
