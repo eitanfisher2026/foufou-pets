@@ -5,7 +5,6 @@ import {
   DOG_FUR_TYPES,
   CAT_CONDITIONS,
   SPECIES,
-  SPECIES_LABELS,
 } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
@@ -26,7 +25,6 @@ export function buildFoundReportSections(report) {
       title: labels.petDetailsSection,
       rows: [
         { label: 'שם', value: displayFoundReportName(report) },
-        { label: 'מין', value: SPECIES_LABELS[report.species] },
         { label: labels.conditionLabel, value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
         { label: 'צבע', value: report.color },
         { label: 'תבנית פרווה', value: report.pattern },

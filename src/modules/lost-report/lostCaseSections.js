@@ -4,7 +4,6 @@ import {
   CAT_FUR_TYPES,
   DOG_FUR_TYPES,
   SPECIES,
-  SPECIES_LABELS,
   CLOSURE_REASON_LABELS,
 } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
@@ -27,7 +26,6 @@ export function buildLostCaseSections(lostCase) {
       title: labels.petDetailsSection,
       rows: [
         { label: 'שם', value: displayLostCaseName(lostCase) },
-        { label: 'מין', value: SPECIES_LABELS[lostCase.species] },
         { label: 'צבע', value: lostCase.color },
         { label: 'תבנית פרווה', value: lostCase.pattern },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },

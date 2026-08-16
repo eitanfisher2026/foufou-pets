@@ -106,17 +106,17 @@ export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showT
           )}
           <StatusBadge status={c.status} labels={statusLabels} />
         </div>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <span className="truncate text-xs text-slate-400">{c.neighborhood}</span>
-          {c.matchCount > 0 && (
+        <p className="mt-1 truncate text-xs text-slate-400">{c.neighborhood}</p>
+        {c.matchCount > 0 && (
+          <div className="mt-1">
             <MatchSummaryRow
               matchCount={c.matchCount}
               newMatchCount={c.newMatchCount}
               topMatchScore={c.topMatchScore}
               confidenceColors={confidenceColors}
             />
-          )}
-        </div>
+          </div>
+        )}
       </Link>
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </li>

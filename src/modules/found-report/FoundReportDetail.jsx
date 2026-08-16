@@ -19,7 +19,6 @@ import {
   COLLAR_COLORS,
   CAT_CONDITIONS,
   SPECIES,
-  SPECIES_LABELS,
   CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import { useColorOptions } from '../shared/useColorOptions.js';
@@ -441,9 +440,6 @@ export default function FoundReportDetail() {
           <FormSection title={labels.petDetailsSection}>
             <Field label={`${labels.nameLabel} (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)`}>
               <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
-            </Field>
-            <Field label="מין" inline>
-              <span className="text-sm text-slate-600">{SPECIES_LABELS[report.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
             </Field>
             <Field label={labels.conditionLabel} inline>
               <SelectField

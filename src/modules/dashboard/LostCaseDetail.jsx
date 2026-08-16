@@ -13,7 +13,6 @@ import {
   DOG_FUR_TYPES,
   COLLAR_COLORS,
   SPECIES,
-  SPECIES_LABELS,
   CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
@@ -496,9 +495,6 @@ export default function LostCaseDetail() {
           <FormSection title={labels.petDetailsSection}>
             <Field label={labels.nameLabel}>
               <input className="input" value={fields.name || ''} onChange={(e) => setField('name', e.target.value)} />
-            </Field>
-            <Field label="מין" inline>
-              <span className="text-sm text-slate-600">{SPECIES_LABELS[lostCase.species] || SPECIES_LABELS[SPECIES.CAT]}</span>
             </Field>
             <Field label="צבע" inline>
               <SelectField
