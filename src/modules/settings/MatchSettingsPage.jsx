@@ -130,6 +130,16 @@ export default function MatchSettingsPage() {
 
   function removeBreedOption(breed) {
     setBreedOptions((prev) => prev.filter((b) => b !== breed));
+    // Same reasoning as removeColorOption - a breed removed from the list
+    // shouldn't linger in a similarity group. breedGroups is keyed by
+    // species, same as colorGroups (see matchingEngine.js).
+    setConfig((prev) => ({
+      ...prev,
+      breedGroups: {
+        ...prev.breedGroups,
+        [listSpecies]: (prev.breedGroups?.[listSpecies] || []).map((g) => g.filter((b) => b !== breed)),
+      },
+    }));
   }
 
   function addPatternOption() {
@@ -179,6 +189,32 @@ export default function MatchSettingsPage() {
         ...prev.colorGroups,
         [listSpecies]: prev.colorGroups[listSpecies].map((g, i) =>
           i === groupIndex ? (g.includes(color) ? g.filter((c) => c !== color) : [...g, color]) : g
+        ),
+      },
+    }));
+  }
+
+  function addBreedGroup() {
+    setConfig((prev) => ({
+      ...prev,
+      breedGroups: { ...prev.breedGroups, [listSpecies]: [...(prev.breedGroups?.[listSpecies] || []), []] },
+    }));
+  }
+
+  function removeBreedGroup(index) {
+    setConfig((prev) => ({
+      ...prev,
+      breedGroups: { ...prev.breedGroups, [listSpecies]: prev.breedGroups[listSpecies].filter((_, i) => i !== index) },
+    }));
+  }
+
+  function toggleBreedInGroup(groupIndex, breed) {
+    setConfig((prev) => ({
+      ...prev,
+      breedGroups: {
+        ...prev.breedGroups,
+        [listSpecies]: prev.breedGroups[listSpecies].map((g, i) =>
+          i === groupIndex ? (g.includes(breed) ? g.filter((b) => b !== breed) : [...g, breed]) : g
         ),
       },
     }));
@@ -483,6 +519,52 @@ export default function MatchSettingsPage() {
               </button>
             </div>
           </div>
+        </div>
+
+        <div>
+          <h3 className="mb-1 text-base font-semibold text-slate-700">קבוצות גזעים דומים</h3>
+          <p className="mb-3 text-sm text-slate-500">
+            גזעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לגזעים שקל לבלבל
+            ביניהם בתמונה, לא לגזעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "גזע". "מעורב"/"אחר" לא
+            מוצגים כאן - הם תמיד מדולגים בהשוואת גזע, בלי קשר לקבוצות.
+          </p>
+          <div className="space-y-3">
+            {(config.breedGroups?.[listSpecies] || []).map((group, i) => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-600">קבוצה {i + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeBreedGroup(i)}
+                    className="text-sm text-red-600"
+                    aria-label="הסרת קבוצה"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {breedOptions.map((breed) => (
+                    <label
+                      key={breed}
+                      className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
+                        group.includes(breed) ? 'border-slate-800 bg-slate-100' : 'border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <input type="checkbox" checked={group.includes(breed)} onChange={() => toggleBreedInGroup(i, breed)} />
+                      {breed}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={addBreedGroup}
+            className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
+          >
+            + הוספת קבוצת גזעים
+          </button>
         </div>
 
         {listSpecies === SPECIES.CAT && (

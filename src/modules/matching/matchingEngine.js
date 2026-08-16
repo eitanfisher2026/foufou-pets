@@ -1,4 +1,4 @@
-import { SPECIES } from '../shared/collections.js';
+import { SPECIES, DEFAULT_CAT_BREED, DEFAULT_DOG_BREED } from '../shared/collections.js';
 
 /**
  * Deterministic, explainable scoring - no AI call here on purpose. This runs
@@ -35,6 +35,26 @@ const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 export const DEFAULT_COLOR_GROUPS = {
   [SPECIES.CAT]: [['לבן', 'אפור']],
   [SPECIES.DOG]: [],
+};
+
+// Same idea as DEFAULT_COLOR_GROUPS, for breed - starts empty for both
+// species (unlike color's cat default) since there's no obviously-
+// confusable pair to pre-seed; an admin adds one from the settings panel
+// once a real case shows two breeds are actually hard to tell apart in
+// photos.
+export const DEFAULT_BREED_GROUPS = {
+  [SPECIES.CAT]: [],
+  [SPECIES.DOG]: [],
+};
+
+// "מעורב/חתול רחוב" and "מעורב (לא ידוע)" are what a cat/dog record gets
+// when no breed was identified (see DEFAULT_CAT_BREED/DEFAULT_DOG_BREED in
+// collections.js) - not a real breed identification, so a pairing where
+// either side has it can't meaningfully agree OR disagree on breed, same
+// reasoning as "אחר" being excluded from color comparison below.
+const EXCLUDED_BREEDS_BY_SPECIES = {
+  [SPECIES.CAT]: [DEFAULT_CAT_BREED, 'אחר'],
+  [SPECIES.DOG]: [DEFAULT_DOG_BREED, 'אחר'],
 };
 
 // A raw "45/100" or "100%" reads as false precision - two cats that don't
@@ -132,6 +152,25 @@ function compareColor(a, b, ctx) {
   return { ratio: 0 };
 }
 
+// Same shape and reasoning as compareColor: exact match scores full, two
+// breeds placed in the same configured group for this pair's species
+// (config.breedGroups) score partial credit for being easy to mix up in a
+// photo, and any other disagreement scores a hard 0. "מעורב"/"אחר" on
+// either side means no real breed was identified, so that pairing is
+// skipped entirely rather than treated as a mismatch (see
+// EXCLUDED_BREEDS_BY_SPECIES above).
+function compareBreed(a, b, ctx) {
+  if (!a || !b) return null;
+  const excluded = ctx?.excludedBreeds || [];
+  if (excluded.includes(a) || excluded.includes(b)) return null;
+  if (a === b) return { ratio: 1 };
+  const groupsBySpecies = ctx?.breedGroups || DEFAULT_BREED_GROUPS;
+  const groups = groupsBySpecies[ctx?.species] || [];
+  const sameGroup = groups.some((group) => group.includes(a) && group.includes(b));
+  if (sameGroup) return { ratio: 0.6 };
+  return { ratio: 0 };
+}
+
 function compareTextOverlap(a, b) {
   const wordsA = new Set(tokenize(a));
   const wordsB = new Set(tokenize(b));
@@ -222,6 +261,7 @@ const COMPARATORS = {
   booleanTrait: compareBooleanTrait,
   exactSkipDefault: compareExactSkipDefault,
   colorMatch: compareColor,
+  breedMatch: compareBreed,
   textOverlap: compareTextOverlap,
   markList: compareMarkList,
   dateProximity: compareDateProximity,
@@ -243,6 +283,7 @@ export const DEFAULT_MATCH_CONFIG = {
   // a fully-filled-in pair would.
   relativeScoring: true,
   colorGroups: DEFAULT_COLOR_GROUPS,
+  breedGroups: DEFAULT_BREED_GROUPS,
   confidenceColors: DEFAULT_CONFIDENCE_COLORS,
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
@@ -250,6 +291,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
+    { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed', disqualifying: true },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
     { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
     { key: 'pattern', label: 'תבנית פרווה (חתולים)', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'pattern', foundField: 'pattern', mismatchPenalty: 10, defaultValue: 'אחיד' },
@@ -297,6 +339,7 @@ export const COMPARISON_TYPE_LABELS = {
   booleanTrait: 'סימן נדיר (קיים/לא קיים - "לא קיים" משני הצדדים לא נחשב כהתאמה)',
   exactSkipDefault: 'התאמה מדויקת, מלבד ערך ברירת מחדל (התאמה על הערך הנפוץ/הרגיל לא נחשבת)',
   colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
+  breedMatch: 'גזע (מתעלם מ"מעורב"/"אחר" (אין גזע מזוהה), סולח על זוגות גזעים שהוגדרו כדומים/קלים לבלבול)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
@@ -358,10 +401,13 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const lenient =
       p.comparisonType === 'dateProximity' &&
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
+    const species = lostCase.species || foundReport.species || SPECIES.CAT;
     const ctx = {
       lenient,
       colorGroups: config.colorGroups,
-      species: lostCase.species || foundReport.species || SPECIES.CAT,
+      breedGroups: config.breedGroups,
+      excludedBreeds: EXCLUDED_BREEDS_BY_SPECIES[species] || [],
+      species,
       defaultValue: p.defaultValue,
     };
     const result = compare(lostValue, foundValue, ctx);
@@ -376,19 +422,24 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       p.comparisonType === 'exact' ||
       p.comparisonType === 'booleanTrait' ||
       p.comparisonType === 'exactSkipDefault' ||
-      p.comparisonType === 'colorMatch'
+      p.comparisonType === 'colorMatch' ||
+      p.comparisonType === 'breedMatch'
     ) {
       if (result.ratio === 1) {
         earned += p.weight;
         reasons.push(`${p.label}: תואם`);
         push({ contribution: p.weight, verdict: 'match', detail: 'תואם' });
       } else if (result.ratio > 0) {
-        // Only colorMatch produces this: a lighting-confusable pair (e.g.
-        // white vs. gray) isn't a real disagreement, so it earns partial
+        // Only colorMatch/breedMatch produce this: a confusable pair (e.g.
+        // white vs. gray under bad lighting, or two breeds grouped as
+        // easy to mix up) isn't a real disagreement, so it earns partial
         // credit instead of triggering a mismatch penalty/disqualification.
         const points = result.ratio * p.weight;
         earned += points;
-        const detail = 'התאמה חלקית (יתכן הבדל עקב תאורת הצילום)';
+        const detail =
+          p.comparisonType === 'breedMatch'
+            ? 'התאמה חלקית (גזעים שהוגדרו כדומים/קלים לבלבול)'
+            : 'התאמה חלקית (יתכן הבדל עקב תאורת הצילום)';
         reasons.push(`${p.label}: ${detail}`);
         push({ contribution: points, verdict: 'partial', detail });
       } else if (p.disqualifying) {

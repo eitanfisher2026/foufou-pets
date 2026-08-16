@@ -39,6 +39,27 @@ function fromFirestoreColorGroups(raw) {
   return result;
 }
 
+// Same shape and same nested-array workaround as colorGroups above, for
+// breed-similarity groups (see DEFAULT_BREED_GROUPS in matchingEngine.js).
+function toFirestoreBreedGroups(breedGroupsBySpecies) {
+  const result = {};
+  for (const species of Object.keys(breedGroupsBySpecies || {})) {
+    result[species] = (breedGroupsBySpecies[species] || []).map((breeds) => ({ breeds }));
+  }
+  return result;
+}
+
+function fromFirestoreBreedGroups(raw) {
+  const result = {};
+  for (const species of Object.keys(DEFAULT_MATCH_CONFIG.breedGroups)) {
+    const speciesRaw = raw && !Array.isArray(raw) ? raw[species] : null;
+    result[species] = Array.isArray(speciesRaw)
+      ? speciesRaw.map((g) => (Array.isArray(g?.breeds) ? g.breeds : []))
+      : DEFAULT_MATCH_CONFIG.breedGroups[species] || [];
+  }
+  return result;
+}
+
 // hasFluffyTail, colorDescription, lastSeenLocation/location were retired
 // as standalone fields (folded into markings/neighborhood) - a parameter
 // saved before that change could still reference one of them, which would
@@ -54,6 +75,20 @@ function dropRetiredParameters(parameters) {
   );
 }
 
+// A saved config's `parameters` array fully replaces DEFAULT_MATCH_CONFIG's
+// (see getMatchConfig below) rather than merging with it - so a brand new
+// default parameter (like "breed" when it was first added) would never
+// reach anyone who'd already saved a config once, without this. Any
+// DEFAULT_MATCH_CONFIG parameter whose key isn't already present gets
+// appended, in its default (enabled) state; parameters the admin already
+// has are never touched.
+function mergeNewDefaultParameters(savedParameters) {
+  const saved = dropRetiredParameters(savedParameters);
+  const savedKeys = new Set(saved.map((p) => p.key));
+  const newDefaults = DEFAULT_MATCH_CONFIG.parameters.filter((p) => !savedKeys.has(p.key));
+  return [...saved, ...newDefaults];
+}
+
 /**
  * Reads the live matching-algorithm config from Firestore, falling back to
  * DEFAULT_MATCH_CONFIG if it's never been saved (e.g. a fresh project, or
@@ -65,17 +100,26 @@ export async function getMatchConfig() {
   const data = snap.data();
   return {
     relativeScoring: data.relativeScoring ?? DEFAULT_MATCH_CONFIG.relativeScoring,
-    parameters: dropRetiredParameters(data.parameters),
+    parameters: mergeNewDefaultParameters(data.parameters),
     colorGroups: fromFirestoreColorGroups(data.colorGroups),
+    breedGroups: fromFirestoreBreedGroups(data.breedGroups),
     confidenceColors: { ...DEFAULT_MATCH_CONFIG.confidenceColors, ...data.confidenceColors },
   };
 }
 
 export async function saveMatchConfig(config) {
-  await setDoc(doc(db, ...CONFIG_DOC_PATH), { ...config, colorGroups: toFirestoreColorGroups(config.colorGroups) });
+  await setDoc(doc(db, ...CONFIG_DOC_PATH), {
+    ...config,
+    colorGroups: toFirestoreColorGroups(config.colorGroups),
+    breedGroups: toFirestoreBreedGroups(config.breedGroups),
+  });
 }
 
 export async function resetMatchConfig() {
-  await setDoc(doc(db, ...CONFIG_DOC_PATH), { ...DEFAULT_MATCH_CONFIG, colorGroups: toFirestoreColorGroups(DEFAULT_MATCH_CONFIG.colorGroups) });
+  await setDoc(doc(db, ...CONFIG_DOC_PATH), {
+    ...DEFAULT_MATCH_CONFIG,
+    colorGroups: toFirestoreColorGroups(DEFAULT_MATCH_CONFIG.colorGroups),
+    breedGroups: toFirestoreBreedGroups(DEFAULT_MATCH_CONFIG.breedGroups),
+  });
   return DEFAULT_MATCH_CONFIG;
 }
