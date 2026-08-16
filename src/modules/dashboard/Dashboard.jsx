@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { RECORD_STATUS, LOST_CASE_STATUS_LABELS } from '../shared/collections.js';
+import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import SpeciesToggle from '../shared/SpeciesToggle.jsx';
-import { listLostCases, countFoundReports } from './dashboardApi.js';
+import { listLostCases, listFoundReports, countFoundReports } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
-import { LostCaseRow } from './RecordRows.jsx';
+import { LostCaseRow, FoundReportRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import HelpDialog from '../shared/HelpDialog.jsx';
+import SearchDialog from './SearchDialog.jsx';
+import { matchesSearch } from './recordSearch.js';
 import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 
 // A found report doesn't need its own eagerly-loaded browsing list on every
@@ -18,7 +20,9 @@ import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 // found reports (see matchingApi.js), so this list was never actually load-
 // bearing for the app's core flow, just a nice-to-have "browse everything"
 // view. Loading only lost cases by default cuts the dashboard's default
-// read in half; "כל הדיווחים על חיות שנמצאו" is one tap away instead.
+// read in half; "כל הדיווחים על חיות שנמצאו" is one tap away instead. Found
+// reports only ever get fetched here on demand, when a search explicitly
+// asks to include them (see handleSearch below).
 export default function Dashboard() {
   const { preferredSpecies, setPreferredSpecies, roleLoading } = useAuth();
   // Firestore does the species filtering now (see dashboardApi.js) rather
@@ -38,11 +42,33 @@ export default function Dashboard() {
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [foundCount, setFoundCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  // null = no search applied yet; otherwise { recordType, ...fields } from
+  // SearchDialog. Found reports for a 'found'/'both' search live in their
+  // own state below, fetched only when actually needed.
+  const [searchCriteria, setSearchCriteria] = useState(null);
+  const [foundReportsForSearch, setFoundReportsForSearch] = useState([]);
+  const [loadingFoundSearch, setLoadingFoundSearch] = useState(false);
   const labels = petLabels(preferredSpecies);
+
+  const { recordType: activeRecordType = 'lost', ...activeFields } = searchCriteria || {};
+  // Picking "found" or "both" is itself a meaningful search (it changes
+  // what's shown, even with no field filled in) - only "lost" with nothing
+  // filled in is indistinguishable from the default view, so that alone
+  // doesn't count as an active search worth showing a "clear" link for.
+  const hasActiveSearch = searchCriteria !== null && (activeRecordType !== 'lost' || Object.values(activeFields).some((v) => v));
 
   useEffect(() => {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
+
+  // Some search fields are species-specific (e.g. "תבנית פרווה" only
+  // applies to cats) - clearing on toggle switch avoids a stale filter
+  // silently carrying over to a species it was never meant for.
+  useEffect(() => {
+    setSearchCriteria(null);
+    setFoundReportsForSearch([]);
+  }, [preferredSpecies]);
 
   // Just a count query (no documents fetched) - cheap enough to run
   // eagerly, unlike the full list this links to. Same roleLoading gate as
@@ -53,16 +79,37 @@ export default function Dashboard() {
     countFoundReports(preferredSpecies).then(setFoundCount);
   }, [preferredSpecies, roleLoading]);
 
+  async function handleSearch(criteria) {
+    setSearchCriteria(criteria);
+    setShowSearch(false);
+    if (criteria.recordType === 'found' || criteria.recordType === 'both') {
+      setLoadingFoundSearch(true);
+      try {
+        const reports = await listFoundReports(preferredSpecies);
+        setFoundReportsForSearch(reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED));
+      } finally {
+        setLoadingFoundSearch(false);
+      }
+    }
+  }
+
+  function handleClearSearch() {
+    setSearchCriteria(null);
+    setFoundReportsForSearch([]);
+  }
+
   // Archived and resolved cases move to their own archive view (see
   // ArchivePage.jsx) instead of a same-page toggle - a resolved case
   // (already found) doesn't need attention any more than an archived one
   // does, so it doesn't belong cluttering the default working list either.
   // Species itself is no longer filtered here - listLostCases(species)
   // above only ever returns the current species to begin with.
-  const visibleLostCases = useMemo(
-    () => lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED),
-    [lostCases]
-  );
+  const openLostCases = lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED);
+  const lostResults =
+    activeRecordType === 'found' ? [] : hasActiveSearch ? openLostCases.filter((c) => matchesSearch(c, activeFields)) : openLostCases;
+  const foundResults =
+    hasActiveSearch && activeRecordType !== 'lost' ? foundReportsForSearch.filter((r) => matchesSearch(r, activeFields)) : [];
+  const resultCount = lostResults.length + foundResults.length;
 
   return (
     <div className="p-4">
@@ -81,7 +128,19 @@ export default function Dashboard() {
         <ProfileMenu />
       </header>
 
-      <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} />
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <SpeciesToggle value={preferredSpecies} onChange={setPreferredSpecies} className="mb-0" />
+        <button
+          type="button"
+          onClick={() => setShowSearch(true)}
+          aria-label="חיפוש מתקדם"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-base ${
+            hasActiveSearch ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-500'
+          }`}
+        >
+          🔍
+        </button>
+      </div>
 
       <div className="mb-3 flex gap-3">
         <Link
@@ -116,18 +175,33 @@ export default function Dashboard() {
       </div>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">
-          {labels.openCasesSection}{' '}
-          {visibleLostCases.length > 0 && (
-            <span className="text-sm font-normal text-slate-400">({visibleLostCases.length})</span>
-          )}
+        <h2 className="mb-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-700">
+          {hasActiveSearch ? 'תוצאות חיפוש' : labels.openCasesSection}
+          {resultCount > 0 && <span className="text-sm font-normal text-slate-400">({resultCount})</span>}
         </h2>
+        {hasActiveSearch && (
+          <button type="button" onClick={handleClearSearch} className="mb-3 text-xs text-slate-500 underline">
+            ניקוי חיפוש וחזרה לכל {labels.openCasesSection}
+          </button>
+        )}
         {progress && <ProgressBar current={progress.current} total={progress.total} />}
         {loading && !progress && <p className="text-slate-500">טוען...</p>}
-        {visibleLostCases.length === 0 && !loading && <p className="text-sm text-slate-400">אין תיקים פתוחים עדיין.</p>}
+        {loadingFoundSearch && <p className="text-sm text-slate-400">טוענים גם את הדיווחים שנמצאו...</p>}
+        {!loading && !loadingFoundSearch && resultCount === 0 && (
+          <p className="text-sm text-slate-400">{hasActiveSearch ? 'אין תוצאות לחיפוש הזה.' : 'אין תיקים פתוחים עדיין.'}</p>
+        )}
         <ul className="space-y-2">
-          {visibleLostCases.map((c) => (
-            <LostCaseRow key={c.id} lostCase={c} statusLabels={LOST_CASE_STATUS_LABELS} confidenceColors={confidenceColors} />
+          {lostResults.map((c) => (
+            <LostCaseRow
+              key={c.id}
+              lostCase={c}
+              statusLabels={LOST_CASE_STATUS_LABELS}
+              confidenceColors={confidenceColors}
+              showTypeBadge={activeRecordType === 'both'}
+            />
+          ))}
+          {foundResults.map((r) => (
+            <FoundReportRow key={r.id} report={r} statusLabels={FOUND_REPORT_STATUS_LABELS} showTypeBadge={activeRecordType === 'both'} />
           ))}
         </ul>
       </section>
@@ -135,6 +209,9 @@ export default function Dashboard() {
       <AppFooter />
 
       {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
+      {showSearch && (
+        <SearchDialog species={preferredSpecies} initialCriteria={searchCriteria} onSearch={handleSearch} onClose={() => setShowSearch(false)} />
+      )}
     </div>
   );
 }

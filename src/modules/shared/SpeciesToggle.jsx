@@ -14,9 +14,9 @@ const SPECIES_ICONS = {
  * two independent toggles, and the label alongside each icon means a new
  * user doesn't have to guess which paw means which species.
  */
-export default function SpeciesToggle({ value, onChange }) {
+export default function SpeciesToggle({ value, onChange, className = 'mb-4' }) {
   return (
-    <div className="mb-4 inline-flex gap-0.5 rounded-full bg-slate-300 p-1">
+    <div className={`inline-flex gap-0.5 rounded-full bg-slate-300 p-1 ${className}`}>
       {Object.values(SPECIES).map((species) => (
         <button
           key={species}
