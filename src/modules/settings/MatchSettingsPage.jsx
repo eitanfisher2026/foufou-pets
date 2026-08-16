@@ -323,18 +323,18 @@ export default function MatchSettingsPage() {
         + הוספת פרמטר
       </button>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת הצבעים האפשריים</h2>
+      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">הגדרות לפי סוג חיה</h2>
       <p className="mb-3 text-sm text-slate-500">
-        אלו האפשרויות שמופיעות בתפריט "צבע" בכל טפסי הדיווח, וגם מה שה-AI מתבקש לבחור מתוכן כשהוא קורא צילום מסך. "אחר"
-        תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה. לחתולים וכלבים יש רשימות נפרדות.
+        צבעים, קבוצות צבעים דומים, גזעים, ותבניות פרווה - לכל סוג חיה יש הגדרות משלו. הבחירה כאן קובעת מה מוצג בכל
+        הסעיפים למטה, עד שתבחרו סוג אחר.
       </p>
-      <div className="mb-3 flex gap-2">
+      <div className="mb-4 flex gap-2">
         {Object.values(SPECIES).map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setColorSpecies(s)}
-            className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium ${
+            className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${
               listSpecies === s ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 text-slate-600'
             }`}
           >
@@ -342,199 +342,200 @@ export default function MatchSettingsPage() {
           </button>
         ))}
       </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {colorOptions.map((color) => (
-            <span key={color} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
-              {color}
+
+      <div className="space-y-6 rounded-2xl border-2 border-slate-200 p-4">
+        <div>
+          <h3 className="mb-1 text-base font-semibold text-slate-700">רשימת הצבעים האפשריים</h3>
+          <p className="mb-3 text-sm text-slate-500">
+            אלו האפשרויות שמופיעות בתפריט "צבע" בטפסי {SPECIES_LABELS[listSpecies]}, וגם מה שה-AI מתבקש לבחור מתוכן
+            כשהוא קורא צילום מסך. "אחר" תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
+          </p>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap gap-2">
+              {colorOptions.map((color) => (
+                <span key={color} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                  {color}
+                  <button
+                    type="button"
+                    onClick={() => removeColorOption(color)}
+                    className="text-red-600"
+                    aria-label={`הסרת ${color}`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1"
+                value={colorInput}
+                onChange={(e) => setColorInput(e.target.value)}
+                placeholder="שם צבע חדש"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addColorOption();
+                  }
+                }}
+              />
               <button
                 type="button"
-                onClick={() => removeColorOption(color)}
-                className="text-red-600"
-                aria-label={`הסרת ${color}`}
+                onClick={addColorOption}
+                className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
               >
-                ✕
+                הוספה
               </button>
-            </span>
-          ))}
-          <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
-        </div>
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            value={colorInput}
-            onChange={(e) => setColorInput(e.target.value)}
-            placeholder="שם צבע חדש"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addColorOption();
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={addColorOption}
-            className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
-          >
-            הוספה
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          שינויים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.
-        </p>
-      </div>
-
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">קבוצות צבעים דומים</h2>
-      <p className="mb-3 text-sm text-slate-500">
-        צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל ביניהם
-        בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "צבע". לחתולים
-        וכלבים יש קבוצות נפרדות - לפי הבחירה למעלה ({SPECIES_LABELS[listSpecies]} כרגע).
-      </p>
-      <div className="space-y-3">
-        {(config.colorGroups?.[listSpecies] || []).map((group, i) => (
-          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-slate-600">קבוצה {i + 1}</span>
-              <button type="button" onClick={() => removeColorGroup(i)} className="text-sm text-red-600" aria-label="הסרת קבוצה">
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {colorOptions.map((color) => (
-                <label
-                  key={color}
-                  className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
-                    group.includes(color) ? 'border-slate-800 bg-slate-100' : 'border-slate-200 text-slate-500'
-                  }`}
-                >
-                  <input type="checkbox" checked={group.includes(color)} onChange={() => toggleColorInGroup(i, color)} />
-                  {color}
-                </label>
-              ))}
             </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <button
-        type="button"
-        onClick={addColorGroup}
-        className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
-      >
-        + הוספת קבוצת צבעים
-      </button>
-
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת הגזעים האפשריים</h2>
-      <p className="mb-3 text-sm text-slate-500">
-        אלו האפשרויות שמופיעות בתפריט "גזע" בטפסי הדיווח, וגם מה שה-AI מתבקש לבחור מתוכן כשהוא קורא צילום מסך. הרשומה
-        הראשונה בכל רשימה (למשל "מעורב / חתול רחוב") היא ברירת המחדל לחיה ללא גזע מזוהה. "אחר" תמיד קיים כברירת מחדל
-        קבועה ולא ניתן להסרה. לחתולים וכלבים יש רשימות נפרדות.
-      </p>
-      <div className="mb-3 flex gap-2">
-        {Object.values(SPECIES).map((s) => (
+        <div>
+          <h3 className="mb-1 text-base font-semibold text-slate-700">קבוצות צבעים דומים</h3>
+          <p className="mb-3 text-sm text-slate-500">
+            צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל
+            ביניהם בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה
+            "צבע".
+          </p>
+          <div className="space-y-3">
+            {(config.colorGroups?.[listSpecies] || []).map((group, i) => (
+              <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-sm font-medium text-slate-600">קבוצה {i + 1}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeColorGroup(i)}
+                    className="text-sm text-red-600"
+                    aria-label="הסרת קבוצה"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {colorOptions.map((color) => (
+                    <label
+                      key={color}
+                      className={`flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1 text-xs ${
+                        group.includes(color) ? 'border-slate-800 bg-slate-100' : 'border-slate-200 text-slate-500'
+                      }`}
+                    >
+                      <input type="checkbox" checked={group.includes(color)} onChange={() => toggleColorInGroup(i, color)} />
+                      {color}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
           <button
-            key={s}
             type="button"
-            onClick={() => setColorSpecies(s)}
-            className={`flex-1 rounded-lg border px-3 py-1.5 text-sm font-medium ${
-              listSpecies === s ? 'border-slate-800 bg-slate-800 text-white' : 'border-slate-300 text-slate-600'
-            }`}
+            onClick={addColorGroup}
+            className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
           >
-            {SPECIES_LABELS[s]}
+            + הוספת קבוצת צבעים
           </button>
-        ))}
-      </div>
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {breedOptions.map((breed) => (
-            <span key={breed} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
-              {breed}
+        </div>
+
+        <div>
+          <h3 className="mb-1 text-base font-semibold text-slate-700">רשימת הגזעים האפשריים</h3>
+          <p className="mb-3 text-sm text-slate-500">
+            אלו האפשרויות שמופיעות בתפריט "גזע" בטפסי {SPECIES_LABELS[listSpecies]}, וגם מה שה-AI מתבקש לבחור מתוכן
+            כשהוא קורא צילום מסך. הרשומה הראשונה ברשימה היא ברירת המחדל לחיה ללא גזע מזוהה. "אחר" תמיד קיים כברירת
+            מחדל קבועה ולא ניתן להסרה.
+          </p>
+          <div className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="mb-2 flex flex-wrap gap-2">
+              {breedOptions.map((breed) => (
+                <span key={breed} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                  {breed}
+                  <button
+                    type="button"
+                    onClick={() => removeBreedOption(breed)}
+                    className="text-red-600"
+                    aria-label={`הסרת ${breed}`}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+              <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="input flex-1"
+                value={breedInput}
+                onChange={(e) => setBreedInput(e.target.value)}
+                placeholder="שם גזע חדש"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    addBreedOption();
+                  }
+                }}
+              />
               <button
                 type="button"
-                onClick={() => removeBreedOption(breed)}
-                className="text-red-600"
-                aria-label={`הסרת ${breed}`}
+                onClick={addBreedOption}
+                className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
               >
-                ✕
+                הוספה
               </button>
-            </span>
-          ))}
-          <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            value={breedInput}
-            onChange={(e) => setBreedInput(e.target.value)}
-            placeholder="שם גזע חדש"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addBreedOption();
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={addBreedOption}
-            className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
-          >
-            הוספה
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          שינויים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.
-        </p>
-      </div>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">רשימת תבניות הפרווה האפשריות (חתולים)</h2>
-      <p className="mb-3 text-sm text-slate-500">
-        אלו האפשרויות שמופיעות בתפריט "תבנית פרווה" בטפסי חתול - שדה נפרד מ"צבע", לתבנית עצמה (טאבי, קליקו, טורטי,
-        טוקסידו, פוינט וכו'). לא רלוונטי לכלבים - השדה לא מופיע בטפסי כלב כלל. "אחיד" הוא ברירת המחדל לחתול ללא תבנית
-        מיוחדת, ו"אחר" תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
-      </p>
-      <div className="rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {patternOptions.map((pattern) => (
-            <span key={pattern} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
-              {pattern}
-              <button
-                type="button"
-                onClick={() => removePatternOption(pattern)}
-                className="text-red-600"
-                aria-label={`הסרת ${pattern}`}
-              >
-                ✕
-              </button>
-            </span>
-          ))}
-          <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
-        </div>
-        <div className="flex gap-2">
-          <input
-            className="input flex-1"
-            value={patternInput}
-            onChange={(e) => setPatternInput(e.target.value)}
-            placeholder="שם תבנית חדשה"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                addPatternOption();
-              }
-            }}
-          />
-          <button
-            type="button"
-            onClick={addPatternOption}
-            className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
-          >
-            הוספה
-          </button>
-        </div>
-        <p className="mt-2 text-xs text-slate-400">
-          שינויים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.
-        </p>
+        {listSpecies === SPECIES.CAT && (
+          <div>
+            <h3 className="mb-1 text-base font-semibold text-slate-700">רשימת תבניות הפרווה האפשריות</h3>
+            <p className="mb-3 text-sm text-slate-500">
+              אלו האפשרויות שמופיעות בתפריט "תבנית פרווה" בטפסי חתול - שדה נפרד מ"צבע", לתבנית עצמה (טאבי, קליקו,
+              טורטי, טוקסידו, פוינט וכו'). שדה קיים לחתולים בלבד - לא מופיע בטפסי כלב כלל. "אחיד" הוא ברירת המחדל
+              לחתול ללא תבנית מיוחדת, ו"אחר" תמיד קיים כברירת מחדל קבועה ולא ניתן להסרה.
+            </p>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 flex flex-wrap gap-2">
+                {patternOptions.map((pattern) => (
+                  <span key={pattern} className="flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs text-slate-700">
+                    {pattern}
+                    <button
+                      type="button"
+                      onClick={() => removePatternOption(pattern)}
+                      className="text-red-600"
+                      aria-label={`הסרת ${pattern}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <span className="flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 text-xs text-slate-400">אחר (קבוע)</span>
+              </div>
+              <div className="flex gap-2">
+                <input
+                  className="input flex-1"
+                  value={patternInput}
+                  onChange={(e) => setPatternInput(e.target.value)}
+                  placeholder="שם תבנית חדשה"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      addPatternOption();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={addPatternOption}
+                  className="rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-600"
+                >
+                  הוספה
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <p className="text-xs text-slate-400">שינויים בכל הסעיפים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.</p>
       </div>
 
       <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">צבעי רמת התאמה</h2>
