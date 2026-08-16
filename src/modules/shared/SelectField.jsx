@@ -47,9 +47,11 @@ export default function SelectField({
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className={`input flex items-center justify-between gap-2 text-start disabled:opacity-50 ${className}`}
+        className={`input flex min-w-0 items-center justify-between gap-2 text-start disabled:opacity-50 ${className}`}
       >
-        <span className={selected ? 'text-slate-800' : 'text-slate-400'}>{selected ? selected.label : placeholder}</span>
+        <span className={`truncate ${selected ? 'text-slate-800' : 'text-slate-400'}`}>
+          {selected ? selected.label : placeholder}
+        </span>
         <span aria-hidden="true" className="shrink-0 text-[10px] text-slate-400">
           ▾
         </span>

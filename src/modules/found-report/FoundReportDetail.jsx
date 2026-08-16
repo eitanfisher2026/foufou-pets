@@ -331,7 +331,7 @@ export default function FoundReportDetail() {
             </Field>
             <Field label={labels.conditionLabel} inline>
               <SelectField
-                className="w-36"
+                className="w-full max-w-[9rem]"
                 label={labels.conditionLabel}
                 allowClear={false}
                 value={fields.condition || 'seen_only'}
@@ -341,7 +341,7 @@ export default function FoundReportDetail() {
             </Field>
             <Field label="צבע" inline>
               <SelectField
-                className="w-36"
+                className="w-full max-w-[9rem]"
                 label="בחירת צבע"
                 placeholder="בחר/י צבע"
                 value={fields.color || ''}
@@ -352,7 +352,7 @@ export default function FoundReportDetail() {
             {report.species === SPECIES.CAT && (
               <Field label="תבנית פרווה" inline>
                 <SelectField
-                  className="w-36"
+                  className="w-full max-w-[9rem]"
                   label="בחירת תבנית פרווה"
                   placeholder="בחר/י תבנית"
                   value={fields.pattern || ''}
@@ -377,7 +377,7 @@ export default function FoundReportDetail() {
               <>
                 <Field label="צבע הקולר" inline>
                   <SelectField
-                    className="w-36"
+                    className="w-full max-w-[9rem]"
                     label="בחירת צבע קולר"
                     placeholder="בחר/י צבע"
                     value={fields.collarColor || ''}
@@ -413,7 +413,7 @@ export default function FoundReportDetail() {
             </Field>
             <Field label={labels.breedLabel} inline>
               <SelectField
-                className="w-36"
+                className="w-full max-w-[9rem]"
                 label="בחירת גזע"
                 placeholder="בחר/י גזע"
                 value={fields.breed || ''}
@@ -428,14 +428,14 @@ export default function FoundReportDetail() {
                     type="number"
                     step="0.1"
                     min="0"
-                    className="input w-36"
+                    className="input w-full max-w-[9rem]"
                     value={fields.weightKg || ''}
                     onChange={(e) => setField('weightKg', e.target.value)}
                   />
                 </Field>
                 <Field label="מספר שבב (אם ידוע)" inline>
                   <input
-                    className="input w-36"
+                    className="input w-full max-w-[9rem]"
                     value={fields.microchipNumber || ''}
                     onChange={(e) => setField('microchipNumber', e.target.value)}
                   />
@@ -444,7 +444,7 @@ export default function FoundReportDetail() {
             )}
             <Field label={labels.furTypeLabel} inline>
               <SelectField
-                className="w-36"
+                className="w-full max-w-[9rem]"
                 label={labels.furTypeLabel}
                 value={fields.furType || ''}
                 onChange={(v) => setField('furType', v)}
@@ -453,7 +453,7 @@ export default function FoundReportDetail() {
             </Field>
             <Field label="גודל" inline>
               <SelectField
-                className="w-36"
+                className="w-full max-w-[9rem]"
                 label="בחירת גודל"
                 value={fields.size || ''}
                 onChange={(v) => setField('size', v)}
