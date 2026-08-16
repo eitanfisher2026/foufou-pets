@@ -105,6 +105,12 @@ export default function FoundReportDetail() {
   const [showDetails, setShowDetails] = useState(false);
   const [matches, setMatches] = useState([]);
   const [checking, setChecking] = useState(false);
+  // Brief "✓ done" confirmation right after a check completes, so pressing
+  // the button always gives visible feedback that something happened -
+  // without making any lasting claim about whether the check is "current"
+  // or "up to date", since new lost cases/found reports can be added to
+  // the pool at any time and only a fresh click ever reflects that.
+  const [justChecked, setJustChecked] = useState(false);
   const [recheckingId, setRecheckingId] = useState(null);
   const [showProcessedMatches, setShowProcessedMatches] = useState(false);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
@@ -169,10 +175,16 @@ export default function FoundReportDetail() {
     setMatches(await getMatchesForFoundReport(reportId));
   }
 
+  function flashJustChecked() {
+    setJustChecked(true);
+    setTimeout(() => setJustChecked(false), 2500);
+  }
+
   async function handleCheckMatches() {
     setChecking(true);
     try {
       setMatches(await checkMatchesForFoundReport(reportId));
+      flashJustChecked();
     } finally {
       setChecking(false);
     }
@@ -188,6 +200,7 @@ export default function FoundReportDetail() {
     try {
       await clearMatchesForFoundReport(reportId);
       setMatches(await checkMatchesForFoundReport(reportId));
+      flashJustChecked();
     } finally {
       setChecking(false);
     }
@@ -683,27 +696,19 @@ export default function FoundReportDetail() {
 
       {!showEditForm && (
         <>
-          {checking ? (
-            <div className="w-full rounded-xl bg-slate-800 px-4 py-3 text-center font-medium text-white">בודקים התאמות...</div>
-          ) : matches.length === 0 ? (
-            <button
-              onClick={handleCheckMatches}
-              className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white"
-            >
-              בדיקת התאמות מול תיקי חיפוש
-            </button>
-          ) : newMatches.length > 0 ? (
-            <a
-              href="#new-matches-list"
-              className="block w-full rounded-xl bg-amber-50 px-4 py-3 text-center font-medium text-amber-700"
-            >
-              🔶 {newMatches.length} התאמות חדשות ממתינות לבדיקה - למטה
-            </a>
-          ) : (
-            <div className="w-full rounded-xl bg-slate-100 px-4 py-3 text-center font-medium text-slate-400">
-              ✓ כל ההתאמות נבדקו
-            </div>
-          )}
+          <button
+            onClick={handleCheckMatches}
+            disabled={checking}
+            className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
+          >
+            {checking
+              ? 'בודקים התאמות...'
+              : justChecked
+                ? '✓ הבדיקה הושלמה'
+                : matches.length === 0
+                  ? 'בדיקת התאמות מול תיקי חיפוש'
+                  : 'בדיקה חוזרת'}
+          </button>
           {matches.length > 0 && (
             <button
               onClick={handleClearAndRecheckMatches}
@@ -715,7 +720,14 @@ export default function FoundReportDetail() {
           )}
           {matches.length === 0 && <div className="mb-6" />}
 
-          <h2 className="mb-1 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
+          <h2 className="mb-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-700">
+            תיקי חיפוש תואמים אפשריים ({matches.length})
+            {newMatches.length > 0 && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                {newMatches.length} ממתינות לבדיקה
+              </span>
+            )}
+          </h2>
           {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
@@ -724,7 +736,7 @@ export default function FoundReportDetail() {
           )}
 
           {newMatches.length > 0 ? (
-            <ul id="new-matches-list" className="space-y-3">
+            <ul className="space-y-3">
               {newMatches.map((m) => (
                 <ReverseMatchCard
                   key={m.lostCase.id}
