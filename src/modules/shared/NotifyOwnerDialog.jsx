@@ -3,6 +3,7 @@ import { buildNotifyMessage, buildWhatsAppUrl } from './notifyMessage.js';
 import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
 import { updateFoundReportStatus } from '../found-report/foundReportApi.js';
 import { RECORD_STATUS, CLOSURE_REASON } from './collections.js';
+import { useConfirm } from './useConfirm.jsx';
 
 /**
  * Lets whoever's looking at a match (the owner themselves, or a volunteer/
@@ -27,8 +28,17 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, onC
   const [markResolved, setMarkResolved] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolved, setResolved] = useState(false);
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function handleSend() {
+    if (!phone.trim()) {
+      const ok = await confirm('אין מספר טלפון לבעלים - וואטסאפ ייפתח בלי איש קשר, ותצטרכו לבחור אחד ידנית. להמשיך?', {
+        confirmLabel: 'המשך',
+        cancelLabel: 'ביטול',
+        danger: false,
+      });
+      if (!ok) return;
+    }
     window.open(buildWhatsAppUrl(phone, message), '_blank', 'noopener,noreferrer');
     if (!sent) {
       setSent(true);
@@ -135,6 +145,7 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, onC
           </div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

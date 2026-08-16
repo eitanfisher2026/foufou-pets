@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -61,6 +61,7 @@ import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import ClosureDialog from '../shared/ClosureDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
+import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החיה' },
@@ -87,38 +88,20 @@ const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'postAgeText', extractedKey: 'postAgeText', label: 'מתי פורסם' },
 ];
 
-const MATCH_STATUS_LABELS = {
-  [REPORT_STATUS.NEW]: 'חדש',
-  [REPORT_STATUS.NO_MATCH]: 'האלגוריתם קבע: אין התאמה',
-  [REPORT_STATUS.REVIEWING]: 'בבדיקה',
-  [REPORT_STATUS.NEEDS_FOLLOWUP]: 'דורש מעקב',
-  [REPORT_STATUS.NOT_RELEVANT]: 'נבדק ולא נמצא קשר',
-  [REPORT_STATUS.LIKELY_MATCH]: 'בעל סבירות גבוהה',
-  [REPORT_STATUS.CONTACTED]: 'נוצר קשר עם המדווח',
-  [REPORT_STATUS.CLOSED]: 'נסגר',
-};
-
-const MATCH_STATUS_COLORS = {
-  [REPORT_STATUS.NEW]: 'bg-amber-100 text-amber-800',
-  [REPORT_STATUS.NO_MATCH]: 'bg-slate-100 text-slate-600',
-  [REPORT_STATUS.REVIEWING]: 'bg-blue-100 text-blue-800',
-  [REPORT_STATUS.NEEDS_FOLLOWUP]: 'bg-amber-100 text-amber-800',
-  [REPORT_STATUS.NOT_RELEVANT]: 'bg-slate-100 text-slate-600',
-  [REPORT_STATUS.LIKELY_MATCH]: 'bg-emerald-100 text-emerald-800',
-  [REPORT_STATUS.CONTACTED]: 'bg-blue-100 text-blue-800',
-  [REPORT_STATUS.CLOSED]: 'bg-slate-200 text-slate-600',
-};
-
 export default function LostCaseDetail() {
   const { caseId } = useParams();
   const navigate = useNavigate();
   const { user, isEditorOrAdmin } = useAuth();
+  const [searchParams] = useSearchParams();
   const [lostCase, setLostCase] = useState(null);
   const [matches, setMatches] = useState([]);
   const [reportsById, setReportsById] = useState({});
   const [checking, setChecking] = useState(false);
   const [recheckingId, setRecheckingId] = useState(null);
-  const [editing, setEditing] = useState(false);
+  // Lets a link jump straight into edit mode (e.g. "עריכה" on a reverse
+  // match card, from a found report's matching lost cases) instead of
+  // landing on the view first and requiring an extra tap.
+  const [editing, setEditing] = useState(() => searchParams.get('edit') === '1');
   const [fields, setFields] = useState(null);
   const [newPhotos, setNewPhotos] = useState([]);
   const [newPhotosFirst, setNewPhotosFirst] = useState(false);
@@ -382,6 +365,10 @@ export default function LostCaseDetail() {
   // manage everything. Viewing and running matches stay open to everyone
   // regardless (see collections.js / firestore.rules).
   const canManage = isEditorOrAdmin || lostCase.ownerId === user.uid;
+  // A ?edit=1 deep link (e.g. from a found report's matching lost cases)
+  // still only works for someone who's actually allowed to edit - anyone
+  // else lands on the normal view instead.
+  const showEditForm = editing && canManage;
 
   const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
   const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
@@ -392,7 +379,7 @@ export default function LostCaseDetail() {
         לעמוד הראשי
       </BackLink>
 
-      {!editing ? (
+      {!showEditForm ? (
         <>
           <MainPhoto photo={lostCase.photos?.[0]} onView={setLightboxUrl} />
           <div className="mb-4">

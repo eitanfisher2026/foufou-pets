@@ -140,6 +140,63 @@ export async function getMatches(lostCaseId) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.score - a.score);
 }
 
+/**
+ * The reverse direction of checkMatchesForLostCase: starting from one found/
+ * seen report, compares it against every active lost case. Matches still
+ * live in the same place (each lost case's own "matches" subcollection,
+ * keyed by foundReportId) regardless of which side triggered the check -
+ * there's only ever one match record per lost-case/found-report pair, so
+ * checking from the found-report side and checking from the lost-case side
+ * both read/write the exact same data. Reuses checkSingleMatch per
+ * candidate rather than duplicating its scoring-and-persist logic.
+ */
+export async function checkMatchesForFoundReport(foundReportId) {
+  const reportSnap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId));
+  if (!reportSnap.exists()) throw new Error('found report not found');
+  const report = reportSnap.data();
+
+  const casesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
+  const lostCases = casesSnap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .filter(
+      (c) =>
+        (c.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE &&
+        (!report.species || !c.species || c.species === report.species)
+    );
+
+  const results = await Promise.all(
+    lostCases.map(async (lostCase) => {
+      const { score, reasons, breakdown, status } = await checkSingleMatch(lostCase.id, foundReportId);
+      return { lostCase, score, reasons, breakdown, status };
+    })
+  );
+
+  return results.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Reads back whatever matches were last persisted for this found report
+ * (across every lost case's subcollection) without re-scoring anything -
+ * the found-report-detail equivalent of getMatches, used on page load so
+ * revisiting the page doesn't silently re-run a fresh check. No top-level
+ * "matches" collection exists to query directly (see checkMatchesForFoundReport),
+ * so this reads one match doc per lost case - fine at this project's scale,
+ * and avoids needing a Firestore collection-group index just to list them.
+ */
+export async function getMatchesForFoundReport(foundReportId) {
+  const casesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
+  const results = [];
+  await Promise.all(
+    casesSnap.docs.map(async (caseDoc) => {
+      const matchSnap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseDoc.id, 'matches', foundReportId));
+      if (matchSnap.exists()) {
+        results.push({ lostCase: { id: caseDoc.id, ...caseDoc.data() }, ...matchSnap.data() });
+      }
+    })
+  );
+  return results.sort((a, b) => b.score - a.score);
+}
+
 export async function getMatch(lostCaseId, foundReportId) {
   const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import {
   getFoundReport,
@@ -11,6 +11,7 @@ import {
 } from './foundReportApi.js';
 import {
   RECORD_STATUS,
+  REPORT_STATUS,
   FOUND_REPORT_STATUS_LABELS,
   CAT_SIZES,
   CAT_FUR_TYPES,
@@ -27,6 +28,8 @@ import { usePatternOptions } from '../shared/usePatternOptions.js';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { petLabels } from '../shared/petLabels.js';
 import { displayFoundReportName } from './foundFieldMapping.js';
+import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
+import { buildLostCaseSections } from '../lost-report/lostCaseSections.js';
 import { shortSnippet } from '../shared/textSnippet.js';
 import EditableTitle from '../shared/EditableTitle.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
@@ -42,6 +45,17 @@ import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import { buildFoundReportSections } from './foundReportSections.js';
+import {
+  checkMatchesForFoundReport,
+  checkSingleMatch,
+  getMatchesForFoundReport,
+  updateMatchStatus,
+} from '../matching/matchingApi.js';
+import { getMatchConfig } from '../matching/matchConfigApi.js';
+import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
+import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import DropdownBadge from '../shared/DropdownBadge.jsx';
+import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'sourceGroupName', extractedKey: 'sourceGroupName', label: 'מקור המידע (קבוצה)' },
@@ -88,6 +102,11 @@ export default function FoundReportDetail() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [matches, setMatches] = useState([]);
+  const [checking, setChecking] = useState(false);
+  const [recheckingId, setRecheckingId] = useState(null);
+  const [showProcessedMatches, setShowProcessedMatches] = useState(false);
+  const [confidenceColors, setConfidenceColors] = useState(undefined);
   const {
     reading: extracting,
     error: extractError,
@@ -105,6 +124,10 @@ export default function FoundReportDetail() {
   useEffect(() => {
     load();
   }, [reportId]);
+
+  useEffect(() => {
+    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
+  }, []);
 
   // Compares against the last-loaded/last-saved report, not just whether
   // edit mode is open - entering edit mode without touching anything
@@ -142,6 +165,43 @@ export default function FoundReportDetail() {
     const data = await getFoundReport(reportId);
     setReport(data);
     setFields(data);
+    setMatches(await getMatchesForFoundReport(reportId));
+  }
+
+  async function handleCheckMatches() {
+    setChecking(true);
+    try {
+      setMatches(await checkMatchesForFoundReport(reportId));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  // Re-scores just this one pairing - useful right after editing that lost
+  // case's details (from the same match card) to see the effect
+  // immediately, without re-running the full check against every lost case
+  // again.
+  async function handleRecheckSingleMatch(lostCaseId) {
+    setRecheckingId(lostCaseId);
+    try {
+      await checkSingleMatch(lostCaseId, reportId);
+      setMatches(await getMatchesForFoundReport(reportId));
+    } finally {
+      setRecheckingId(null);
+    }
+  }
+
+  async function handleMatchStatusChange(lostCaseId, status) {
+    await updateMatchStatus(lostCaseId, reportId, status);
+    setMatches((prev) => prev.map((m) => (m.lostCase.id === lostCaseId ? { ...m, status } : m)));
+  }
+
+  // Same reasoning as the lost-case page's handleMatchResolved - once a
+  // match is confirmed via NotifyOwnerDialog's checkbox, both records are
+  // already closed by the time this fires, so there's nothing left to do
+  // on this page.
+  function handleMatchResolved() {
+    navigate('/');
   }
 
   // Quick rename from the pencil on the view header - saves just the
@@ -602,6 +662,77 @@ export default function FoundReportDetail() {
         </div>
       )}
 
+      {!showEditForm && (
+        <>
+          <button
+            onClick={handleCheckMatches}
+            disabled={checking}
+            className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
+          >
+            {checking ? 'בודקים התאמות...' : 'בדיקת התאמות מול תיקי חיפוש'}
+          </button>
+
+          <h2 className="mb-1 mt-6 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
+          {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
+          {matches.length > 0 && (
+            <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              הכי טובה: <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
+            </p>
+          )}
+
+          {(() => {
+            const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
+            const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
+            return (
+              <>
+                {newMatches.length > 0 ? (
+                  <ul className="space-y-3">
+                    {newMatches.map((m) => (
+                      <ReverseMatchCard
+                        key={m.lostCase.id}
+                        match={m}
+                        report={report}
+                        onStatusChange={handleMatchStatusChange}
+                        onViewPhoto={setLightboxUrl}
+                        confidenceColors={confidenceColors}
+                        onRecheck={handleRecheckSingleMatch}
+                        rechecking={recheckingId === m.lostCase.id}
+                        onResolved={handleMatchResolved}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  matches.length > 0 && <p className="text-sm text-slate-400">אין התאמות חדשות שטרם נבדקו.</p>
+                )}
+
+                {processedMatches.length > 0 && (
+                  <div className="mt-6">
+                    <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
+                      {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
+                    </button>
+                    {showProcessedMatches && (
+                      <ul className="space-y-3">
+                        {processedMatches.map((m) => (
+                          <ReverseMatchCard
+                            key={m.lostCase.id}
+                            match={m}
+                            report={report}
+                            onStatusChange={handleMatchStatusChange}
+                            onViewPhoto={setLightboxUrl}
+                            confidenceColors={confidenceColors}
+                            onResolved={handleMatchResolved}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </>
+      )}
+
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
       {colorCheckPending && (
@@ -617,6 +748,118 @@ export default function FoundReportDetail() {
         />
       )}
     </div>
+  );
+}
+
+// The reverse of LostCaseDetail.jsx's MatchCard: here the found report is
+// fixed (it's the page we're on) and the lost case is the varying side.
+// Same underlying match record either way (see matchingApi.js), so this
+// reuses the exact same status labels/colors and the same NotifyOwnerDialog
+// (still always addressed to the lost case's owner, describing this found
+// report - who initiated the check doesn't change who the message is for).
+function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, onRecheck, rechecking, onResolved }) {
+  const { lostCase } = match;
+  const [showCaseDetails, setShowCaseDetails] = useState(false);
+  const [showNotify, setShowNotify] = useState(false);
+
+  return (
+    <li className="rounded-xl border border-slate-200 bg-white p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="flex shrink-0 items-center gap-2 font-medium text-slate-800">
+          רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
+        </span>
+        {onRecheck && (
+          <button
+            type="button"
+            onClick={() => onRecheck(lostCase.id)}
+            disabled={rechecking}
+            className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
+          >
+            {rechecking ? 'מרענן...' : 'רענן בדיקה'}
+          </button>
+        )}
+      </div>
+      <div className="mb-2 flex justify-end">
+        <DropdownBadge
+          value={match.status}
+          labels={MATCH_STATUS_LABELS}
+          onChange={(status) => onStatusChange(lostCase.id, status)}
+          colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+        />
+      </div>
+
+      {lostCase.photos?.[0]?.url && (
+        <button type="button" onClick={() => onViewPhoto(lostCase.photos[0].url)} className="mb-2 block w-full">
+          <img
+            src={lostCase.photos[0].url}
+            alt=""
+            className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
+          />
+        </button>
+      )}
+
+      <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
+        {match.reasons.map((reason, i) => (
+          <li key={i}>{reason}</li>
+        ))}
+      </ul>
+
+      <div className="rounded-lg bg-slate-50 p-2 text-xs text-slate-500">
+        <p className="font-medium text-slate-700">{displayLostCaseName(lostCase)}</p>
+        {lostCase.contactPhone && <p>טלפון: {lostCase.contactPhone}</p>}
+      </div>
+
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setShowCaseDetails(true)}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-sm font-medium text-slate-600"
+        >
+          {petLabels(lostCase.species).petDetailsSection}
+        </button>
+        <Link
+          to={`/lost/${lostCase.id}?edit=1`}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
+        >
+          עריכה
+        </Link>
+        <Link
+          to={`/lost/${lostCase.id}/analysis/${report.id}`}
+          className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
+        >
+          ניתוח מלא
+        </Link>
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setShowNotify(true)}
+        className="mt-2 w-full rounded-lg bg-emerald-50 py-2 text-sm font-medium text-emerald-700"
+      >
+        📱 עדכון הבעלים בוואטסאפ
+      </button>
+
+      {showCaseDetails && (
+        <RecordDetailsDialog
+          title={displayLostCaseName(lostCase)}
+          onClose={() => setShowCaseDetails(false)}
+          photos={lostCase.photos}
+          onViewPhoto={onViewPhoto}
+          sections={buildLostCaseSections(lostCase)}
+        />
+      )}
+
+      {showNotify && (
+        <NotifyOwnerDialog
+          lostCase={lostCase}
+          report={report}
+          foundReportId={report.id}
+          onClose={() => setShowNotify(false)}
+          onSent={() => onStatusChange(lostCase.id, REPORT_STATUS.CONTACTED)}
+          onResolved={onResolved}
+        />
+      )}
+    </li>
   );
 }
 
