@@ -32,7 +32,7 @@ export function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, conf
   return (
     <div className="flex items-center gap-2">
       <span className="whitespace-nowrap text-xs text-black">
-        {hasNew && `${newMatchCount} חדש, `}
+        {hasNew && `${newMatchCount} לבדיקה, `}
         {reviewedCount} נבדקו
       </span>
       <ConfidenceBadge score={topMatchScore} confidenceColors={confidenceColors} />

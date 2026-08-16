@@ -49,6 +49,7 @@ import {
   checkMatchesForFoundReport,
   checkSingleMatch,
   clearMatchesForFoundReport,
+  countNewCandidatesForFoundReport,
   getMatchesForFoundReport,
   updateMatchStatus,
 } from '../matching/matchingApi.js';
@@ -113,6 +114,13 @@ export default function FoundReportDetail() {
   const [justChecked, setJustChecked] = useState(false);
   const [recheckingId, setRecheckingId] = useState(null);
   const [showProcessedMatches, setShowProcessedMatches] = useState(false);
+  const [showNoMatch, setShowNoMatch] = useState(false);
+  // How many active lost cases have never been compared against this
+  // report at all - distinct from matches.length, which counts pairings
+  // that already have a scored record (whether awaiting review, no-match,
+  // or already triaged). Computed live, not denormalized, since it depends
+  // on the whole lost-cases pool.
+  const [newCandidateCount, setNewCandidateCount] = useState(0);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const {
     reading: extracting,
@@ -173,6 +181,7 @@ export default function FoundReportDetail() {
     setReport(data);
     setFields(data);
     setMatches(await getMatchesForFoundReport(reportId));
+    setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
   }
 
   function flashJustChecked() {
@@ -183,24 +192,26 @@ export default function FoundReportDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     try {
-      setMatches(await checkMatchesForFoundReport(reportId));
+      await checkMatchesForFoundReport(reportId);
+      setMatches(await getMatchesForFoundReport(reportId));
+      setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
       flashJustChecked();
     } finally {
       setChecking(false);
     }
   }
 
-  async function handleClearAndRecheckMatches() {
+  async function handleReset() {
     const ok = await confirm(
-      'למחוק את כל ההתאמות הקיימות עבור הדיווח הזה - כולל סטטוסים שנקבעו ידנית - ולבדוק הכל מחדש מאפס?',
-      { confirmLabel: 'איפוס ובדיקה מחדש', danger: true }
+      'לאפס את כל ההתאמות הקיימות עבור הדיווח הזה - כולל סטטוסים שנקבעו ידנית? כל תיקי החיפוש יסומנו כחדשים ויהיה צריך לבדוק אותם שוב.',
+      { confirmLabel: 'איפוס', danger: true }
     );
     if (!ok) return;
     setChecking(true);
     try {
       await clearMatchesForFoundReport(reportId);
-      setMatches(await checkMatchesForFoundReport(reportId));
-      flashJustChecked();
+      setMatches([]);
+      setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
     } finally {
       setChecking(false);
     }
@@ -342,8 +353,13 @@ export default function FoundReportDetail() {
   const canManage = isEditorOrAdmin || report.reportedByUid === user.uid;
   const showEditForm = editing && canManage;
 
-  const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
-  const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
+  // Three groups the algorithm itself produces, plus a fourth (below) for
+  // whatever a person has explicitly triaged by hand. "New" (candidates
+  // never scored at all) isn't one of these - it has no card to show yet,
+  // so it only ever appears as a count on the check button itself.
+  const pendingReview = matches.filter((m) => m.status === REPORT_STATUS.NEW);
+  const noMatch = matches.filter((m) => m.status === REPORT_STATUS.NO_MATCH);
+  const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW && m.status !== REPORT_STATUS.NO_MATCH);
 
   return (
     <div className="p-4">
@@ -698,74 +714,49 @@ export default function FoundReportDetail() {
         <>
           <button
             onClick={handleCheckMatches}
-            disabled={checking}
-            className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
+            disabled={checking || newCandidateCount === 0}
+            className={
+              !checking && newCandidateCount === 0
+                ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
+                : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
+            }
           >
             {checking
               ? 'בודקים התאמות...'
               : justChecked
                 ? '✓ הבדיקה הושלמה'
-                : matches.length === 0
-                  ? 'בדיקת התאמות מול תיקי חיפוש'
-                  : 'בדיקה חוזרת'}
+                : newCandidateCount > 0
+                  ? `בדיקת ${newCandidateCount} חדשים`
+                  : 'אין חדשים לבדיקה'}
           </button>
           {matches.length > 0 && (
             <button
-              onClick={handleClearAndRecheckMatches}
+              onClick={handleReset}
               disabled={checking}
               className="mb-6 mt-2 w-full text-center text-xs text-slate-400 underline disabled:opacity-50"
             >
-              איפוס כל ההתאמות (כולל סטטוסים) ובדיקה מחדש
+              איפוס כל ההתאמות (כולל סטטוסים) - הכל יחזור להיות חדש
             </button>
           )}
           {matches.length === 0 && <div className="mb-6" />}
 
-          <h2 className="mb-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-700">
-            תיקי חיפוש תואמים אפשריים ({matches.length})
-            {newMatches.length > 0 && (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">{newMatches.length} חדשות</span>
-            )}
-          </h2>
-          {newMatches.length > 0 && (
-            <p className="mb-2 text-xs text-slate-400">
-              כדי לסמן התאמה כטופלה, בחרו לה סטטוס ברשימה למטה - לחיצה על הכפתור למעלה רק מריצה שוב את הבדיקה מול המאגר.
-            </p>
-          )}
-          {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
+          <h2 className="mb-3 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">
               הכי טובה: <ConfidenceBadge score={matches[0].score} confidenceColors={confidenceColors} />
             </p>
           )}
 
-          {newMatches.length > 0 ? (
-            <ul className="space-y-3">
-              {newMatches.map((m) => (
-                <ReverseMatchCard
-                  key={m.lostCase.id}
-                  match={m}
-                  report={report}
-                  onStatusChange={handleMatchStatusChange}
-                  onViewPhoto={setLightboxUrl}
-                  confidenceColors={confidenceColors}
-                  onRecheck={handleRecheckSingleMatch}
-                  rechecking={recheckingId === m.lostCase.id}
-                  onResolved={handleMatchResolved}
-                />
-              ))}
-            </ul>
+          {matches.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              {newCandidateCount > 0 ? 'לא בוצעה בדיקה עדיין - לחצו למעלה כדי לבדוק.' : 'אין תיקי חיפוש במאגר להשוואה.'}
+            </p>
           ) : (
-            matches.length > 0 && <p className="text-sm text-slate-400">אין התאמות חדשות שטרם נבדקו.</p>
-          )}
-
-          {processedMatches.length > 0 && (
-            <div className="mt-6">
-              <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
-                {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
-              </button>
-              {showProcessedMatches && (
-                <ul className="space-y-3">
-                  {processedMatches.map((m) => (
+            <>
+              <h3 className="mb-2 text-sm font-semibold text-slate-600">ממתינות לבדיקה ({pendingReview.length})</h3>
+              {pendingReview.length > 0 ? (
+                <ul className="mb-6 space-y-3">
+                  {pendingReview.map((m) => (
                     <ReverseMatchCard
                       key={m.lostCase.id}
                       match={m}
@@ -773,12 +764,64 @@ export default function FoundReportDetail() {
                       onStatusChange={handleMatchStatusChange}
                       onViewPhoto={setLightboxUrl}
                       confidenceColors={confidenceColors}
+                      onRecheck={handleRecheckSingleMatch}
+                      rechecking={recheckingId === m.lostCase.id}
                       onResolved={handleMatchResolved}
                     />
                   ))}
                 </ul>
+              ) : (
+                <p className="mb-6 text-sm text-slate-400">אין התאמות ממתינות לבדיקה כרגע.</p>
               )}
-            </div>
+
+              {noMatch.length > 0 && (
+                <div className="mb-6">
+                  <button onClick={() => setShowNoMatch((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
+                    {showNoMatch ? 'הסתרת' : 'הצגת'} {noMatch.length} ללא התאמה
+                  </button>
+                  {showNoMatch && (
+                    <ul className="space-y-3">
+                      {noMatch.map((m) => (
+                        <ReverseMatchCard
+                          key={m.lostCase.id}
+                          match={m}
+                          report={report}
+                          onStatusChange={handleMatchStatusChange}
+                          onViewPhoto={setLightboxUrl}
+                          confidenceColors={confidenceColors}
+                          onRecheck={handleRecheckSingleMatch}
+                          rechecking={recheckingId === m.lostCase.id}
+                          onResolved={handleMatchResolved}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {processedMatches.length > 0 && (
+                <div>
+                  <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
+                    {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
+                  </button>
+                  {showProcessedMatches && (
+                    <ul className="space-y-3">
+                      {processedMatches.map((m) => (
+                        <ReverseMatchCard
+                          key={m.lostCase.id}
+                          match={m}
+                          report={report}
+                          onStatusChange={handleMatchStatusChange}
+                          onViewPhoto={setLightboxUrl}
+                          confidenceColors={confidenceColors}
+                          onResolved={handleMatchResolved}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </>
       )}
