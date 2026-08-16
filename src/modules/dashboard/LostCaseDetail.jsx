@@ -735,18 +735,20 @@ export default function LostCaseDetail() {
 
       <button
         onClick={handleCheckMatches}
-        disabled={checking || matches.length > 0}
+        disabled={checking || (matches.length > 0 && newMatches.length === 0)}
         className={
-          !checking && matches.length > 0
+          !checking && matches.length > 0 && newMatches.length === 0
             ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
             : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
         }
       >
         {checking
           ? 'בודקים התאמות...'
-          : matches.length > 0
-            ? `✓ ההתאמות נבדקו (${matches.length})`
-            : 'בדיקת התאמות אפשריות'}
+          : matches.length === 0
+            ? 'בדיקת התאמות אפשריות'
+            : newMatches.length > 0
+              ? `בדיקת התאמה ל-${newMatches.length}`
+              : `✓ ההתאמות נבדקו (${matches.length})`}
       </button>
       {matches.length > 0 && (
         <button

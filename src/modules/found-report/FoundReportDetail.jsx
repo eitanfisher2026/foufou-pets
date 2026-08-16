@@ -329,6 +329,9 @@ export default function FoundReportDetail() {
   const canManage = isEditorOrAdmin || report.reportedByUid === user.uid;
   const showEditForm = editing && canManage;
 
+  const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
+  const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
+
   return (
     <div className="p-4">
       <BackLink onClick={handleBackToHome} onBack={handleBackInHistory}>
@@ -682,18 +685,20 @@ export default function FoundReportDetail() {
         <>
           <button
             onClick={handleCheckMatches}
-            disabled={checking || matches.length > 0}
+            disabled={checking || (matches.length > 0 && newMatches.length === 0)}
             className={
-              !checking && matches.length > 0
+              !checking && matches.length > 0 && newMatches.length === 0
                 ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
                 : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
             }
           >
             {checking
               ? 'בודקים התאמות...'
-              : matches.length > 0
-                ? `✓ ההתאמות נבדקו (${matches.length})`
-                : 'בדיקת התאמות מול תיקי חיפוש'}
+              : matches.length === 0
+                ? 'בדיקת התאמות מול תיקי חיפוש'
+                : newMatches.length > 0
+                  ? `בדיקת התאמה ל-${newMatches.length}`
+                  : `✓ ההתאמות נבדקו (${matches.length})`}
           </button>
           {matches.length > 0 && (
             <button
@@ -714,56 +719,48 @@ export default function FoundReportDetail() {
             </p>
           )}
 
-          {(() => {
-            const newMatches = matches.filter((m) => m.status === REPORT_STATUS.NEW);
-            const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW);
-            return (
-              <>
-                {newMatches.length > 0 ? (
-                  <ul className="space-y-3">
-                    {newMatches.map((m) => (
-                      <ReverseMatchCard
-                        key={m.lostCase.id}
-                        match={m}
-                        report={report}
-                        onStatusChange={handleMatchStatusChange}
-                        onViewPhoto={setLightboxUrl}
-                        confidenceColors={confidenceColors}
-                        onRecheck={handleRecheckSingleMatch}
-                        rechecking={recheckingId === m.lostCase.id}
-                        onResolved={handleMatchResolved}
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  matches.length > 0 && <p className="text-sm text-slate-400">אין התאמות חדשות שטרם נבדקו.</p>
-                )}
+          {newMatches.length > 0 ? (
+            <ul className="space-y-3">
+              {newMatches.map((m) => (
+                <ReverseMatchCard
+                  key={m.lostCase.id}
+                  match={m}
+                  report={report}
+                  onStatusChange={handleMatchStatusChange}
+                  onViewPhoto={setLightboxUrl}
+                  confidenceColors={confidenceColors}
+                  onRecheck={handleRecheckSingleMatch}
+                  rechecking={recheckingId === m.lostCase.id}
+                  onResolved={handleMatchResolved}
+                />
+              ))}
+            </ul>
+          ) : (
+            matches.length > 0 && <p className="text-sm text-slate-400">אין התאמות חדשות שטרם נבדקו.</p>
+          )}
 
-                {processedMatches.length > 0 && (
-                  <div className="mt-6">
-                    <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
-                      {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
-                    </button>
-                    {showProcessedMatches && (
-                      <ul className="space-y-3">
-                        {processedMatches.map((m) => (
-                          <ReverseMatchCard
-                            key={m.lostCase.id}
-                            match={m}
-                            report={report}
-                            onStatusChange={handleMatchStatusChange}
-                            onViewPhoto={setLightboxUrl}
-                            confidenceColors={confidenceColors}
-                            onResolved={handleMatchResolved}
-                          />
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </>
-            );
-          })()}
+          {processedMatches.length > 0 && (
+            <div className="mt-6">
+              <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
+                {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
+              </button>
+              {showProcessedMatches && (
+                <ul className="space-y-3">
+                  {processedMatches.map((m) => (
+                    <ReverseMatchCard
+                      key={m.lostCase.id}
+                      match={m}
+                      report={report}
+                      onStatusChange={handleMatchStatusChange}
+                      onViewPhoto={setLightboxUrl}
+                      confidenceColors={confidenceColors}
+                      onResolved={handleMatchResolved}
+                    />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       )}
 
