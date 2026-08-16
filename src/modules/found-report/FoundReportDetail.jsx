@@ -755,8 +755,11 @@ export default function FoundReportDetail() {
 // fixed (it's the page we're on) and the lost case is the varying side.
 // Same underlying match record either way (see matchingApi.js), so this
 // reuses the exact same status labels/colors and the same NotifyOwnerDialog
-// (still always addressed to the lost case's owner, describing this found
-// report - who initiated the check doesn't change who the message is for).
+// - but with direction="toFinder", since here the person looking at this
+// card is usually a stranger who found/saw an animal and doesn't yet know
+// whose it might be. The message they'd send needs to be addressed to
+// them and describe the LOST pet + its owner's contact info, not the other
+// way around (see buildNotifyFinderMessage in notifyMessage.js).
 function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confidenceColors, onRecheck, rechecking, onResolved }) {
   const { lostCase } = match;
   const [showCaseDetails, setShowCaseDetails] = useState(false);
@@ -836,7 +839,7 @@ function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confiden
         onClick={() => setShowNotify(true)}
         className="mt-2 w-full rounded-lg bg-emerald-50 py-2 text-sm font-medium text-emerald-700"
       >
-        📱 עדכון הבעלים בוואטסאפ
+        📱 יצירת קשר עם מי שמצא/ה בוואטסאפ
       </button>
 
       {showCaseDetails && (
@@ -854,6 +857,7 @@ function ReverseMatchCard({ match, report, onStatusChange, onViewPhoto, confiden
           lostCase={lostCase}
           report={report}
           foundReportId={report.id}
+          direction="toFinder"
           onClose={() => setShowNotify(false)}
           onSent={() => onStatusChange(lostCase.id, REPORT_STATUS.CONTACTED)}
           onResolved={onResolved}

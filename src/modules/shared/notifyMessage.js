@@ -35,6 +35,38 @@ export function buildNotifyMessage(lostCase, report) {
   return lines.join('\n');
 }
 
+/**
+ * The mirror of buildNotifyMessage, for the reverse direction: starting
+ * from a found/seen report and telling whoever reported it (the finder,
+ * not necessarily the lost pet's owner) about a possible match to a lost
+ * case - so the message needs to be about the LOST pet (its name, where/
+ * when it went missing, its owner's contact info), not the found sighting
+ * the finder already knows about firsthand.
+ */
+export function buildNotifyFinderMessage(report, lostCase) {
+  const animal = petLabels(lostCase?.species || report?.species).animal;
+  const lines = [`היי! יש התאמה אפשרית ל${animal} שמצאת/ראית 🐾`, ''];
+
+  let lost = `יתכן שזה ${displayLostCaseName(lostCase)}, ${animal} שאבד`;
+  const whereParts = [lostCase?.city, lostCase?.neighborhood].filter(Boolean);
+  if (whereParts.length > 0) lost += ` ב${whereParts.join(', ')}`;
+  if (lostCase?.lastSeenAt) lost += `, ${lostCase.lastSeenAt}`;
+  lines.push(lost + '.');
+
+  if (lostCase?.sourceUrl) {
+    lines.push('', `לצפייה בפוסט המקורי: ${lostCase.sourceUrl}`);
+  } else if (lostCase?.markings) {
+    lines.push('', `סימנים מיוחדים: ${lostCase.markings}`);
+  }
+
+  if (lostCase?.contactName || lostCase?.contactPhone) {
+    lines.push('', `פרטי קשר של הבעלים: ${[lostCase.contactName, lostCase.contactPhone].filter(Boolean).join(' - ')}`);
+  }
+
+  lines.push('', 'תודה על העזרה! 🙏', '', 'נשלח דרך אפליקציית איתור חיות מחמד (FouFou-Pets) 🐾', 'https://foufou-pets.web.app');
+  return lines.join('\n');
+}
+
 // wa.me needs digits only, international format with no leading "+" or
 // "0" - e.g. "054-123-4567" -> "972541234567". Same normalization
 // direction as duplicateCheckApi.js's phone matching, just inverted (that
