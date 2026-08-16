@@ -1,2 +1,2 @@
 // Bump on every code change: v1.0 -> v1.1 -> v1.2 ... v1.99 -> v2.0 -> v2.1 ...
-export const APP_VERSION = 'v2.24';
+export const APP_VERSION = 'v2.25';
