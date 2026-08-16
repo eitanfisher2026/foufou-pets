@@ -127,7 +127,22 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
 
   const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
   const prevSnap = await getDoc(matchRef);
-  const status = prevSnap.exists() ? prevSnap.data().status : score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+  const prevStatus = prevSnap.exists() ? prevSnap.data().status : undefined;
+  // NEW and NO_MATCH are both the algorithm's own verdict, never a person's
+  // - "האלגוריתם קבע: אין התאמה" literally says so. Only a real triage
+  // status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH, CONTACTED, CLOSED, ...)
+  // means a person actually looked at this pairing, and only that should
+  // survive a re-score untouched. Otherwise the auto-verdict needs to track
+  // whatever the current score actually says - a re-check that now
+  // disqualifies a pairing (or un-disqualifies one) should visibly move it
+  // out of "ממתינות לבדיקה" into "ללא התאמה" (or back), not leave a stale
+  // status sitting on a score that no longer matches it.
+  const status =
+    prevStatus && prevStatus !== REPORT_STATUS.NEW && prevStatus !== REPORT_STATUS.NO_MATCH
+      ? prevStatus
+      : score === 0
+        ? REPORT_STATUS.NO_MATCH
+        : REPORT_STATUS.NEW;
   await setDoc(matchRef, { foundReportId, score, reasons, breakdown, status, checkedAt: serverTimestamp() }, { merge: true });
   await recomputeLostCaseCounts(lostCaseId);
 
