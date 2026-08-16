@@ -61,7 +61,18 @@ export function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, conf
 // browsers handle the click-through oddly, so the photo needs its own tap
 // target with its own stopPropagation instead of living inside the link
 // that opens the record's detail page.
+//
+// The paw placeholder is always in the DOM, not just a fallback for a
+// missing photo - it's the visible state until that specific image
+// actually finishes loading, so a long list never shows a bare gap that
+// then pops a photo in at whatever moment the network happens to deliver
+// it (lazy-loaded images across a list resolve in whatever order the
+// browser gets to them, not top-to-bottom). object-top instead of the
+// default centered crop, because a pet photo's subject is almost always
+// framed in the upper part of the shot - centering a tight square crop
+// routinely cut the head off.
 function RowThumbnail({ photo, onOpen }) {
+  const [loaded, setLoaded] = useState(false);
   return (
     <button
       type="button"
@@ -71,20 +82,22 @@ function RowThumbnail({ photo, onOpen }) {
         e.stopPropagation();
         onOpen(photo.url);
       }}
-      className="shrink-0"
+      className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100"
       aria-label={photo ? 'הצגת תמונה' : undefined}
       tabIndex={photo ? 0 : -1}
     >
-      {photo ? (
+      {(!photo || !loaded) && (
+        <div className="absolute inset-0 flex items-center justify-center text-2xl">🐾</div>
+      )}
+      {photo && (
         <img
           src={photo.url}
           alt=""
           loading="lazy"
           decoding="async"
-          className="h-12 w-12 rounded-lg bg-slate-50 object-cover"
+          onLoad={() => setLoaded(true)}
+          className={`h-16 w-16 object-cover object-top transition-opacity duration-300 ${loaded ? 'opacity-100' : 'opacity-0'}`}
         />
-      ) : (
-        <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-slate-100 text-lg">🐾</div>
       )}
     </button>
   );
