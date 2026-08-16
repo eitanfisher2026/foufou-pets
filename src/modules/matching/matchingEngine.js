@@ -155,24 +155,28 @@ function compareColor(a, b, ctx) {
   return { ratio: 0 };
 }
 
-// Skipped only when BOTH sides are the species' "no breed identified"
-// default (see DEFAULT_BREED_BY_SPECIES above) - neither side is actually
-// claiming a breed then, so there's nothing to compare. The moment either
-// side names a real breed, the comparison is live and strict: exact match
-// scores full, two breeds placed in the same configured group for this
-// pair's species (config.breedGroups) score partial credit for being easy
-// to mix up in a photo, and anything else - including the other side being
-// the generic "מעורב" default - scores a hard 0, same as a genuinely
-// different breed would.
+// Breed only ever helps, never disqualifies - skipped (no score either way)
+// whenever EITHER side is the species' "no breed identified" default (see
+// DEFAULT_BREED_BY_SPECIES above), including both sides being the default.
+// The common real-world case is an owner who knows their own pet's breed
+// reporting against a street-finder who has no way to identify a breed from
+// a glance and just picks "מעורב" - that's a "can't tell," not a
+// disagreement. Even once both sides name a real, specific breed, only
+// agreement is scored: an exact match scores full, two breeds placed in the
+// same configured group for this pair's species (config.breedGroups) score
+// partial credit for being easy to mix up in a photo, and two specific
+// breeds that genuinely differ are still skipped rather than counted as a
+// mismatch - a wrong/uncertain breed read shouldn't be able to rule out an
+// otherwise-good match.
 function compareBreed(a, b, ctx) {
   if (!a || !b) return null;
-  if (a === ctx?.defaultBreed && b === ctx?.defaultBreed) return null;
+  if (a === ctx?.defaultBreed || b === ctx?.defaultBreed) return null;
   if (a === b) return { ratio: 1 };
   const groupsBySpecies = ctx?.breedGroups || DEFAULT_BREED_GROUPS;
   const groups = groupsBySpecies[ctx?.species] || [];
   const sameGroup = groups.some((group) => group.includes(a) && group.includes(b));
   if (sameGroup) return { ratio: 0.6 };
-  return { ratio: 0 };
+  return null;
 }
 
 function compareTextOverlap(a, b) {
@@ -295,7 +299,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
-    { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed', disqualifying: true },
+    { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed' },
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
     { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
     { key: 'pattern', label: 'תבנית פרווה (חתולים)', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'pattern', foundField: 'pattern', mismatchPenalty: 10, defaultValue: 'אחיד' },
@@ -344,7 +348,7 @@ export const COMPARISON_TYPE_LABELS = {
   exactSkipDefault: 'התאמה מדויקת, מלבד ערך ברירת מחדל (התאמה על הערך הנפוץ/הרגיל לא נחשבת)',
   colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
   breedMatch:
-    'גזע (מדלג רק אם משני הצדדים "מעורב" (אין גזע מזוהה) - ברגע שצד אחד ציין גזע ספציפי, ההשוואה מדויקת וגם "מעורב" בצד השני נחשב אי-התאמה, מלבד זוגות גזעים שהוגדרו כדומים/קלים לבלבול)',
+    'גזע (יכול רק להוסיף ניקוד, לעולם לא פוסל התאמה. מדלג אם אחד הצדדים "מעורב" - לא נחשב לא התאמה ולא אי-התאמה. גזע זהה בשני הצדדים מקבל ציון גבוה, גזעים שהוגדרו כדומים/קלים לבלבול מקבלים ציון בינוני, וגזעים ספציפיים שונים שאינם באותה קבוצה לא מקבלים ציון בכלל)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
