@@ -21,6 +21,7 @@ import { findDuplicatesBySourceUrl, findDuplicates } from '../shared/duplicateCh
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
+import BreedCheckDialog from '../shared/BreedCheckDialog.jsx';
 import {
   CAT_SIZES,
   CAT_FUR_TYPES,
@@ -30,6 +31,7 @@ import {
   SPECIES,
   CAT_PATTERN_DESCRIPTIONS,
   DEFAULT_CAT_BREED,
+  DEFAULT_DOG_BREED,
 } from '../shared/collections.js';
 import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
@@ -71,6 +73,7 @@ export default function FoundReportForm() {
   const [duplicateMatches, setDuplicateMatches] = useState(null);
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
   const [colorCheckReportId, setColorCheckReportId] = useState(null);
+  const [breedCheckReportId, setBreedCheckReportId] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -163,17 +166,47 @@ export default function FoundReportForm() {
     setSubmitting(true);
     try {
       const reportId = await createFoundReport({ ...fields, source }, photos, user);
-      // The record is already saved at this point either way - this is a
-      // one-time nudge to fix a non-specific color right after creation,
-      // never a gate on the save itself (see ColorCheckDialog.jsx).
-      if (fields.color === 'אחר') {
-        setColorCheckReportId(reportId);
-      } else {
-        navigate(`/found/${reportId}`);
-      }
+      runPostCreateChecks(reportId);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // The record is already saved at this point either way - breed first
+  // (dog-only, since the overwhelming majority of cat reports are
+  // genuinely mixed/street cats with nothing to double-check), then color,
+  // same order and non-blocking pattern as the smart-intake flow (see
+  // useSmartIntake.js) - a one-time nudge toward a more specific value,
+  // never a gate on the save itself.
+  function runPostCreateChecks(reportId) {
+    const isUnidentifiedDogBreed = fields.species === SPECIES.DOG && (!fields.breed || fields.breed === DEFAULT_DOG_BREED);
+    if (isUnidentifiedDogBreed) {
+      setBreedCheckReportId(reportId);
+    } else {
+      maybeColorCheck(reportId);
+    }
+  }
+
+  function maybeColorCheck(reportId) {
+    if (fields.color === 'אחר') {
+      setColorCheckReportId(reportId);
+    } else {
+      navigate(`/found/${reportId}`);
+    }
+  }
+
+  async function handleBreedCheckSave(newBreed) {
+    await updateFoundReport(breedCheckReportId, { ...fields, breed: newBreed }, []);
+    setField('breed', newBreed);
+    const id = breedCheckReportId;
+    setBreedCheckReportId(null);
+    maybeColorCheck(id);
+  }
+
+  function handleBreedCheckSkip() {
+    const id = breedCheckReportId;
+    setBreedCheckReportId(null);
+    maybeColorCheck(id);
   }
 
   async function handleColorCheckSave(newColor) {
@@ -546,6 +579,10 @@ export default function FoundReportForm() {
             if (duplicateDialogMode === 'info') navigate('/');
           }}
         />
+      )}
+
+      {breedCheckReportId && (
+        <BreedCheckDialog breedOptions={breedOptions} onSave={handleBreedCheckSave} onSkip={handleBreedCheckSkip} />
       )}
 
       {colorCheckReportId && (

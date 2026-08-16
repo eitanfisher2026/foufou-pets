@@ -1,9 +1,22 @@
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS, RECORD_STATUS, SPECIES } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS, SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
+
+// A dog record saved with a truly blank breed (not even the "מעורב (לא
+// ידוע)" default) can't be usefully compared on breed at all - the
+// matching engine treats "unspecified" as "skip", so a real breed on the
+// other side just silently never gets checked against it. This is the
+// last-resort backstop (the direct forms and the smart-intake flow all
+// nudge for a real breed before this ever matters), catching any path -
+// present or future - that might still let one through. Cats don't need
+// this: the forms already default a blank cat breed to the street-cat
+// default up front, and it's a much softer requirement for them anyway.
+function normalizeBreed(breed, species) {
+  return breed || (species === SPECIES.DOG ? DEFAULT_DOG_BREED : '');
+}
 
 /**
  * Creates a lost-cat case: writes the Firestore doc first (to get an id for
@@ -21,7 +34,7 @@ export async function createLostCase(fields, photoFiles, owner) {
     name: fields.name || '',
     color: fields.color || '',
     pattern: fields.pattern || '',
-    breed: fields.breed || '',
+    breed: normalizeBreed(fields.breed, species),
     size: fields.size || '',
     ageClass: fields.ageClass || '',
     furType: fields.furType || '',
@@ -80,7 +93,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       name: fields.name || '',
       color: fields.color || '',
       pattern: fields.pattern || '',
-      breed: fields.breed || '',
+      breed: normalizeBreed(fields.breed, fields.species),
       size: fields.size || '',
       ageClass: fields.ageClass || '',
       furType: fields.furType || '',

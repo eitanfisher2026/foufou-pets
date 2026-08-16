@@ -21,6 +21,7 @@ import { findDuplicatesBySourceUrl, findDuplicates } from '../shared/duplicateCh
 import DuplicateWarningDialog from '../shared/DuplicateWarningDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
+import BreedCheckDialog from '../shared/BreedCheckDialog.jsx';
 import {
   CAT_SIZES,
   CAT_FUR_TYPES,
@@ -29,6 +30,7 @@ import {
   SPECIES,
   CAT_PATTERN_DESCRIPTIONS,
   DEFAULT_CAT_BREED,
+  DEFAULT_DOG_BREED,
 } from '../shared/collections.js';
 import { createLostCase, updateLostCase } from './lostReportApi.js';
 import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
@@ -69,6 +71,7 @@ export default function LostReportForm() {
   const [duplicateMatches, setDuplicateMatches] = useState(null);
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
   const [colorCheckCaseId, setColorCheckCaseId] = useState(null);
+  const [breedCheckCaseId, setBreedCheckCaseId] = useState(null);
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -160,17 +163,47 @@ export default function LostReportForm() {
     setSubmitting(true);
     try {
       const caseId = await createLostCase({ ...fields, source }, photos, user);
-      // The record is already saved at this point either way - this is a
-      // one-time nudge to fix a non-specific color right after creation,
-      // never a gate on the save itself (see ColorCheckDialog.jsx).
-      if (fields.color === 'אחר') {
-        setColorCheckCaseId(caseId);
-      } else {
-        navigate(`/lost/${caseId}`);
-      }
+      runPostCreateChecks(caseId);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // The record is already saved at this point either way - breed first
+  // (dog-only, since the overwhelming majority of cat reports are
+  // genuinely mixed/street cats with nothing to double-check), then color,
+  // same order and non-blocking pattern as the smart-intake flow (see
+  // useSmartIntake.js) - a one-time nudge toward a more specific value,
+  // never a gate on the save itself.
+  function runPostCreateChecks(caseId) {
+    const isUnidentifiedDogBreed = fields.species === SPECIES.DOG && (!fields.breed || fields.breed === DEFAULT_DOG_BREED);
+    if (isUnidentifiedDogBreed) {
+      setBreedCheckCaseId(caseId);
+    } else {
+      maybeColorCheck(caseId);
+    }
+  }
+
+  function maybeColorCheck(caseId) {
+    if (fields.color === 'אחר') {
+      setColorCheckCaseId(caseId);
+    } else {
+      navigate(`/lost/${caseId}`);
+    }
+  }
+
+  async function handleBreedCheckSave(newBreed) {
+    await updateLostCase(breedCheckCaseId, { ...fields, breed: newBreed }, []);
+    setField('breed', newBreed);
+    const id = breedCheckCaseId;
+    setBreedCheckCaseId(null);
+    maybeColorCheck(id);
+  }
+
+  function handleBreedCheckSkip() {
+    const id = breedCheckCaseId;
+    setBreedCheckCaseId(null);
+    maybeColorCheck(id);
   }
 
   async function handleColorCheckSave(newColor) {
@@ -521,6 +554,10 @@ export default function LostReportForm() {
             if (duplicateDialogMode === 'info') navigate('/');
           }}
         />
+      )}
+
+      {breedCheckCaseId && (
+        <BreedCheckDialog breedOptions={breedOptions} onSave={handleBreedCheckSave} onSkip={handleBreedCheckSkip} />
       )}
 
       {colorCheckCaseId && (
