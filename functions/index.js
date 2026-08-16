@@ -84,14 +84,15 @@ const CAT_BREEDS = [
   'מעורב / חתול רחוב',
   'פרסי',
   'מיין קון',
-  'בן-גל (בנגל)',
+  'בנגלי',
   'סיאמי',
-  'בריטי לשיער קצר',
+  'בריטי/סקוטי',
   'ראגדול',
   'ספינקס',
   'אבסיני',
-  'נורווגי יער',
+  'יער נורווגי',
   'אמריקן שורטהייר',
+  'רוסי כחול',
   'אחר',
 ];
 const DOG_BREEDS = [
@@ -114,7 +115,8 @@ const DOG_BREEDS = [
   'מלטז',
   'קאן קורסו',
   'אמריקן סטפורדשייר (פיטבול)',
-  'קוואליר קינג צ׳ארלס ספניאל',
+  'פינצ׳ר',
+  'פומרניאן',
   'אחר',
 ];
 const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
@@ -294,7 +296,7 @@ function buildColorBullet(species) {
   return [COLOR_INTRO, anchors, COLOR_OUTRO].join('\n');
 }
 
-const CAT_BREED_BULLET = `- "breed" is only for a specific, named breed from the given list - either stated explicitly in the post text (e.g. "פרסי", "מיין קון", "בן-גל"), or visually unmistakable from the photos (e.g. a clearly hairless Sphynx, a clearly flat-faced Persian). The overwhelming majority of street cats in these posts are ordinary mixed-breed cats with no identifiable breed - use "מעורב / חתול רחוב" in that default case rather than guessing a breed from a generic coat/body type. A wrong guess here is actively misleading, not a harmless default - only pick a specific named breed when you're genuinely confident.`;
+const CAT_BREED_BULLET = `- "breed" is only for a specific, named breed from the given list - either stated explicitly in the post text (e.g. "פרסי", "מיין קון", "בנגלי"), or visually unmistakable from the photos (e.g. a clearly hairless Sphynx, a clearly flat-faced Persian). The overwhelming majority of street cats in these posts are ordinary mixed-breed cats with no identifiable breed - use "מעורב / חתול רחוב" in that default case rather than guessing a breed from a generic coat/body type. A wrong guess here is actively misleading, not a harmless default - only pick a specific named breed when you're genuinely confident.`;
 const DOG_BREED_BULLET = `- "breed" is only for a specific, named breed from the given list - either stated explicitly in the post text (e.g. "לברדור", "רועה גרמני", "האסקי"), or visually unmistakable from the photos (e.g. a clearly recognizable Husky or German Shepherd build/coat). A dog is meaningfully more likely than a street cat to be purebred or a clearly recognizable mix, so a confident visual read is often worth recording - but use "מעורב (לא ידוע)" whenever you're not genuinely confident, rather than guessing a specific breed from a generic build. A wrong guess here is actively misleading, not a harmless default.`;
 
 const CLIPPED_EAR_BULLET = `- "hasClippedEar" is whether the animal has a clipped/notched ear tip (usually the left ear) - the standard visual marking left after a street cat is trap-neuter-released (TNR), a small flat cut or V-notch at the very tip of one ear, distinct from an injury. true only if this specific marking is visible, false if an ear is clearly visible and clearly NOT clipped, null if ears aren't visible clearly enough to tell either way. This is worth looking for carefully - it's one of the most reliable identifying marks for a street cat, and easy to miss if you're not specifically checking the ear tips.`;
