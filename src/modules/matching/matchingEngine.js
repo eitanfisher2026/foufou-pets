@@ -1,3 +1,5 @@
+import { SPECIES } from '../shared/collections.js';
+
 /**
  * Deterministic, explainable scoring - no AI call here on purpose. This runs
  * for every lost-case x found-report pair, so it has to stay free and instant;
@@ -20,14 +22,20 @@ const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 // Default color-similarity groups: colors placed in the same group are
 // treated as "can't tell apart from a photo" (e.g. lighting/white balance
 // making white look gray) rather than a real mismatch - editable from the
-// settings panel (config.colorGroups), not fixed in code. Values must
-// reference CAT_COLORS in src/modules/shared/collections.js. Any color
-// disagreement outside a shared group, including solid vs. patterned (a
-// solid-colored cat can't become tabby/calico/bi-color or vice versa), is
-// treated as a real mismatch. "אחר" (other) is excluded entirely - it's an
-// AI catch-all with no reliable meaning, so a comparison involving it is
+// settings panel (config.colorGroups), not fixed in code. Keyed by species,
+// not one shared list: CAT_COLORS and DOG_COLORS overlap on several literal
+// values (e.g. "לבן", "שחור"), so a single flat group list had no way to
+// keep a cat-specific grouping (like white/gray) from also silently
+// applying to dogs, or from a dog color ending up added to a group that
+// was really about cats. A lost cat is never scored against a found dog to
+// begin with (see scoreMatch below), so cross-species grouping was never
+// meaningful anyway. "אחר" (other) is excluded entirely - it's an AI
+// catch-all with no reliable meaning, so a comparison involving it is
 // inconclusive, not a mismatch.
-export const DEFAULT_COLOR_GROUPS = [['לבן', 'אפור']];
+export const DEFAULT_COLOR_GROUPS = {
+  [SPECIES.CAT]: [['לבן', 'אפור']],
+  [SPECIES.DOG]: [],
+};
 
 // A raw "45/100" or "100%" reads as false precision - two cats that don't
 // even look alike can still land on 100 under relative scoring if the few
@@ -109,15 +117,16 @@ function compareExactSkipDefault(a, b, ctx) {
 }
 
 // Color-aware comparison: exact match scores full, two colors placed in
-// the same configured group (config.colorGroups, defaults to
-// DEFAULT_COLOR_GROUPS) score partial credit since they could be the same
-// cat photographed under different lighting, and any other disagreement
-// (including solid vs. patterned) scores a hard 0.
+// the same configured group for this pair's species (config.colorGroups,
+// defaults to DEFAULT_COLOR_GROUPS) score partial credit since they could
+// be the same animal photographed under different lighting, and any other
+// disagreement (including solid vs. patterned) scores a hard 0.
 function compareColor(a, b, ctx) {
   if (!a || !b) return null;
   if (a === 'אחר' || b === 'אחר') return null;
   if (a === b) return { ratio: 1 };
-  const groups = ctx?.colorGroups || DEFAULT_COLOR_GROUPS;
+  const groupsBySpecies = ctx?.colorGroups || DEFAULT_COLOR_GROUPS;
+  const groups = groupsBySpecies[ctx?.species] || [];
   const sameGroup = groups.some((group) => group.includes(a) && group.includes(b));
   if (sameGroup) return { ratio: 0.6 };
   return { ratio: 0 };
@@ -349,7 +358,12 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const lenient =
       p.comparisonType === 'dateProximity' &&
       !!(lostCase[`${p.lostField}Approx`] || foundReport[`${p.foundField}Approx`]);
-    const ctx = { lenient, colorGroups: config.colorGroups, defaultValue: p.defaultValue };
+    const ctx = {
+      lenient,
+      colorGroups: config.colorGroups,
+      species: lostCase.species || foundReport.species || SPECIES.CAT,
+      defaultValue: p.defaultValue,
+    };
     const result = compare(lostValue, foundValue, ctx);
     if (!result) {
       push({ contribution: 0, verdict: 'skipped', detail: 'חסר מידע באחד הצדדים או בשניהם - לא נבדק' });

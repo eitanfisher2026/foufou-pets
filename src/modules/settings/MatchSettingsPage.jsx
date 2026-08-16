@@ -109,10 +109,15 @@ export default function MatchSettingsPage() {
 
   function removeColorOption(color) {
     setColorOptions((prev) => prev.filter((c) => c !== color));
-    // A color removed from the list shouldn't linger in a similarity group.
+    // A color removed from the list shouldn't linger in a similarity group -
+    // only this species' groups, colorGroups is keyed by species (see
+    // matchingEngine.js).
     setConfig((prev) => ({
       ...prev,
-      colorGroups: (prev.colorGroups || []).map((g) => g.filter((c) => c !== color)),
+      colorGroups: {
+        ...prev.colorGroups,
+        [listSpecies]: (prev.colorGroups?.[listSpecies] || []).map((g) => g.filter((c) => c !== color)),
+      },
     }));
   }
 
@@ -154,19 +159,28 @@ export default function MatchSettingsPage() {
   }
 
   function addColorGroup() {
-    setConfig((prev) => ({ ...prev, colorGroups: [...(prev.colorGroups || []), []] }));
+    setConfig((prev) => ({
+      ...prev,
+      colorGroups: { ...prev.colorGroups, [listSpecies]: [...(prev.colorGroups?.[listSpecies] || []), []] },
+    }));
   }
 
   function removeColorGroup(index) {
-    setConfig((prev) => ({ ...prev, colorGroups: prev.colorGroups.filter((_, i) => i !== index) }));
+    setConfig((prev) => ({
+      ...prev,
+      colorGroups: { ...prev.colorGroups, [listSpecies]: prev.colorGroups[listSpecies].filter((_, i) => i !== index) },
+    }));
   }
 
   function toggleColorInGroup(groupIndex, color) {
     setConfig((prev) => ({
       ...prev,
-      colorGroups: prev.colorGroups.map((g, i) =>
-        i === groupIndex ? (g.includes(color) ? g.filter((c) => c !== color) : [...g, color]) : g
-      ),
+      colorGroups: {
+        ...prev.colorGroups,
+        [listSpecies]: prev.colorGroups[listSpecies].map((g, i) =>
+          i === groupIndex ? (g.includes(color) ? g.filter((c) => c !== color) : [...g, color]) : g
+        ),
+      },
     }));
   }
 
@@ -374,10 +388,11 @@ export default function MatchSettingsPage() {
       <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">קבוצות צבעים דומים</h2>
       <p className="mb-3 text-sm text-slate-500">
         צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל ביניהם
-        בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "צבע".
+        בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "צבע". לחתולים
+        וכלבים יש קבוצות נפרדות - לפי הבחירה למעלה ({SPECIES_LABELS[listSpecies]} כרגע).
       </p>
       <div className="space-y-3">
-        {(config.colorGroups || []).map((group, i) => (
+        {(config.colorGroups?.[listSpecies] || []).map((group, i) => (
           <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-sm font-medium text-slate-600">קבוצה {i + 1}</span>

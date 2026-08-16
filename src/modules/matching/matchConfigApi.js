@@ -5,17 +5,38 @@ import { DEFAULT_MATCH_CONFIG } from './matchingEngine.js';
 const CONFIG_DOC_PATH = ['config', 'matchWeights'];
 
 // Firestore rejects an array directly containing another array ("nested
-// arrays are not supported") - colorGroups is exactly that shape in memory
-// (an array of color-name arrays), so it's wrapped as an array of {colors}
-// maps only at the Firestore boundary. This was the actual cause behind
-// color-group edits silently failing to save - every save attempt was
-// throwing before the write ever reached the server.
-function toFirestoreColorGroups(colorGroups) {
-  return (colorGroups || []).map((colors) => ({ colors }));
+// arrays are not supported") - a species' groups are exactly that shape in
+// memory (an array of color-name arrays), so each is wrapped as an array of
+// {colors} maps only at the Firestore boundary. This was the actual cause
+// behind color-group edits silently failing to save - every save attempt
+// was throwing before the write ever reached the server.
+//
+// colorGroups itself is keyed by species (see DEFAULT_COLOR_GROUPS in
+// matchingEngine.js) - CAT_COLORS and DOG_COLORS overlap on several literal
+// values, so one flat group list had no way to keep a cat grouping from
+// also silently applying to dogs. A doc saved before that split was a flat
+// array, not an object with cat/dog keys - fromFirestoreColorGroups can't
+// tell which of those old groups were "really" about cats vs. dogs (that
+// distinction never existed), so it falls back to the code default per
+// species rather than guess; the mixed groups need re-entering once, this
+// time correctly scoped.
+function toFirestoreColorGroups(colorGroupsBySpecies) {
+  const result = {};
+  for (const species of Object.keys(colorGroupsBySpecies || {})) {
+    result[species] = (colorGroupsBySpecies[species] || []).map((colors) => ({ colors }));
+  }
+  return result;
 }
 
 function fromFirestoreColorGroups(raw) {
-  return Array.isArray(raw) ? raw.map((g) => (Array.isArray(g?.colors) ? g.colors : [])) : DEFAULT_MATCH_CONFIG.colorGroups;
+  const result = {};
+  for (const species of Object.keys(DEFAULT_MATCH_CONFIG.colorGroups)) {
+    const speciesRaw = raw && !Array.isArray(raw) ? raw[species] : null;
+    result[species] = Array.isArray(speciesRaw)
+      ? speciesRaw.map((g) => (Array.isArray(g?.colors) ? g.colors : []))
+      : DEFAULT_MATCH_CONFIG.colorGroups[species] || [];
+  }
+  return result;
 }
 
 // hasFluffyTail, colorDescription, lastSeenLocation/location were retired
