@@ -48,6 +48,7 @@ import { buildFoundReportSections } from './foundReportSections.js';
 import {
   checkMatchesForFoundReport,
   checkSingleMatch,
+  clearMatchesForFoundReport,
   getMatchesForFoundReport,
   updateMatchStatus,
 } from '../matching/matchingApi.js';
@@ -171,6 +172,21 @@ export default function FoundReportDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     try {
+      setMatches(await checkMatchesForFoundReport(reportId));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  async function handleClearAndRecheckMatches() {
+    const ok = await confirm(
+      'למחוק את כל ההתאמות הקיימות עבור הדיווח הזה - כולל סטטוסים שנקבעו ידנית - ולבדוק הכל מחדש מאפס?',
+      { confirmLabel: 'איפוס ובדיקה מחדש', danger: true }
+    );
+    if (!ok) return;
+    setChecking(true);
+    try {
+      await clearMatchesForFoundReport(reportId);
       setMatches(await checkMatchesForFoundReport(reportId));
     } finally {
       setChecking(false);
@@ -666,13 +682,31 @@ export default function FoundReportDetail() {
         <>
           <button
             onClick={handleCheckMatches}
-            disabled={checking}
-            className="w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50"
+            disabled={checking || matches.length > 0}
+            className={
+              !checking && matches.length > 0
+                ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
+                : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
+            }
           >
-            {checking ? 'בודקים התאמות...' : 'בדיקת התאמות מול תיקי חיפוש'}
+            {checking
+              ? 'בודקים התאמות...'
+              : matches.length > 0
+                ? `✓ ההתאמות נבדקו (${matches.length})`
+                : 'בדיקת התאמות מול תיקי חיפוש'}
           </button>
+          {matches.length > 0 && (
+            <button
+              onClick={handleClearAndRecheckMatches}
+              disabled={checking}
+              className="mb-6 mt-2 w-full text-center text-xs text-slate-400 underline disabled:opacity-50"
+            >
+              איפוס כל ההתאמות (כולל סטטוסים) ובדיקה מחדש
+            </button>
+          )}
+          {matches.length === 0 && <div className="mb-6" />}
 
-          <h2 className="mb-1 mt-6 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
+          <h2 className="mb-1 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
           {matches.length === 0 && <p className="text-sm text-slate-400">לא בוצעה בדיקה עדיין, או שאין תיקי חיפוש במאגר.</p>}
           {matches.length > 0 && (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-slate-500">

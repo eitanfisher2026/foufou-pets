@@ -197,6 +197,22 @@ export async function getMatchesForFoundReport(foundReportId) {
   return results.sort((a, b) => b.score - a.score);
 }
 
+/**
+ * The reverse of clearMatches: deletes this found report's match record
+ * from every lost case that has one, including whatever status a person
+ * already set. Deleting a doc that doesn't exist on a given lost case is
+ * a harmless no-op, so this doesn't need to first look up which lost cases
+ * actually have a match here.
+ */
+export async function clearMatchesForFoundReport(foundReportId) {
+  const casesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
+  const batch = writeBatch(db);
+  casesSnap.docs.forEach((caseDoc) => {
+    batch.delete(doc(db, COLLECTIONS.LOST_CASES, caseDoc.id, 'matches', foundReportId));
+  });
+  await batch.commit();
+}
+
 export async function getMatch(lostCaseId, foundReportId) {
   const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId));
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
