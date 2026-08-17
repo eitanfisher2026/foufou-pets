@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { backfillDisplayNames } from '../shared/displayNameBackfill.js';
 import { backfillRecordNumbers } from '../shared/recordNumberApi.js';
-import { backfillPhotoThumbnails } from '../shared/thumbnailBackfill.js';
+import { backfillPhotoThumbnails, cleanupExtraPhotoThumbnails } from '../shared/thumbnailBackfill.js';
 import AppFooter from '../shared/AppFooter.jsx';
 
 export default function SettingsPage() {
@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [numberingResult, setNumberingResult] = useState(null);
   const [thumbnailing, setThumbnailing] = useState(false);
   const [thumbnailResult, setThumbnailResult] = useState(null);
+  const [cleaningThumbnails, setCleaningThumbnails] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState(null);
 
   async function handleBackfill() {
     setBackfilling(true);
@@ -46,6 +48,17 @@ export default function SettingsPage() {
       setThumbnailResult(result);
     } finally {
       setThumbnailing(false);
+    }
+  }
+
+  async function handleCleanupThumbnails() {
+    setCleaningThumbnails(true);
+    setCleanupResult(null);
+    try {
+      const result = await cleanupExtraPhotoThumbnails();
+      setCleanupResult(result);
+    } finally {
+      setCleaningThumbnails(false);
     }
   }
 
@@ -131,8 +144,9 @@ export default function SettingsPage() {
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-1 font-medium text-slate-700">תמונות ממוזערות לרשימה</h2>
         <p className="mb-3 text-sm text-slate-500">
-          יוצר תמונה ממוזערת קטנה לכל תמונה קיימת שעדיין אין לה אחת - כדי שרשימת התיקים/דיווחים תיטען מהר יותר. לא
-          נוגע בתמונות שכבר יש להן ממוזערת, ואפשר להריץ שוב בלי נזק.
+          יוצר תמונה ממוזערת קטנה לתמונה הראשית של כל תיק/דיווח שעדיין אין לה אחת - כדי שרשימת התיקים/דיווחים תיטען
+          מהר יותר. רק לתמונה הראשית, כי זו היחידה שהרשימה בכלל מציגה. לא נוגע ברשומות שכבר יש להן, ואפשר להריץ שוב
+          בלי נזק.
         </p>
         <button
           type="button"
@@ -146,6 +160,28 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm text-emerald-700">
             נוצרו {thumbnailResult.thumbsCreated} תמונות ממוזערות ב-{thumbnailResult.recordsUpdated} רשומות
             {thumbnailResult.errors > 0 && ` (${thumbnailResult.errors} נכשלו)`}.
+          </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-1 font-medium text-slate-700">ניקוי תמונות ממוזערות מיותרות</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          מוחק תמונות ממוזערות שנוצרו בעבר לתמונות שאינן התמונה הראשית - הרשימה בכלל לא מציגה אותן, אז אין טעם
+          לשמור אותן. חד-פעמי, אבל אפשר להריץ שוב בלי נזק.
+        </p>
+        <button
+          type="button"
+          onClick={handleCleanupThumbnails}
+          disabled={cleaningThumbnails}
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          {cleaningThumbnails ? 'מנקה...' : 'הרצה'}
+        </button>
+        {cleanupResult && (
+          <p className="mt-2 text-sm text-emerald-700">
+            נמחקו {cleanupResult.thumbsRemoved} תמונות ממוזערות מיותרות ב-{cleanupResult.recordsUpdated} רשומות
+            {cleanupResult.errors > 0 && ` (${cleanupResult.errors} נכשלו)`}.
           </p>
         )}
       </section>
