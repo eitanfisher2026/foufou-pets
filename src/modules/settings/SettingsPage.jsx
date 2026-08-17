@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { backfillDisplayNames } from '../shared/displayNameBackfill.js';
 import { backfillRecordNumbers } from '../shared/recordNumberApi.js';
+import { backfillPhotoThumbnails } from '../shared/thumbnailBackfill.js';
 import AppFooter from '../shared/AppFooter.jsx';
 
 export default function SettingsPage() {
@@ -12,6 +13,8 @@ export default function SettingsPage() {
   const [backfillResult, setBackfillResult] = useState(null);
   const [numbering, setNumbering] = useState(false);
   const [numberingResult, setNumberingResult] = useState(null);
+  const [thumbnailing, setThumbnailing] = useState(false);
+  const [thumbnailResult, setThumbnailResult] = useState(null);
 
   async function handleBackfill() {
     setBackfilling(true);
@@ -32,6 +35,17 @@ export default function SettingsPage() {
       setNumberingResult(result);
     } finally {
       setNumbering(false);
+    }
+  }
+
+  async function handleThumbnailing() {
+    setThumbnailing(true);
+    setThumbnailResult(null);
+    try {
+      const result = await backfillPhotoThumbnails();
+      setThumbnailResult(result);
+    } finally {
+      setThumbnailing(false);
     }
   }
 
@@ -110,6 +124,28 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm text-emerald-700">
             מוספרו {numberingResult.lc} חתולים אבודים, {numberingResult.ld} כלבים אבודים, {numberingResult.fc} חתולים
             שנמצאו, {numberingResult.fd} כלבים שנמצאו.
+          </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-1 font-medium text-slate-700">תמונות ממוזערות לרשימה</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          יוצר תמונה ממוזערת קטנה לכל תמונה קיימת שעדיין אין לה אחת - כדי שרשימת התיקים/דיווחים תיטען מהר יותר. לא
+          נוגע בתמונות שכבר יש להן ממוזערת, ואפשר להריץ שוב בלי נזק.
+        </p>
+        <button
+          type="button"
+          onClick={handleThumbnailing}
+          disabled={thumbnailing}
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          {thumbnailing ? 'יוצר תמונות ממוזערות...' : 'הרצה'}
+        </button>
+        {thumbnailResult && (
+          <p className="mt-2 text-sm text-emerald-700">
+            נוצרו {thumbnailResult.thumbsCreated} תמונות ממוזערות ב-{thumbnailResult.recordsUpdated} רשומות
+            {thumbnailResult.errors > 0 && ` (${thumbnailResult.errors} נכשלו)`}.
           </p>
         )}
       </section>

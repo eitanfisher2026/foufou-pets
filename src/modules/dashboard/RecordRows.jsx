@@ -91,7 +91,7 @@ function RowThumbnail({ photo, onOpen }) {
       )}
       {photo && (
         <img
-          src={photo.url}
+          src={photo.thumbUrl || photo.url}
           alt=""
           loading="lazy"
           decoding="async"

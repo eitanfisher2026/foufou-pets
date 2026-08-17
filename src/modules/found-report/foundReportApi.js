@@ -144,6 +144,7 @@ export async function updateFoundReportStatus(reportId, status) {
  */
 export async function removeFoundReportPhoto(reportId, photo, currentPhotos) {
   await deleteObject(ref(storage, photo.path)).catch(() => {});
+  if (photo.thumbPath) await deleteObject(ref(storage, photo.thumbPath)).catch(() => {});
   const remaining = currentPhotos.filter((p) => p.path !== photo.path);
   await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { photos: remaining }, { merge: true });
   return remaining;
@@ -167,6 +168,11 @@ export async function makeFoundReportPhotoMain(reportId, photo, currentPhotos) {
  * match whose found report no longer exists.
  */
 export async function deleteFoundReport(reportId, photos = []) {
-  await Promise.all(photos.map((p) => deleteObject(ref(storage, p.path)).catch(() => {})));
+  await Promise.all(
+    photos.flatMap((p) => [
+      deleteObject(ref(storage, p.path)).catch(() => {}),
+      p.thumbPath ? deleteObject(ref(storage, p.thumbPath)).catch(() => {}) : null,
+    ].filter(Boolean))
+  );
   await deleteDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId));
 }

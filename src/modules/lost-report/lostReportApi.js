@@ -163,6 +163,7 @@ export async function updateLostCaseClosure(caseId, status, closure) {
  */
 export async function removeLostCasePhoto(caseId, photo, currentPhotos) {
   await deleteObject(ref(storage, photo.path)).catch(() => {});
+  if (photo.thumbPath) await deleteObject(ref(storage, photo.thumbPath)).catch(() => {});
   const remaining = currentPhotos.filter((p) => p.path !== photo.path);
   await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { photos: remaining }, { merge: true });
   return remaining;
@@ -186,6 +187,11 @@ export async function makeLostCasePhotoMain(caseId, photo, currentPhotos) {
 export async function deleteLostCase(caseId, photos = []) {
   const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, caseId, 'matches'));
   await Promise.all(matchesSnap.docs.map((d) => deleteDoc(d.ref)));
-  await Promise.all(photos.map((p) => deleteObject(ref(storage, p.path)).catch(() => {})));
+  await Promise.all(
+    photos.flatMap((p) => [
+      deleteObject(ref(storage, p.path)).catch(() => {}),
+      p.thumbPath ? deleteObject(ref(storage, p.thumbPath)).catch(() => {}) : null,
+    ].filter(Boolean))
+  );
   await deleteDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
 }
