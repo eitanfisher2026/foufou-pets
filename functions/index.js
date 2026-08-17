@@ -1,5 +1,12 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
+import { randomUUID } from 'node:crypto';
+import sharp from 'sharp';
 import Anthropic from '@anthropic-ai/sdk';
+
+initializeApp();
 
 // Sonnet, not Opus: this is a bounded structured-extraction task (read a
 // screenshot, fill a form), not open-ended reasoning - Sonnet's accuracy on
@@ -662,4 +669,123 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
   }
 
   return { text, imageBase64, imageMimeType, groupName };
+});
+
+// Small enough to cover a 64px CSS thumbnail even at 3x pixel density, with
+// headroom - matches THUMB_MAX_DIMENSION in src/modules/shared/
+// imageCompression.js (the same sizing new uploads use going forward; this
+// runs server-side, only for existing photos from before that existed).
+const THUMB_MAX_DIMENSION = 220;
+const THUMB_JPEG_QUALITY = 70;
+const LOST_CASES_COLLECTION = 'lostCases';
+const FOUND_REPORTS_COLLECTION = 'foundReports';
+
+// Mirrors the "<base>.jpg" / "<base>_thumb.jpg" naming a fresh client
+// upload gives a photo (see uploadPhotos.js), so a backfilled thumbnail
+// lives right next to the photo it belongs to.
+function deriveThumbPath(path) {
+  return path.replace(/\.jpg$/i, '_thumb.jpg');
+}
+
+// Admin-side file writes don't get a client-style download URL for free -
+// this builds the same firebasestorage.googleapis.com?alt=media&token=...
+// shape getDownloadURL() returns, using a token set on the file's own
+// metadata, so a backfilled thumbUrl is indistinguishable from one created
+// by a fresh client upload.
+async function uploadThumbnail(bucket, thumbPath, buffer) {
+  const token = randomUUID();
+  const file = bucket.file(thumbPath);
+  await file.save(buffer, {
+    contentType: 'image/jpeg',
+    metadata: { metadata: { firebaseStorageDownloadTokens: token } },
+  });
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(thumbPath)}?alt=media&token=${token}`;
+}
+
+async function backfillPhoto(bucket, photo) {
+  const [buffer] = await bucket.file(photo.path).download();
+  const thumbBuffer = await sharp(buffer)
+    .resize(THUMB_MAX_DIMENSION, THUMB_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: THUMB_JPEG_QUALITY })
+    .toBuffer();
+  const thumbPath = deriveThumbPath(photo.path);
+  const thumbUrl = await uploadThumbnail(bucket, thumbPath, thumbBuffer);
+  return { ...photo, thumbPath, thumbUrl };
+}
+
+async function backfillDoc(bucket, db, collectionName, docSnap) {
+  const photos = docSnap.data().photos || [];
+  if (photos.length === 0 || photos.every((p) => p.thumbUrl)) {
+    return { recordUpdated: false, thumbsCreated: 0, errors: 0 };
+  }
+
+  let thumbsCreated = 0;
+  let errors = 0;
+  let changed = false;
+
+  const updatedPhotos = await Promise.all(
+    photos.map(async (photo) => {
+      if (photo.thumbUrl) return photo;
+      try {
+        const result = await backfillPhoto(bucket, photo);
+        thumbsCreated += 1;
+        changed = true;
+        return result;
+      } catch (err) {
+        console.error('thumbnail backfill failed for', photo.path, err);
+        errors += 1;
+        return photo;
+      }
+    })
+  );
+
+  if (changed) {
+    await db.collection(collectionName).doc(docSnap.id).set({ photos: updatedPhotos }, { merge: true });
+  }
+
+  return { recordUpdated: changed, thumbsCreated, errors };
+}
+
+async function backfillCollection(bucket, db, collectionName) {
+  const snap = await db.collection(collectionName).get();
+  const results = await Promise.all(snap.docs.map((d) => backfillDoc(bucket, db, collectionName, d)));
+  return results.reduce(
+    (acc, r) => ({
+      recordsUpdated: acc.recordsUpdated + (r.recordUpdated ? 1 : 0),
+      thumbsCreated: acc.thumbsCreated + r.thumbsCreated,
+      errors: acc.errors + r.errors,
+    }),
+    { recordsUpdated: 0, thumbsCreated: 0, errors: 0 }
+  );
+}
+
+/**
+ * One-time (but safe to re-run) admin migration: generates a small list-
+ * thumbnail for every existing photo that doesn't have one yet, across both
+ * lost cases and found reports. Runs server-side (Admin SDK reads/writes
+ * Storage directly) rather than in the browser - a client-side fetch() of
+ * an existing photo's download URL hits Firebase Storage's CORS policy,
+ * which only allows same-origin <img> loads, not cross-origin fetch/canvas
+ * reads. Only ever touches photos missing thumbUrl, so re-running it after
+ * new uploads already have thumbnails (created directly on upload, see
+ * uploadPhotos.js) does nothing to those.
+ */
+export const backfillPhotoThumbnails = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 300 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+
+  const bucket = getStorage().bucket();
+  const db = getFirestore();
+
+  const [lost, found] = await Promise.all([
+    backfillCollection(bucket, db, LOST_CASES_COLLECTION),
+    backfillCollection(bucket, db, FOUND_REPORTS_COLLECTION),
+  ]);
+
+  return {
+    recordsUpdated: lost.recordsUpdated + found.recordsUpdated,
+    thumbsCreated: lost.thumbsCreated + found.thumbsCreated,
+    errors: lost.errors + found.errors,
+  };
 });
