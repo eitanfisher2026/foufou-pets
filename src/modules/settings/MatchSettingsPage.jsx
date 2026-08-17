@@ -18,6 +18,34 @@ import SelectField from '../shared/SelectField.jsx';
 
 const OTHER = 'אחר';
 
+// A starting point for "קבוצות גזעים דומים" below, not a fixed system
+// default (unlike DEFAULT_BREED_GROUPS in matchingEngine.js, which starts
+// empty for both species) - these are specific breed pairs that are
+// genuinely easy to mix up from a phone photo (not just related breeds),
+// offered as a one-click fill-in via seedRecommendedBreedGroups so an admin
+// doesn't have to hand-build ~10 groups through the checkboxes below.
+// Editable/removable like any other group once seeded.
+const RECOMMENDED_BREED_GROUPS = {
+  [SPECIES.DOG]: [
+    ['לברדור', 'גולדן רטריבר'],
+    ['מלטז', 'שיצו', 'יורקשייר טרייר'],
+    ['דוברמן', 'רוטוויילר'],
+    ['בוקסר', 'אמריקן סטפורדשייר (פיטבול)'],
+    ['בורדר קולי', 'קולי'],
+    ['ג׳ק ראסל', 'ביגל'],
+  ],
+  [SPECIES.CAT]: [
+    ['מיין קון', 'יער נורווגי'],
+    ['בריטי/סקוטי', 'אמריקן שורטהייר'],
+    ['רוסי כחול', 'בריטי/סקוטי'],
+    ['אבסיני', 'בנגלי'],
+  ],
+};
+
+function sameGroupContents(a, b) {
+  return a.length === b.length && a.every((breed) => b.includes(breed));
+}
+
 // The AI extraction (functions/index.js) reads its own static copies of
 // any customizable vocabulary - not a live Firestore read, kept simple and
 // fast on purpose, the same pattern as Roy News' static include/exclude
@@ -218,6 +246,25 @@ export default function MatchSettingsPage() {
         ),
       },
     }));
+  }
+
+  // Fills in RECOMMENDED_BREED_GROUPS for both species at once (not just
+  // whichever tab is currently open) - skips any group whose exact breed
+  // set is already present, so clicking this again after editing doesn't
+  // re-add duplicates. Only touches local state; still needs "שמירת
+  // ההגדרות" below like every other edit on this page.
+  function seedRecommendedBreedGroups() {
+    setConfig((prev) => {
+      const nextBreedGroups = { ...prev.breedGroups };
+      for (const species of Object.values(SPECIES)) {
+        const existing = prev.breedGroups?.[species] || [];
+        const toAdd = (RECOMMENDED_BREED_GROUPS[species] || []).filter(
+          (group) => !existing.some((g) => sameGroupContents(g, group))
+        );
+        nextBreedGroups[species] = [...existing, ...toAdd];
+      }
+      return { ...prev, breedGroups: nextBreedGroups };
+    });
   }
 
   function addParam() {
@@ -560,13 +607,22 @@ export default function MatchSettingsPage() {
               </div>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={addBreedGroup}
-            className="mt-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
-          >
-            + הוספת קבוצת גזעים
-          </button>
+          <div className="mt-3 flex gap-2">
+            <button
+              type="button"
+              onClick={seedRecommendedBreedGroups}
+              className="flex-1 rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
+            >
+              + הוספת קבוצות מומלצות (חתולים וכלבים)
+            </button>
+            <button
+              type="button"
+              onClick={addBreedGroup}
+              className="flex-1 rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
+            >
+              + הוספת קבוצת גזעים
+            </button>
+          </div>
         </div>
 
         {listSpecies === SPECIES.CAT && (
