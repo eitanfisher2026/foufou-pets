@@ -203,23 +203,37 @@ function splitMarks(text) {
 // concatenated - "black spot near the nose, short ears" - shouldn't get
 // word-overlap credit for one mark just because the other happens to share
 // a word with something unrelated on the other side. Each mark on the lost
-// side is matched against its single best-matching mark on the found side,
-// and the score is the average of those best-match ratios.
+// side is matched against its single best-matching mark on the found side.
+//
+// A lost-side mark with literally zero shared vocabulary anywhere in the
+// found side is excluded from the average rather than counted as a 0 - the
+// far more common reason a mark goes unmentioned is that whoever wrote the
+// found report just didn't happen to describe that specific detail (a
+// stranger's few-second sighting vs. an owner's full description), not that
+// the mark is actually absent. Averaging it in as a hard 0 let a handful of
+// undescribed marks bury a genuinely strong match on the marks that WERE
+// both written down - same "don't penalize for what was never comparable"
+// principle as relativeScoring at the whole-match level, one level down.
+// matchedCount/totalCount travel with the result so the UI can say "2 of 3
+// marks matched" instead of just a bare, unexplained percentage.
 function compareMarkList(a, b) {
   const marksA = splitMarks(a);
   const marksB = splitMarks(b);
   if (marksA.length === 0 || marksB.length === 0) return null;
 
-  let total = 0;
+  const matched = [];
   for (const markA of marksA) {
     let best = 0;
     for (const markB of marksB) {
       const overlap = compareTextOverlap(markA, markB);
       if (overlap && overlap.ratio > best) best = overlap.ratio;
     }
-    total += best;
+    if (best > 0) matched.push(best);
   }
-  return { ratio: total / marksA.length };
+  if (matched.length === 0) return null;
+
+  const ratio = matched.reduce((sum, r) => sum + r, 0) / matched.length;
+  return { ratio, matchedCount: matched.length, totalCount: marksA.length };
 }
 
 // Needs real calendar dates (e.g. an <input type="date"> value), not the
@@ -300,13 +314,22 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
     { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed' },
-    { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exact', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10 },
+    // 'adult' is by far the common case (most reported cats/dogs are
+    // grown), so both sides landing on it proves nothing about identity -
+    // same "skip the boring default" logic as furType/pattern below.
+    // Agreeing on 'kitten' is the real signal, and a genuine kitten/adult
+    // disagreement still costs the mismatch penalty.
+    { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10, defaultValue: 'adult' },
     { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
     { key: 'pattern', label: 'תבנית פרווה (חתולים)', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'pattern', foundField: 'pattern', mismatchPenalty: 10, defaultValue: 'אחיד' },
     { key: 'city', label: 'עיר', weight: 10, enabled: true, comparisonType: 'textOverlap', lostField: 'city', foundField: 'city' },
     { key: 'hasCollar', label: 'קולר/רתמה', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'hasCollar', foundField: 'hasCollar', mismatchPenalty: 5 },
     { key: 'collarColor', label: 'צבע הקולר', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'collarColor', foundField: 'collarColor' },
-    { key: 'collarBell', label: 'פעמון על הקולר', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'collarHasBell', foundField: 'collarHasBell' },
+    // No bell is the ordinary/common case for a collar - both sides being
+    // false proves nothing, same as any other rare-marking field
+    // (booleanTrait already exists for exactly this shape, see clippedEar).
+    // A bell on one side and not the other is still a real difference.
+    { key: 'collarBell', label: 'פעמון על הקולר', weight: 5, enabled: true, comparisonType: 'booleanTrait', lostField: 'collarHasBell', foundField: 'collarHasBell' },
     { key: 'neighborhood', label: 'שכונה', weight: 5, enabled: true, comparisonType: 'textOverlap', lostField: 'neighborhood', foundField: 'neighborhood' },
     { key: 'size', label: 'גודל', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'size', foundField: 'size' },
     { key: 'weight', label: 'משקל', weight: 5, enabled: true, comparisonType: 'numericProximity', lostField: 'weightKg', foundField: 'weightKg' },
@@ -350,7 +373,8 @@ export const COMPARISON_TYPE_LABELS = {
   breedMatch:
     'גזע (יכול רק להוסיף ניקוד, לעולם לא פוסל התאמה. מדלג אם אחד הצדדים "מעורב" - לא נחשב לא התאמה ולא אי-התאמה. גזע זהה בשני הצדדים מקבל ציון גבוה, גזעים שהוגדרו כדומים/קלים לבלבול מקבלים ציון בינוני, וגזעים ספציפיים שונים שאינם באותה קבוצה לא מקבלים ציון בכלל)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
-  markList: 'רשימת סימנים (כל סימן מול הסימן הכי דומה לו בצד השני)',
+  markList:
+    'רשימת סימנים (כל שורה/סימן מושווה מול הסימן הדומה לו ביותר בצד השני, לפי חפיפת מילים. סימן שלא נמצאה לו שום התאמה לא נספר לרעה - הציון הוא הממוצע רק על הסימנים שכן נמצאה להם התאמה כלשהי)',
   dateProximity: 'קרבה בזמן (דורש שדה תאריך אמיתי)',
   numericProximity: 'קרבה במספר (למשל משקל)',
   presence: 'קיים משני הצדדים',
@@ -480,7 +504,9 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
           ? `הפרש של כ-${result.diffDays} ימים${lenient ? ' (תאריך משוער בצד אחד, ההשוואה גמישה יותר)' : ''}`
           : p.comparisonType === 'numericProximity'
             ? `הפרש של כ-${result.diff}`
-            : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
+            : p.comparisonType === 'markList'
+              ? `${result.matchedCount} מתוך ${result.totalCount} הסימנים שצוינו נמצאה להם התאמה בצד השני, בדמיון ממוצע של כ-${Math.round(result.ratio * 100)}% (סימנים שלא נמצאה להם שום התאמה לא נספרו לרעה - ייתכן שפשוט לא תוארו)`
+              : `התאמה של כ-${Math.round(result.ratio * 100)}%`;
       if (points > 0.01) {
         earned += points;
         reasons.push(`${p.label}: ${detail}`);

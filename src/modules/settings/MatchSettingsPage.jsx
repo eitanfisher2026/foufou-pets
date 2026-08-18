@@ -42,6 +42,19 @@ const RECOMMENDED_BREED_GROUPS = {
   ],
 };
 
+// A one-time nudge for a config someone already saved before these two
+// parameters' comparison logic improved in code (see ageClass/collarBell in
+// DEFAULT_MATCH_CONFIG) - a saved parameter is never auto-upgraded by
+// mergeNewDefaultParameters in matchConfigApi.js (that only adds parameters
+// missing entirely, e.g. a brand new one), so anyone who saved this page
+// before the fix would otherwise keep the old "adult/adult" and "no bell/no
+// bell" both counting as a match forever. Applied via
+// applyRecommendedParameterUpgrades below; harmless to click more than once.
+const RECOMMENDED_PARAMETER_UPGRADES = {
+  ageClass: { comparisonType: 'exactSkipDefault', defaultValue: 'adult' },
+  collarBell: { comparisonType: 'booleanTrait' },
+};
+
 function sameGroupContents(a, b) {
   return a.length === b.length && a.every((breed) => b.includes(breed));
 }
@@ -279,6 +292,15 @@ export default function MatchSettingsPage() {
     });
   }
 
+  function applyRecommendedParameterUpgrades() {
+    setConfig((prev) => ({
+      ...prev,
+      parameters: prev.parameters.map((p) =>
+        RECOMMENDED_PARAMETER_UPGRADES[p.key] ? { ...p, ...RECOMMENDED_PARAMETER_UPGRADES[p.key] } : p
+      ),
+    }));
+  }
+
   function addParam() {
     setConfig((prev) => ({
       ...prev,
@@ -403,6 +425,14 @@ export default function MatchSettingsPage() {
         <h2 className="text-lg font-semibold text-slate-700">פרמטרים ({config.parameters.length})</h2>
         <span className="text-xs text-slate-400">סכום משקלים פעילים: {enabledWeightSum}</span>
       </div>
+
+      <button
+        type="button"
+        onClick={applyRecommendedParameterUpgrades}
+        className="mb-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
+      >
+        עדכון "גור/מבוגר" ו"פעמון על הקולר" לשיטת השוואה מומלצת (מתעלם מהתאמה על הערך הנפוץ - מבוגר/אין פעמון)
+      </button>
 
       <div className="space-y-3">
         {config.parameters.map((p, i) => (
