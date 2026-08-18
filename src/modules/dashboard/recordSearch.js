@@ -27,8 +27,8 @@ import { SPECIES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js
  * reports).
  */
 export const SEARCH_FIELDS = [
-  { key: 'color', label: 'צבע', optionsKey: 'colorOptions', group: 'traits' },
   { key: 'breed', label: 'גזע', optionsKey: 'breedOptions', group: 'traits' },
+  { key: 'color', label: 'צבע', optionsKey: 'colorOptions', group: 'traits' },
   { key: 'pattern', label: 'תבנית פרווה', optionsKey: 'patternOptions', group: 'traits', speciesOnly: SPECIES.CAT },
   { key: 'furType', label: 'סוג פרווה', optionsKey: 'furTypeOptions', group: 'traits' },
   { key: 'size', label: 'גודל', optionsKey: 'sizeOptions', group: 'traits' },

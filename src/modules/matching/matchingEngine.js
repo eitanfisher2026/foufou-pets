@@ -357,7 +357,12 @@ export const DEFAULT_MATCH_CONFIG = {
     // Agreeing on 'kitten' is the real signal, and a genuine kitten/adult
     // disagreement still costs the mismatch penalty.
     { key: 'ageClass', label: 'גור/מבוגר', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'ageClass', foundField: 'ageClass', mismatchPenalty: 10, defaultValue: 'adult' },
-    { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short' },
+    // Disqualifying like color, not just a mismatch penalty: fur length/type
+    // is just as stable and visually unmistakable as color (a hairless cat
+    // is never mistaken for a long-haired one), and doesn't change while an
+    // animal is missing. Still skips on both sides being 'short' (the
+    // common case, uninformative), same as before.
+    { key: 'furType', label: 'סוג פרווה', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'furType', foundField: 'furType', mismatchPenalty: 10, defaultValue: 'short', disqualifying: true },
     { key: 'pattern', label: 'תבנית פרווה (חתולים)', weight: 10, enabled: true, comparisonType: 'exactSkipDefault', lostField: 'pattern', foundField: 'pattern', mismatchPenalty: 10, defaultValue: 'אחיד' },
     { key: 'city', label: 'עיר', weight: 10, enabled: true, comparisonType: 'textOverlap', lostField: 'city', foundField: 'city' },
     { key: 'hasCollar', label: 'קולר/רתמה', weight: 5, enabled: true, comparisonType: 'exact', lostField: 'hasCollar', foundField: 'hasCollar', mismatchPenalty: 5 },

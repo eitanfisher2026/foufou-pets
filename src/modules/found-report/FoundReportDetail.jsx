@@ -443,6 +443,16 @@ export default function FoundReportDetail() {
             <Field label={`${labels.nameLabel} (אם ידוע) / כותרת (כך יופיע הדיווח ברשימה)`}>
               <input className="input" value={fields.title || ''} onChange={(e) => setField('title', e.target.value)} />
             </Field>
+            <Field label={labels.breedLabel} inline>
+              <SelectField
+                className="w-full max-w-[9rem]"
+                label="בחירת גזע"
+                placeholder="בחר/י גזע"
+                value={fields.breed || ''}
+                onChange={(v) => setField('breed', v)}
+                options={breedOptions}
+              />
+            </Field>
             <Field label={labels.conditionLabel} inline>
               <SelectField
                 className="w-full max-w-[9rem]"
@@ -523,16 +533,6 @@ export default function FoundReportDetail() {
                 rows={3}
                 value={fields.markings || ''}
                 onChange={(e) => setField('markings', e.target.value)}
-              />
-            </Field>
-            <Field label={labels.breedLabel} inline>
-              <SelectField
-                className="w-full max-w-[9rem]"
-                label="בחירת גזע"
-                placeholder="בחר/י גזע"
-                value={fields.breed || ''}
-                onChange={(v) => setField('breed', v)}
-                options={breedOptions}
               />
             </Field>
             {report.species === SPECIES.DOG && (

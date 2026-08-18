@@ -26,6 +26,7 @@ export function buildLostCaseSections(lostCase) {
       title: labels.petDetailsSection,
       rows: [
         { label: 'שם', value: displayLostCaseName(lostCase) },
+        { label: labels.breedLabel, value: lostCase.breed },
         { label: 'צבע', value: lostCase.color },
         { label: 'תבנית פרווה', value: lostCase.pattern },
         { label: 'גור/מבוגר', value: CAT_AGE_CLASSES.find((a) => a.value === lostCase.ageClass)?.label },
@@ -40,7 +41,6 @@ export function buildLostCaseSections(lostCase) {
           value: lostCase.hasClippedEar === true ? 'כן' : lostCase.hasClippedEar === false ? 'לא' : '',
         },
         { label: 'סימנים מיוחדים', value: lostCase.markings },
-        { label: labels.breedLabel, value: lostCase.breed },
         {
           label: labels.furTypeLabel,
           value: (lostCase.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES).find((f) => f.value === lostCase.furType)

@@ -42,17 +42,18 @@ const RECOMMENDED_BREED_GROUPS = {
   ],
 };
 
-// A one-time nudge for a config someone already saved before these two
-// parameters' comparison logic improved in code (see ageClass/collarBell in
-// DEFAULT_MATCH_CONFIG) - a saved parameter is never auto-upgraded by
-// mergeNewDefaultParameters in matchConfigApi.js (that only adds parameters
-// missing entirely, e.g. a brand new one), so anyone who saved this page
-// before the fix would otherwise keep the old "adult/adult" and "no bell/no
-// bell" both counting as a match forever. Applied via
-// applyRecommendedParameterUpgrades below; harmless to click more than once.
+// A one-time nudge for a config someone already saved before these
+// parameters' comparison logic improved in code (see ageClass/collarBell/
+// furType in DEFAULT_MATCH_CONFIG) - a saved parameter is never auto-
+// upgraded by mergeNewDefaultParameters in matchConfigApi.js (that only
+// adds parameters missing entirely, e.g. a brand new one), so anyone who
+// saved this page before a fix would otherwise keep the old behavior
+// forever. Applied via applyRecommendedParameterUpgrades below; harmless to
+// click more than once.
 const RECOMMENDED_PARAMETER_UPGRADES = {
   ageClass: { comparisonType: 'exactSkipDefault', defaultValue: 'adult' },
   collarBell: { comparisonType: 'booleanTrait' },
+  furType: { disqualifying: true },
 };
 
 function sameGroupContents(a, b) {
@@ -431,7 +432,7 @@ export default function MatchSettingsPage() {
         onClick={applyRecommendedParameterUpgrades}
         className="mb-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
       >
-        עדכון "גור/מבוגר" ו"פעמון על הקולר" לשיטת השוואה מומלצת (מתעלם מהתאמה על הערך הנפוץ - מבוגר/אין פעמון)
+        עדכון "גור/מבוגר", "פעמון על הקולר" ו"סוג פרווה" לשיטת השוואה מומלצת (מתעלם מהתאמה על הערך הנפוץ, וסוג פרווה שונה פוסל התאמה כמו צבע)
       </button>
 
       <div className="space-y-3">

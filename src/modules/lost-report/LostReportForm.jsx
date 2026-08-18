@@ -310,6 +310,17 @@ export default function LostReportForm() {
           <input className="input" value={fields.name} onChange={(e) => setField('name', e.target.value)} />
         </Field>
 
+        <Field label={labels.breedLabel} inline>
+          <SelectField
+            className="w-full max-w-[9rem]"
+            label="בחירת גזע"
+            placeholder="בחר/י גזע"
+            value={fields.breed}
+            onChange={(v) => setField('breed', v)}
+            options={breedOptions}
+          />
+        </Field>
+
         <Field label="צבע" inline>
           <SelectField
             className="w-full max-w-[9rem]"
@@ -387,17 +398,6 @@ export default function LostReportForm() {
             placeholder={'לדוגמה:\nנקודה שחורה ליד האף\nאוזניים קצרות מהרגיל\nזנב שעיר/פלומתי במיוחד'}
             value={fields.markings}
             onChange={(e) => setField('markings', e.target.value)}
-          />
-        </Field>
-
-        <Field label={labels.breedLabel} inline>
-          <SelectField
-            className="w-full max-w-[9rem]"
-            label="בחירת גזע"
-            placeholder="בחר/י גזע"
-            value={fields.breed}
-            onChange={(v) => setField('breed', v)}
-            options={breedOptions}
           />
         </Field>
 

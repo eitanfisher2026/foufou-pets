@@ -25,6 +25,7 @@ export function buildFoundReportSections(report) {
       title: labels.petDetailsSection,
       rows: [
         { label: 'שם', value: displayFoundReportName(report) },
+        { label: labels.breedLabel, value: report.breed },
         { label: labels.conditionLabel, value: CAT_CONDITIONS.find((c) => c.value === report.condition)?.label },
         { label: 'צבע', value: report.color },
         { label: 'תבנית פרווה', value: report.pattern },
@@ -40,7 +41,6 @@ export function buildFoundReportSections(report) {
           value: report.hasClippedEar === true ? 'כן' : report.hasClippedEar === false ? 'לא' : '',
         },
         { label: 'סימנים מיוחדים', value: report.markings },
-        { label: labels.breedLabel, value: report.breed },
         {
           label: labels.furTypeLabel,
           value: (report.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES).find((f) => f.value === report.furType)?.label,
