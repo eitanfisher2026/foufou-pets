@@ -97,19 +97,28 @@ export function getMatchConfidence(score) {
 // it matters most - markList). Species nouns are always redundant here
 // (species is its own dedicated field, compared separately, and a
 // cross-species pair never even reaches this comparison - see scoreMatch),
-// and "גוון/צבע" duplicate the dedicated color parameter. "פרווה" (fur/
-// coat, the bare noun) is excluded too - it shows up in nearly every coat
-// description regardless of whether the two animals actually look alike,
-// which is what let one lost dog's general "reddish-brown, curly-coated"
-// sentence in its markings field register as a "partial match" against
-// almost every found dog sharing the species, purely on words like "כלב"/
-// "עם"/"פרווה" - not on anything actually distinctive. A real shared trait
-// still matches fine on its own descriptive word (e.g. "מתולתלת" for curly).
+// and "גוון/צבע" duplicate the dedicated color parameter.
+//
+// Bare anatomy nouns (פרווה/שיער/עיניים/זנב/...) are excluded for the same
+// reason - virtually every animal description mentions eyes, a tail, fur,
+// legs, etc., regardless of whether the two animals actually look alike, so
+// on their own they're just as non-distinguishing as "כלב"/"עם". This isn't
+// only a false-positive risk either: "שיער" (hair) is literally shared
+// between "ארוך שיער" (long-HAIRED) and "חסר שיער" (HAIRLESS) - opposite
+// traits that happen to share the noun a negation word is attached to. Bare
+// word-overlap can't detect that "חסר"/"ללא" negates what follows it, so
+// removing the shared noun itself is what stops the false credit; it can't
+// go further and actively flag the two as a real mismatch the way a person
+// reading both sentences would. A real shared trait still matches fine on
+// its own descriptive word (e.g. "מתולתלת" for curly, "ורוד" for a pink
+// patch's color).
 const NON_DISTINGUISHING_WORDS = new Set([
   'כלב', 'כלבה', 'כלבים', 'כלבות', 'חתול', 'חתולה', 'חתולים', 'חתולות', 'חיה', 'בעל', 'חיים',
   'עם', 'של', 'על', 'אל', 'את', 'גם', 'כמו', 'אבל', 'או', 'כי', 'אם', 'כך',
   'זה', 'זו', 'זהו', 'הוא', 'היא', 'הם', 'הן', 'יש', 'אין', 'כן', 'לא',
-  'מאוד', 'קצת', 'עוד', 'כל', 'גוון', 'בגוון', 'צבע', 'בצבע', 'פרווה',
+  'מאוד', 'קצת', 'עוד', 'כל', 'גוון', 'בגוון', 'צבע', 'בצבע',
+  'פרווה', 'שיער', 'עין', 'עיניים', 'אוזן', 'אוזניים', 'זנב', 'רגל', 'רגליים',
+  'כף', 'כפות', 'אף', 'פנים', 'גוף', 'ראש', 'פה', 'שן', 'שיניים', 'בטן', 'גב', 'צוואר', 'חזה',
 ]);
 
 function tokenize(text) {
