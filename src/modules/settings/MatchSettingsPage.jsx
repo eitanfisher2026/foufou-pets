@@ -54,6 +54,7 @@ const RECOMMENDED_PARAMETER_UPGRADES = {
   ageClass: { comparisonType: 'exactSkipDefault', defaultValue: 'adult' },
   collarBell: { comparisonType: 'booleanTrait' },
   furType: { disqualifying: true },
+  breed: { disqualifying: true },
 };
 
 function sameGroupContents(a, b) {
@@ -432,7 +433,7 @@ export default function MatchSettingsPage() {
         onClick={applyRecommendedParameterUpgrades}
         className="mb-3 w-full rounded-xl border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-600"
       >
-        עדכון "גור/מבוגר", "פעמון על הקולר" ו"סוג פרווה" לשיטת השוואה מומלצת (מתעלם מהתאמה על הערך הנפוץ, וסוג פרווה שונה פוסל התאמה כמו צבע)
+        עדכון "גור/מבוגר", "פעמון על הקולר", "סוג פרווה" ו"גזע" לשיטת השוואה מומלצת (מתעלם מהתאמה על הערך הנפוץ, וסוג פרווה/גזע שונה בין שני גזעים ספציפיים פוסל התאמה כמו צבע)
       </button>
 
       <div className="space-y-3">
@@ -614,11 +615,11 @@ export default function MatchSettingsPage() {
         <div>
           <h3 className="mb-1 text-base font-semibold text-slate-700">קבוצות גזעים דומים</h3>
           <p className="mb-3 text-sm text-slate-500">
-            גזעים שנמצאים באותה קבוצה מקבלים ציון בינוני כשמשווים ביניהם, במקום לא לקבל ציון בכלל - מיועד לגזעים שקל
-            לבלבל ביניהם בתמונה. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "גזע". השוואת גזע יכולה רק להוסיף ניקוד -
-            היא לעולם לא פוסלת התאמה. היא מדלגת (לא ציון גבוה ולא נמוך) כשאחד הצדדים לפחות מסומן כ"מעורב" (ברירת
-            המחדל), וגם כששני הצדדים ציינו גזע ספציפי אך שונה שאינו באותה קבוצה - רק גזע זהה, או זוג גזעים שהוגדר כאן
-            כקבוצה, מקבל ציון בפועל.
+            גזעים שנמצאים באותה קבוצה מקבלים ציון בינוני כשמשווים ביניהם, במקום לפסול את ההתאמה - מיועד לגזעים שקל
+            לבלבל ביניהם בתמונה, לא לגזעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "גזע". השוואת גזע
+            מדלגת (לא ציון גבוה ולא נמוך) כשאחד הצדדים לפחות מסומן כ"מעורב" (ברירת המחדל) - אין דרך לדעת. אבל ברגע
+            ששני הצדדים ציינו גזע ספציפי, ההשוואה מחייבת: גזע זהה מקבל ציון גבוה, זוג גזעים שהוגדר כאן כקבוצה מקבל
+            ציון בינוני, וכל זוג גזעים ספציפיים אחר פוסל את ההתאמה כליל - בדיוק כמו אי-התאמת צבע.
           </p>
           <div className="space-y-3">
             {(config.breedGroups?.[listSpecies] || []).map((group, i) => (

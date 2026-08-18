@@ -184,19 +184,20 @@ function compareColor(a, b, ctx) {
   return { ratio: 0 };
 }
 
-// Breed only ever helps, never disqualifies - skipped (no score either way)
-// whenever EITHER side is the species' "no breed identified" default (see
-// DEFAULT_BREED_BY_SPECIES above), including both sides being the default.
-// The common real-world case is an owner who knows their own pet's breed
-// reporting against a street-finder who has no way to identify a breed from
-// a glance and just picks "מעורב" - that's a "can't tell," not a
-// disagreement. Even once both sides name a real, specific breed, only
-// agreement is scored: an exact match scores full, two breeds placed in the
-// same configured group for this pair's species (config.breedGroups) score
-// partial credit for being easy to mix up in a photo, and two specific
-// breeds that genuinely differ are still skipped rather than counted as a
-// mismatch - a wrong/uncertain breed read shouldn't be able to rule out an
-// otherwise-good match.
+// Skipped (no score either way) whenever EITHER side is the species' "no
+// breed identified" default (see DEFAULT_BREED_BY_SPECIES above), including
+// both sides being the default. The common real-world case is an owner who
+// knows their own pet's breed reporting against a street-finder who has no
+// way to identify a breed from a glance and just picks "מעורב" - that's a
+// "can't tell," not a disagreement, so it can't help or hurt the match.
+//
+// Once BOTH sides confidently name a real, specific breed, that's a much
+// stronger claim than "can't tell" - so the comparison goes live and can
+// disqualify: an exact match scores full, two breeds placed in the same
+// configured group for this pair's species (config.breedGroups) score
+// partial credit for being easy to mix up in a photo, and two named breeds
+// that aren't grouped and genuinely differ (e.g. Persian vs. Sphynx) rule
+// the pair out - as certain a mismatch as a real color disagreement.
 function compareBreed(a, b, ctx) {
   if (!a || !b) return null;
   if (a === ctx?.defaultBreed || b === ctx?.defaultBreed) return null;
@@ -205,7 +206,7 @@ function compareBreed(a, b, ctx) {
   const groups = groupsBySpecies[ctx?.species] || [];
   const sameGroup = groups.some((group) => group.includes(a) && group.includes(b));
   if (sameGroup) return { ratio: 0.6 };
-  return null;
+  return { ratio: 0 };
 }
 
 function compareTextOverlap(a, b) {
@@ -350,7 +351,7 @@ export const DEFAULT_MATCH_CONFIG = {
     { key: 'clippedEar', label: 'אוזן קטומה (סימון עיקור)', weight: 10, enabled: true, comparisonType: 'booleanTrait', lostField: 'hasClippedEar', foundField: 'hasClippedEar', mismatchPenalty: 10, disqualifying: true },
     { key: 'dateProximity', label: 'קרבת תאריכים', weight: 15, enabled: true, comparisonType: 'dateProximity', lostField: 'lastSeenDate', foundField: 'seenDate' },
     { key: 'color', label: 'צבע', weight: 15, enabled: true, comparisonType: 'colorMatch', lostField: 'color', foundField: 'color', disqualifying: true },
-    { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed' },
+    { key: 'breed', label: 'גזע', weight: 15, enabled: true, comparisonType: 'breedMatch', lostField: 'breed', foundField: 'breed', disqualifying: true },
     // 'adult' is by far the common case (most reported cats/dogs are
     // grown), so both sides landing on it proves nothing about identity -
     // same "skip the boring default" logic as furType/pattern below.
@@ -413,7 +414,7 @@ export const COMPARISON_TYPE_LABELS = {
   exactSkipDefault: 'התאמה מדויקת, מלבד ערך ברירת מחדל (התאמה על הערך הנפוץ/הרגיל לא נחשבת)',
   colorMatch: 'צבע (מבדיל צבע אחיד ממנומר/רב-גוני, סולח על זוגות שקל לבלבל בתאורה כמו לבן/אפור)',
   breedMatch:
-    'גזע (יכול רק להוסיף ניקוד, לעולם לא פוסל התאמה. מדלג אם אחד הצדדים "מעורב" - לא נחשב לא התאמה ולא אי-התאמה. גזע זהה בשני הצדדים מקבל ציון גבוה, גזעים שהוגדרו כדומים/קלים לבלבול מקבלים ציון בינוני, וגזעים ספציפיים שונים שאינם באותה קבוצה לא מקבלים ציון בכלל)',
+    'גזע (מדלג אם אחד הצדדים "מעורב" - לא נחשב לא התאמה ולא אי-התאמה, כי אין דרך לדעת. אבל ברגע ששני הצדדים ציינו גזע ספציפי, ההשוואה נעשית מחייבת: גזע זהה מקבל ציון גבוה, גזעים שהוגדרו כדומים/קלים לבלבול מקבלים ציון בינוני, וגזעים ספציפיים שונים שאינם באותה קבוצה פוסלים את ההתאמה כליל - בדיוק כמו אי-התאמת צבע)',
   textOverlap: 'חפיפת מילים בטקסט חופשי',
   markList:
     'רשימת סימנים (כל שורה/סימן מושווה מול הסימן הדומה לו ביותר בצד השני, לפי חפיפת מילים. סימן שלא נמצאה לו שום התאמה לא נספר לרעה - הציון הוא הממוצע רק על הסימנים שכן נמצאה להם התאמה כלשהי)',
