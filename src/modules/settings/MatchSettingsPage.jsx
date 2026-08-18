@@ -188,7 +188,19 @@ export default function MatchSettingsPage() {
     }));
   }
 
-  function removeParam(index) {
+  // Removing a parameter loses its weight/comparison-method/field setup,
+  // not just a label - a one-click ✕ with no confirmation is exactly how
+  // "color" got deleted by mistake. A default parameter (like color) does
+  // come back on its own next load (see mergeNewDefaultParameters in
+  // matchConfigApi.js), but a custom one wouldn't, and either way losing
+  // one by mis-click still shouldn't be a single click.
+  async function removeParam(index) {
+    const param = config.parameters[index];
+    const ok = await confirm(`להסיר את הפרמטר "${param.label}"? הוא יפסיק להשפיע על ההתאמות עד שיתווסף מחדש.`, {
+      confirmLabel: 'הסרה',
+      danger: true,
+    });
+    if (!ok) return;
     setConfig((prev) => ({ ...prev, parameters: prev.parameters.filter((_, i) => i !== index) }));
   }
 
@@ -725,6 +737,49 @@ export default function MatchSettingsPage() {
   );
 }
 
+// A number input bound straight to value={param.weight} (with onChange
+// coercing via Number(e.target.value)) forced the field to "0" the instant
+// it went empty - Number('') is 0 - so selecting the old value and retyping
+// looked broken: the field jumped to 0 before a single new digit landed.
+// This keeps its own text buffer so an in-progress edit (including a
+// momentarily empty field) can exist without being coerced into a real
+// number every keystroke; only a value that actually parses gets pushed
+// upward, and leaving the field empty/invalid on blur reverts it instead of
+// silently saving a 0 nobody typed.
+function NumberField({ value, onChange, min, disabled, className }) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    setText(String(value));
+  }, [value]);
+
+  function handleChange(e) {
+    const raw = e.target.value;
+    setText(raw);
+    if (raw !== '' && !Number.isNaN(Number(raw))) {
+      onChange(Number(raw));
+    }
+  }
+
+  function handleBlur() {
+    if (text === '' || Number.isNaN(Number(text))) {
+      setText(String(value));
+    }
+  }
+
+  return (
+    <input
+      type="number"
+      min={min}
+      disabled={disabled}
+      className={className}
+      value={text}
+      onChange={handleChange}
+      onBlur={handleBlur}
+    />
+  );
+}
+
 function ParameterRow({ param, onChange, onRemove }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -745,12 +800,11 @@ function ParameterRow({ param, onChange, onRemove }) {
         />
         <label className="whitespace-nowrap text-xs text-slate-500">
           משקל
-          <input
-            type="number"
+          <NumberField
             min="0"
             className="input mr-1 inline-block w-16"
             value={param.weight}
-            onChange={(e) => onChange({ weight: Number(e.target.value) })}
+            onChange={(weight) => onChange({ weight })}
           />
         </label>
         <button type="button" onClick={onRemove} className="text-sm text-red-600" aria-label="הסרת פרמטר">
@@ -805,13 +859,12 @@ function ParameterRow({ param, onChange, onRemove }) {
             <>
               <label className="block">
                 <span className="mb-1 block text-slate-500">קנס באי-התאמה (0 = ללא קנס)</span>
-                <input
-                  type="number"
+                <NumberField
                   min="0"
                   className="input"
                   disabled={param.disqualifying}
                   value={param.mismatchPenalty || 0}
-                  onChange={(e) => onChange({ mismatchPenalty: Number(e.target.value) })}
+                  onChange={(mismatchPenalty) => onChange({ mismatchPenalty })}
                 />
               </label>
               <label className="col-span-2 flex items-start gap-2 text-xs text-slate-600">
