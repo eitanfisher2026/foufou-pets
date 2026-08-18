@@ -90,6 +90,22 @@ export default function MatchAnalysisPage() {
                   {formatFieldValue(b.foundValue)}
                 </span>
               </div>
+              {b.comparisonType === 'markList' && b.pairs?.length > 0 && (
+                <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                  <p className="text-xs text-slate-400">הסימנים שנמצאה להם התאמה, וכנגד מה בדיוק בצד השני:</p>
+                  {b.pairs.map((pair, j) => (
+                    <div key={j} className="rounded-lg bg-slate-50 p-2 text-xs">
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="text-slate-500">סימן מתיק החיפוש</span>
+                        <span className="font-medium text-slate-700">{Math.round(pair.ratio * 100)}% דמיון</span>
+                      </div>
+                      <p className="text-slate-700">{pair.markA}</p>
+                      <p className="mt-1 text-slate-400">מול, בדיווח:</p>
+                      <p className="text-slate-700">{pair.markB}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}

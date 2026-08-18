@@ -92,13 +92,33 @@ export function getMatchConfidence(score) {
   return CONFIDENCE_BUCKETS.find((b) => score >= b.min && score <= b.max) || CONFIDENCE_BUCKETS[0];
 }
 
+// Words with no distinguishing power for THIS app's matching, filtered out
+// of every word-overlap comparison (city/neighborhood/remarks, and - where
+// it matters most - markList). Species nouns are always redundant here
+// (species is its own dedicated field, compared separately, and a
+// cross-species pair never even reaches this comparison - see scoreMatch),
+// and "גוון/צבע" duplicate the dedicated color parameter. "פרווה" (fur/
+// coat, the bare noun) is excluded too - it shows up in nearly every coat
+// description regardless of whether the two animals actually look alike,
+// which is what let one lost dog's general "reddish-brown, curly-coated"
+// sentence in its markings field register as a "partial match" against
+// almost every found dog sharing the species, purely on words like "כלב"/
+// "עם"/"פרווה" - not on anything actually distinctive. A real shared trait
+// still matches fine on its own descriptive word (e.g. "מתולתלת" for curly).
+const NON_DISTINGUISHING_WORDS = new Set([
+  'כלב', 'כלבה', 'כלבים', 'כלבות', 'חתול', 'חתולה', 'חתולים', 'חתולות', 'חיה', 'בעל', 'חיים',
+  'עם', 'של', 'על', 'אל', 'את', 'גם', 'כמו', 'אבל', 'או', 'כי', 'אם', 'כך',
+  'זה', 'זו', 'זהו', 'הוא', 'היא', 'הם', 'הן', 'יש', 'אין', 'כן', 'לא',
+  'מאוד', 'קצת', 'עוד', 'כל', 'גוון', 'בגוון', 'צבע', 'בצבע', 'פרווה',
+]);
+
 function tokenize(text) {
   if (!text) return [];
   return text
     .toLowerCase()
     .replace(/[.,!?"'()]/g, ' ')
     .split(/\s+/)
-    .filter((word) => word.length > 1);
+    .filter((word) => word.length > 1 && !NON_DISTINGUISHING_WORDS.has(word));
 }
 
 // Every comparator returns null when there isn't enough info on both sides
@@ -215,25 +235,33 @@ function splitMarks(text) {
 // both written down - same "don't penalize for what was never comparable"
 // principle as relativeScoring at the whole-match level, one level down.
 // matchedCount/totalCount travel with the result so the UI can say "2 of 3
-// marks matched" instead of just a bare, unexplained percentage.
+// marks matched" instead of just a bare, unexplained percentage. pairs goes
+// further - the actual lost-mark/found-mark text pair behind each matched
+// score, not just the number - so "why is this 38%" has a literal answer
+// (see the pairs rendering in MatchAnalysisPage.jsx) instead of requiring
+// someone to manually re-derive the word overlap from the raw fields.
 function compareMarkList(a, b) {
   const marksA = splitMarks(a);
   const marksB = splitMarks(b);
   if (marksA.length === 0 || marksB.length === 0) return null;
 
-  const matched = [];
+  const pairs = [];
   for (const markA of marksA) {
     let best = 0;
+    let bestMarkB = null;
     for (const markB of marksB) {
       const overlap = compareTextOverlap(markA, markB);
-      if (overlap && overlap.ratio > best) best = overlap.ratio;
+      if (overlap && overlap.ratio > best) {
+        best = overlap.ratio;
+        bestMarkB = markB;
+      }
     }
-    if (best > 0) matched.push(best);
+    if (best > 0) pairs.push({ markA, markB: bestMarkB, ratio: best });
   }
-  if (matched.length === 0) return null;
+  if (pairs.length === 0) return null;
 
-  const ratio = matched.reduce((sum, r) => sum + r, 0) / matched.length;
-  return { ratio, matchedCount: matched.length, totalCount: marksA.length };
+  const ratio = pairs.reduce((sum, p) => sum + p.ratio, 0) / pairs.length;
+  return { ratio, matchedCount: pairs.length, totalCount: marksA.length, pairs };
 }
 
 // Needs real calendar dates (e.g. an <input type="date"> value), not the
@@ -429,7 +457,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
     const displayValue = (v) => (Array.isArray(v) ? v.length > 0 : (v ?? null));
     const lostValue = displayValue(lostCase[p.lostField]);
     const foundValue = displayValue(foundReport[p.foundField]);
-    const push = (fields) => breakdown.push({ label: p.label, weight: p.weight, lostValue, foundValue, ...fields });
+    const push = (fields) => breakdown.push({ label: p.label, weight: p.weight, lostValue, foundValue, comparisonType: p.comparisonType, ...fields });
 
     const lenient =
       p.comparisonType === 'dateProximity' &&
@@ -510,7 +538,7 @@ export function scoreMatch(lostCase, foundReport, config = DEFAULT_MATCH_CONFIG)
       if (points > 0.01) {
         earned += points;
         reasons.push(`${p.label}: ${detail}`);
-        push({ contribution: points, verdict: 'partial', detail });
+        push({ contribution: points, verdict: 'partial', detail, ...(result.pairs ? { pairs: result.pairs } : {}) });
       } else {
         push({ contribution: 0, verdict: 'no_overlap', detail: 'אין חפיפה משמעותית' });
       }
