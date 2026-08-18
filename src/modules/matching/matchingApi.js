@@ -174,6 +174,33 @@ export async function getMatches(lostCaseId) {
 }
 
 /**
+ * Admin bulk action: clears and immediately rescans every active lost
+ * case's matches against the current active found-reports pool (both cats
+ * and dogs), using whatever scoring logic/config is live right now - one
+ * lost case at a time, same clear-then-rescan as the single-case "reset"
+ * button. Meant to be run once after a real change to the matching
+ * algorithm, so already-stored match data (score, reasons, breakdown)
+ * doesn't keep reflecting an old algorithm version until someone happens to
+ * open that one case and press recheck by hand. onProgress(done, total) is
+ * called after each lost case finishes so a caller can show a progress bar
+ * - this redoes every pair, not just new candidates, so it can take a
+ * while across the whole pool.
+ */
+export async function rescanAllLostCases(onProgress) {
+  const lostCases = await activeLostCasesForSpecies(null);
+  let matchesScored = 0;
+
+  for (let i = 0; i < lostCases.length; i++) {
+    const lostCase = lostCases[i];
+    await clearMatches(lostCase.id);
+    matchesScored += await checkMatchesForLostCase(lostCase.id);
+    onProgress?.(i + 1, lostCases.length);
+  }
+
+  return { casesProcessed: lostCases.length, matchesScored };
+}
+
+/**
  * The reverse direction of checkMatchesForLostCase: starting from one found/
  * seen report, scores it against every active lost case that doesn't
  * already have a match record for this found report - same "only new

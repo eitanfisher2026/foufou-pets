@@ -1,6 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
@@ -675,15 +674,13 @@ export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: t
 
 // Small enough to cover a 64px CSS thumbnail even at 3x pixel density, with
 // headroom - matches THUMB_MAX_DIMENSION in src/modules/shared/
-// imageCompression.js (the same sizing new uploads use going forward; this
-// runs server-side, only for existing photos from before that existed).
+// imageCompression.js (the same sizing new uploads use, see
+// thumbnailIndex in uploadPhotos.js).
 const THUMB_MAX_DIMENSION = 220;
 const THUMB_JPEG_QUALITY = 70;
-const LOST_CASES_COLLECTION = 'lostCases';
-const FOUND_REPORTS_COLLECTION = 'foundReports';
 
 // Mirrors the "<base>.jpg" / "<base>_thumb.jpg" naming a fresh client
-// upload gives a photo (see uploadPhotos.js), so a backfilled thumbnail
+// upload gives a photo (see uploadPhotos.js), so a thumbnail generated here
 // lives right next to the photo it belongs to.
 function deriveThumbPath(path) {
   return path.replace(/\.jpg$/i, '_thumb.jpg');
@@ -692,8 +689,8 @@ function deriveThumbPath(path) {
 // Admin-side file writes don't get a client-style download URL for free -
 // this builds the same firebasestorage.googleapis.com?alt=media&token=...
 // shape getDownloadURL() returns, using a token set on the file's own
-// metadata, so a backfilled thumbUrl is indistinguishable from one created
-// by a fresh client upload.
+// metadata, so a thumbUrl generated here is indistinguishable from one
+// created by a fresh client upload.
 async function uploadThumbnail(bucket, thumbPath, buffer) {
   const token = randomUUID();
   const file = bucket.file(thumbPath);
@@ -704,7 +701,7 @@ async function uploadThumbnail(bucket, thumbPath, buffer) {
   return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(thumbPath)}?alt=media&token=${token}`;
 }
 
-async function backfillPhoto(bucket, photo) {
+async function generateThumbnailFor(bucket, photo) {
   const [buffer] = await bucket.file(photo.path).download();
   const thumbBuffer = await sharp(buffer)
     .resize(THUMB_MAX_DIMENSION, THUMB_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })
@@ -715,81 +712,18 @@ async function backfillPhoto(bucket, photo) {
   return { ...photo, thumbPath, thumbUrl };
 }
 
-// Only photos[0] (the record's main/list photo) ever gets a thumbnail - see
-// the thumbnailIndex comment in uploadPhotos.js for why the other photos in
-// a multi-photo report don't need one at all.
-async function backfillDoc(bucket, db, collectionName, docSnap) {
-  const photos = docSnap.data().photos || [];
-  const mainPhoto = photos[0];
-  if (!mainPhoto || mainPhoto.thumbUrl) {
-    return { recordUpdated: false, thumbsCreated: 0, errors: 0 };
-  }
-
-  try {
-    const result = await backfillPhoto(bucket, mainPhoto);
-    const updatedPhotos = [result, ...photos.slice(1)];
-    await db.collection(collectionName).doc(docSnap.id).set({ photos: updatedPhotos }, { merge: true });
-    return { recordUpdated: true, thumbsCreated: 1, errors: 0 };
-  } catch (err) {
-    console.error('thumbnail backfill failed for', mainPhoto.path, err);
-    return { recordUpdated: false, thumbsCreated: 0, errors: 1 };
-  }
-}
-
-async function backfillCollection(bucket, db, collectionName) {
-  const snap = await db.collection(collectionName).get();
-  const results = await Promise.all(snap.docs.map((d) => backfillDoc(bucket, db, collectionName, d)));
-  return results.reduce(
-    (acc, r) => ({
-      recordsUpdated: acc.recordsUpdated + (r.recordUpdated ? 1 : 0),
-      thumbsCreated: acc.thumbsCreated + r.thumbsCreated,
-      errors: acc.errors + r.errors,
-    }),
-    { recordsUpdated: 0, thumbsCreated: 0, errors: 0 }
-  );
-}
-
-/**
- * One-time (but safe to re-run) admin migration: generates a small
- * thumbnail for the main photo (photos[0]) of every existing lost case/
- * found report that doesn't have one yet. Runs server-side (Admin SDK
- * reads/writes Storage directly) rather than in the browser - a client-side
- * fetch() of an existing photo's download URL hits Firebase Storage's CORS
- * policy, which only allows same-origin <img> loads, not cross-origin
- * fetch/canvas reads. Only ever touches a record whose main photo is
- * missing thumbUrl, so re-running it after new uploads already have one
- * (created directly on upload, see uploadPhotos.js) does nothing to those.
- */
-export const backfillPhotoThumbnails = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 300 }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Sign in required.');
-  }
-
-  const bucket = getStorage().bucket();
-  const db = getFirestore();
-
-  const [lost, found] = await Promise.all([
-    backfillCollection(bucket, db, LOST_CASES_COLLECTION),
-    backfillCollection(bucket, db, FOUND_REPORTS_COLLECTION),
-  ]);
-
-  return {
-    recordsUpdated: lost.recordsUpdated + found.recordsUpdated,
-    thumbsCreated: lost.thumbsCreated + found.thumbsCreated,
-    errors: lost.errors + found.errors,
-  };
-});
-
 /**
  * Generates a thumbnail for one specific already-uploaded photo, given its
  * Storage path and download url - and nothing else; it doesn't touch
- * Firestore, unlike the bulk backfill above. Used when a secondary photo
- * (which, per the thumbnailIndex policy in uploadPhotos.js, was never
- * thumbnailed on upload) is promoted to be a record's main photo, or
- * becomes the main photo because the previous one was deleted - the caller
- * merges the result into its own photos array and writes it, same as it
- * already does for a plain reorder/delete. Runs server-side for the same
- * CORS reason as the bulk backfill.
+ * Firestore. Used when a secondary photo (which, per the thumbnailIndex
+ * policy in uploadPhotos.js, was never thumbnailed on upload) is promoted
+ * to be a record's main photo, or becomes the main photo because the
+ * previous one was deleted - the caller merges the result into its own
+ * photos array and writes it, same as it already does for a plain reorder/
+ * delete. Runs server-side rather than in the browser - a client-side
+ * fetch() of an existing photo's download URL hits Firebase Storage's CORS
+ * policy, which only allows same-origin <img> loads, not cross-origin
+ * fetch/canvas reads.
  */
 export const generatePhotoThumbnail = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) {
@@ -803,89 +737,10 @@ export const generatePhotoThumbnail = onCall({ region: 'europe-west1', cors: tru
 
   try {
     const bucket = getStorage().bucket();
-    const result = await backfillPhoto(bucket, { path, url });
+    const result = await generateThumbnailFor(bucket, { path, url });
     return { thumbPath: result.thumbPath, thumbUrl: result.thumbUrl };
   } catch (err) {
     console.error('generatePhotoThumbnail failed for', path, err);
     throw new HttpsError('internal', 'Could not generate a thumbnail for this photo.');
   }
-});
-
-// The mirror image of backfillDoc: removes a thumbnail from any photo that
-// ISN'T the main one (index 0) - cleans up what backfillPhotoThumbnails
-// used to wastefully create (a thumbnail for every photo, back when the
-// list only ever shows the first one) before it was scoped down to just
-// the main photo.
-async function cleanupDoc(bucket, db, collectionName, docSnap) {
-  const photos = docSnap.data().photos || [];
-  if (photos.length <= 1) {
-    return { recordUpdated: false, thumbsRemoved: 0, errors: 0 };
-  }
-
-  let thumbsRemoved = 0;
-  let errors = 0;
-  let changed = false;
-
-  const updatedPhotos = await Promise.all(
-    photos.map(async (photo, index) => {
-      if (index === 0 || !photo.thumbPath) return photo;
-      try {
-        await bucket.file(photo.thumbPath).delete({ ignoreNotFound: true });
-        thumbsRemoved += 1;
-        changed = true;
-        const { thumbPath, thumbUrl, ...rest } = photo;
-        return rest;
-      } catch (err) {
-        console.error('thumbnail cleanup failed for', photo.thumbPath, err);
-        errors += 1;
-        return photo;
-      }
-    })
-  );
-
-  if (changed) {
-    await db.collection(collectionName).doc(docSnap.id).set({ photos: updatedPhotos }, { merge: true });
-  }
-
-  return { recordUpdated: changed, thumbsRemoved, errors };
-}
-
-async function cleanupCollection(bucket, db, collectionName) {
-  const snap = await db.collection(collectionName).get();
-  const results = await Promise.all(snap.docs.map((d) => cleanupDoc(bucket, db, collectionName, d)));
-  return results.reduce(
-    (acc, r) => ({
-      recordsUpdated: acc.recordsUpdated + (r.recordUpdated ? 1 : 0),
-      thumbsRemoved: acc.thumbsRemoved + r.thumbsRemoved,
-      errors: acc.errors + r.errors,
-    }),
-    { recordsUpdated: 0, thumbsRemoved: 0, errors: 0 }
-  );
-}
-
-/**
- * One-time (but safe to re-run) admin cleanup: deletes the thumbnail files
- * and Firestore thumbPath/thumbUrl fields for every photo that ISN'T a
- * record's main photo - undoing the earlier version of the bulk backfill,
- * which thumbnailed every photo in a report before that was scoped down to
- * just photos[0] (the only one a list/search row ever actually shows).
- */
-export const cleanupExtraPhotoThumbnails = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 300 }, async (request) => {
-  if (!request.auth) {
-    throw new HttpsError('unauthenticated', 'Sign in required.');
-  }
-
-  const bucket = getStorage().bucket();
-  const db = getFirestore();
-
-  const [lost, found] = await Promise.all([
-    cleanupCollection(bucket, db, LOST_CASES_COLLECTION),
-    cleanupCollection(bucket, db, FOUND_REPORTS_COLLECTION),
-  ]);
-
-  return {
-    recordsUpdated: lost.recordsUpdated + found.recordsUpdated,
-    thumbsRemoved: lost.thumbsRemoved + found.thumbsRemoved,
-    errors: lost.errors + found.errors,
-  };
 });
