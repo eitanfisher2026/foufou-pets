@@ -53,6 +53,7 @@ import {
   getMatchesForFoundReport,
   updateMatchStatus,
 } from '../matching/matchingApi.js';
+import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
@@ -129,6 +130,7 @@ export default function FoundReportDetail() {
     cancel: cancelExtracting,
   } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
+  const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
   const colorOptions = useColorOptions(report?.species);
   const breedOptions = useBreedOptions(report?.species);
   const patternOptions = usePatternOptions();
@@ -192,10 +194,11 @@ export default function FoundReportDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     try {
-      await checkMatchesForFoundReport(reportId);
+      const result = await checkMatchesForFoundReport(reportId);
       setMatches(await getMatchesForFoundReport(reportId));
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
       flashJustChecked();
+      notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
     }
@@ -210,10 +213,11 @@ export default function FoundReportDetail() {
     setChecking(true);
     try {
       await clearMatchesForFoundReport(reportId);
-      await checkMatchesForFoundReport(reportId);
+      const result = await checkMatchesForFoundReport(reportId);
       setMatches(await getMatchesForFoundReport(reportId));
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
       flashJustChecked();
+      notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
     }
@@ -226,8 +230,9 @@ export default function FoundReportDetail() {
   async function handleRecheckSingleMatch(lostCaseId) {
     setRecheckingId(lostCaseId);
     try {
-      await checkSingleMatch(lostCaseId, reportId);
+      const result = await checkSingleMatch(lostCaseId, reportId);
       setMatches(await getMatchesForFoundReport(reportId));
+      notifyVisualMatch(result.visualMatch ? [result.visualMatch] : []);
     } finally {
       setRecheckingId(null);
     }
@@ -843,6 +848,7 @@ export default function FoundReportDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {visualMatchDialog}
       {colorCheckPending && (
         <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
       )}

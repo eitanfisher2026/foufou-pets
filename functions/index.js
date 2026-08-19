@@ -11,8 +11,9 @@ initializeApp();
 // screenshot, fill a form), not open-ended reasoning - Sonnet's accuracy on
 // multilingual OCR-plus-judgment is comfortably enough for this, at roughly
 // a fifth of Opus's per-call cost. Runs once per uploaded report, never at
-// match time, so this is (along with the much cheaper species pre-detect
-// call below) the only AI spend in the whole app.
+// match time - see comparePhotoSimilarity below for the one call that does
+// run at match time, deliberately gated to a small minority of pairs to
+// keep that exception cheap.
 const MODEL = 'claude-sonnet-5';
 
 // Claude Sonnet 5 list pricing, per million tokens. Intro pricing is in
@@ -744,3 +745,117 @@ export const generatePhotoThumbnail = onCall({ region: 'europe-west1', cors: tru
     throw new HttpsError('internal', 'Could not generate a thumbnail for this photo.');
   }
 });
+
+// Haiku, not Sonnet: this is a single visual-similarity judgment between two
+// already-known photos, not open-ended extraction - the same reasoning as
+// SPECIES_DETECT_MODEL above. Kept cheap on purpose since, unlike the
+// extraction call (once per uploaded report), the caller (see
+// matchingApi.js) can run this once per lost-case/found-report pair that
+// crosses the admin-configured confidence threshold - a small minority of
+// pairs, but still more than one call per report, so per-call cost matters
+// more here than for extraction.
+const PHOTO_SIMILARITY_MODEL = 'claude-haiku-4-5';
+const PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT = 1.0;
+const PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT = 5.0;
+
+const PHOTO_SIMILARITY_SCHEMA = {
+  type: 'object',
+  properties: {
+    verdict: { type: 'string', enum: ['likely_same', 'possibly_same', 'unclear', 'likely_different'] },
+    explanation: { type: 'string' },
+  },
+  required: ['verdict', 'explanation'],
+  additionalProperties: false,
+};
+
+const PHOTO_SIMILARITY_PROMPT = `You are comparing two photos to judge whether they could plausibly show the same individual cat or dog. One photo is from a "lost pet" report, the other from a "found/seen pet" report - they were taken by different people, at different times (anywhere from hours to weeks apart), possibly in different lighting/angles/photo quality. Focus on stable identifying features - coat color and pattern, distinctive markings, body/face/ear shape - not on pose, lighting, background, or image quality.
+
+Classify into exactly one of:
+- "likely_same": strong visual evidence these are the same animal (matching distinctive markings/coloring/features, no conflicting evidence).
+- "possibly_same": plausibly the same animal, but with real uncertainty (e.g. limited photo quality/angle, or only partial visual evidence).
+- "unclear": the photos don't give enough basis to judge either way (too blurry, animal not clearly visible, or too different in framing to compare).
+- "likely_different": clear visual evidence these are different animals (mismatched color, pattern, or other clearly conflicting physical traits).
+
+"explanation" is a short (1-2 sentence), specific, plain-language reason for your verdict - name the actual visual feature(s) that drove it, in Hebrew.`;
+
+async function fetchImageAsBase64(url) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`failed to fetch image (${res.status})`);
+  const contentType = res.headers.get('content-type') || 'image/jpeg';
+  const buf = Buffer.from(await res.arrayBuffer());
+  return { base64: buf.toString('base64'), mimeType: contentType.split(';')[0] };
+}
+
+/**
+ * Judges whether two already-uploaded photos (one from a lost-pet report,
+ * one from a found/seen-pet report) could plausibly show the same animal -
+ * a refinement layered on top of the free, deterministic field-based
+ * matching (see matchingEngine.js), not a replacement for it. Only called
+ * for pairs that already score into the admin-configured confidence
+ * threshold (see photoMatchThreshold in matchConfigApi.js), so this stays a
+ * small, bounded addition to AI spend rather than one call per lost-case/
+ * found-report pair in the whole pool.
+ */
+export const comparePhotoSimilarity = onCall(
+  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 60 },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Sign in required.');
+    }
+
+    const { lostPhotoUrl, foundPhotoUrl } = request.data || {};
+    if (typeof lostPhotoUrl !== 'string' || typeof foundPhotoUrl !== 'string') {
+      throw new HttpsError('invalid-argument', 'lostPhotoUrl and foundPhotoUrl are required.');
+    }
+
+    let lostImage, foundImage;
+    try {
+      [lostImage, foundImage] = await Promise.all([fetchImageAsBase64(lostPhotoUrl), fetchImageAsBase64(foundPhotoUrl)]);
+    } catch (err) {
+      console.error('comparePhotoSimilarity: could not load photos', err);
+      throw new HttpsError('internal', 'Could not load one of the photos.');
+    }
+
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    const response = await client.messages.create({
+      model: PHOTO_SIMILARITY_MODEL,
+      max_tokens: 300,
+      thinking: { type: 'disabled' },
+      system: PHOTO_SIMILARITY_PROMPT,
+      output_config: { format: { type: 'json_schema', schema: PHOTO_SIMILARITY_SCHEMA } },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'תמונה מדיווח על חיה אבודה:' },
+            { type: 'image', source: { type: 'base64', media_type: lostImage.mimeType, data: lostImage.base64 } },
+            { type: 'text', text: 'תמונה מדיווח על חיה שנמצאה/נראתה:' },
+            { type: 'image', source: { type: 'base64', media_type: foundImage.mimeType, data: foundImage.base64 } },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((b) => b.type === 'text');
+    if (!textBlock) {
+      throw new HttpsError('internal', 'No result returned.');
+    }
+
+    try {
+      const parsed = JSON.parse(textBlock.text);
+      parsed._aiUsage = {
+        inputTokens: response.usage?.input_tokens || 0,
+        outputTokens: response.usage?.output_tokens || 0,
+        estimatedCostUsd: estimateCostUsd(
+          response.usage,
+          PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT,
+          PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT
+        ),
+      };
+      return parsed;
+    } catch {
+      throw new HttpsError('internal', 'Could not parse the result.');
+    }
+  }
+);

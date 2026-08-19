@@ -45,6 +45,7 @@ import {
   getMatches,
   updateMatchStatus,
 } from '../matching/matchingApi.js';
+import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
@@ -138,6 +139,7 @@ export default function LostCaseDetail() {
     cancel: cancelExtracting,
   } = useScreenshotReader();
   const { confirm, dialog } = useConfirm();
+  const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
   const colorOptions = useColorOptions(lostCase?.species);
   const breedOptions = useBreedOptions(lostCase?.species);
   const patternOptions = usePatternOptions();
@@ -223,9 +225,10 @@ export default function LostCaseDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     try {
-      await checkMatchesForLostCase(caseId);
+      const result = await checkMatchesForLostCase(caseId);
       await load();
       flashJustChecked();
+      notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
     }
@@ -240,9 +243,10 @@ export default function LostCaseDetail() {
     setChecking(true);
     try {
       await clearMatches(caseId);
-      await checkMatchesForLostCase(caseId);
+      const result = await checkMatchesForLostCase(caseId);
       await load();
       flashJustChecked();
+      notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
     }
@@ -260,8 +264,9 @@ export default function LostCaseDetail() {
   async function handleRecheckSingleMatch(foundReportId) {
     setRecheckingId(foundReportId);
     try {
-      await checkSingleMatch(caseId, foundReportId);
+      const result = await checkSingleMatch(caseId, foundReportId);
       await load();
+      notifyVisualMatch(result.visualMatch ? [result.visualMatch] : []);
     } finally {
       setRecheckingId(null);
     }
@@ -894,6 +899,7 @@ export default function LostCaseDetail() {
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       {dialog}
+      {visualMatchDialog}
       {colorCheckPending && (
         <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
       )}

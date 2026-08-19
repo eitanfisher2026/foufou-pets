@@ -7,6 +7,7 @@ import {
   fieldLabel,
   CONFIDENCE_BUCKETS,
   CONFIDENCE_COLOR_PALETTE,
+  PHOTO_MATCH_THRESHOLD_OPTIONS,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
@@ -422,6 +423,26 @@ export default function MatchSettingsPage() {
           שיש בו פחות מידע). כשלא מסומן, הציון הוא סכום ישיר מתוך 100.
         </span>
       </label>
+
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+        <p className="mb-2 text-sm font-medium text-slate-700">השוואת תמונות AI (רענון)</p>
+        <p className="mb-3 text-sm text-slate-500">
+          בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך דמיון חזותי -
+          פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על כל זוג). "כבוי"
+          מבטל את זה לגמרי.
+        </p>
+        <SelectField
+          className="w-full max-w-[12rem]"
+          label="סף להפעלת השוואת תמונות"
+          allowClear={false}
+          value={config.photoMatchThreshold}
+          onChange={(v) => setConfig((prev) => ({ ...prev, photoMatchThreshold: v }))}
+          options={PHOTO_MATCH_THRESHOLD_OPTIONS.map((key) => ({
+            value: key,
+            label: key === 'never' ? 'כבוי' : CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key,
+          }))}
+        />
+      </div>
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-slate-700">פרמטרים ({config.parameters.length})</h2>

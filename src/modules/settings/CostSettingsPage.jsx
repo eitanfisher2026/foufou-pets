@@ -32,7 +32,11 @@ export default function CostSettingsPage() {
 
   const lostAiCost = lostCases.reduce((sum, c) => sum + (c.aiCostUsd || 0), 0);
   const foundAiCost = foundReports.reduce((sum, r) => sum + (r.aiCostUsd || 0), 0);
-  const totalAiCost = lostAiCost + foundAiCost;
+  // Stored per lost case (see visualMatchCostUsd in matchingApi.js) since
+  // every match doc lives under a lost case regardless of which side
+  // triggered the check - found reports never carry this field.
+  const visualMatchCost = lostCases.reduce((sum, c) => sum + (c.visualMatchCostUsd || 0), 0);
+  const totalAiCost = lostAiCost + foundAiCost + visualMatchCost;
 
   const totalPhotos =
     lostCases.reduce((sum, c) => sum + (c.photos?.length || 0), 0) +
@@ -51,15 +55,19 @@ export default function CostSettingsPage() {
       </p>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות AI (זיהוי אוטומטי מצילומי מסך)</h2>
+        <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות AI</h2>
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-slate-600">תיקי חיפוש (חיות אבודות)</span>
+            <span className="text-slate-600">תיקי חיפוש (זיהוי מצילומי מסך)</span>
             <span className="font-medium text-slate-800">{formatUsd(lostAiCost)}</span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-slate-600">דיווחים (חיות שנמצאו/נראו)</span>
+            <span className="text-slate-600">דיווחים (זיהוי מצילומי מסך)</span>
             <span className="font-medium text-slate-800">{formatUsd(foundAiCost)}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-slate-600">השוואת תמונות בהתאמות</span>
+            <span className="font-medium text-slate-800">{formatUsd(visualMatchCost)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 pt-2 font-semibold">
             <span className="text-slate-700">סה"כ עלות AI</span>
@@ -67,8 +75,9 @@ export default function CostSettingsPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-slate-400">
-          בדיקת ההתאמות (matching) לא משתמשת ב-AI בכלל - זו השוואה דטרמיניסטית וחינמית על שדות מובנים, ולכן אין לה עלות
-          AI משלה. כל עלות ה-AI במערכת מגיעה מקריאה אחת לכל דיווח בזמן ההעלאה (כולל סריקות חוזרות).
+          זיהוי מצילומי מסך: קריאה אחת לכל דיווח בזמן ההעלאה (כולל סריקות חוזרות). בדיקת ההתאמות (matching) עצמה
+          דטרמיניסטית וחינמית על שדות מובנים - "השוואת תמונות בהתאמות" היא היוצא מן הכלל היחיד: קריאת AI שרצה רק על
+          התאמות שכבר עברו את סף הסבירות שנבחר ב"פרמטרים להתאמה", לא על כל זוג.
         </p>
       </section>
 

@@ -104,6 +104,7 @@ export async function getMatchConfig() {
     colorGroups: fromFirestoreColorGroups(data.colorGroups),
     breedGroups: fromFirestoreBreedGroups(data.breedGroups),
     confidenceColors: { ...DEFAULT_MATCH_CONFIG.confidenceColors, ...data.confidenceColors },
+    photoMatchThreshold: data.photoMatchThreshold ?? DEFAULT_MATCH_CONFIG.photoMatchThreshold,
   };
 }
 

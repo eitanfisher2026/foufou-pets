@@ -92,6 +92,28 @@ export function getMatchConfidence(score) {
   return CONFIDENCE_BUCKETS.find((b) => score >= b.min && score <= b.max) || CONFIDENCE_BUCKETS[0];
 }
 
+// Photo-similarity gating threshold options - deliberately excludes
+// "noMatch" as a choosable value (comparing photos for a pair that's
+// already scored 0 on the fields would be pure waste), on top of the
+// "never" opt-out. Order here doubles as the rank used by
+// confidenceMeetsThreshold below.
+export const PHOTO_MATCH_THRESHOLD_OPTIONS = ['never', 'low', 'medium', 'high'];
+
+/**
+ * Whether a score's confidence bucket meets or exceeds the given threshold
+ * key (one of PHOTO_MATCH_THRESHOLD_OPTIONS) - used to decide whether a
+ * lost-case/found-report pair is worth spending an AI photo-similarity call
+ * on (see maybeCheckPhotoSimilarity in matchingApi.js). "never" never
+ * matches anything, by design.
+ */
+export function confidenceMeetsThreshold(score, thresholdKey) {
+  if (!thresholdKey || thresholdKey === 'never') return false;
+  const bucketRank = PHOTO_MATCH_THRESHOLD_OPTIONS.indexOf(getMatchConfidence(score).key);
+  const thresholdRank = PHOTO_MATCH_THRESHOLD_OPTIONS.indexOf(thresholdKey);
+  if (bucketRank === -1 || thresholdRank === -1) return false;
+  return bucketRank >= thresholdRank;
+}
+
 // Words with no distinguishing power for THIS app's matching, filtered out
 // of every word-overlap comparison (city/neighborhood/remarks, and - where
 // it matters most - markList). Species nouns are always redundant here
@@ -345,6 +367,13 @@ export const DEFAULT_MATCH_CONFIG = {
   colorGroups: DEFAULT_COLOR_GROUPS,
   breedGroups: DEFAULT_BREED_GROUPS,
   confidenceColors: DEFAULT_CONFIDENCE_COLORS,
+  // Field-based scoring is free and instant, so it runs for every pair
+  // without a second thought - a photo comparison costs a real AI call, so
+  // it only runs for pairs that already cleared this confidence bucket (see
+  // confidenceMeetsThreshold above and maybeCheckPhotoSimilarity in
+  // matchingApi.js), keeping it a small, bounded refinement rather than a
+  // cost that scales with the whole pool.
+  photoMatchThreshold: 'high',
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
