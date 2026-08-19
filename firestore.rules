@@ -51,9 +51,9 @@ service cloud.firestore {
     // fields a match-check writes back onto the case (matchCount etc.) -
     // "run the match for all" needs to write those on any case, not just
     // your own, without opening up the rest of the record. visualMatchCostUsd
-    // is the same story for the AI photo-similarity check (see
-    // matchingApi.js) - it can fire while checking matches against someone
-    // else's lost case just as easily as your own.
+    // and hasVisualMatch are the same story for the AI photo-similarity
+    // check (see matchingApi.js) - it can fire while checking matches
+    // against someone else's lost case just as easily as your own.
     match /lostCases/{caseId} {
       allow read: if signedIn();
       allow create: if signedIn();
@@ -61,7 +61,7 @@ service cloud.firestore {
         isEditorOrAdmin() ||
         resource.data.ownerId == request.auth.uid ||
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['matchCount', 'newMatchCount', 'topMatchScore', 'lastCheckedAt', 'visualMatchCostUsd'])
+          .hasOnly(['matchCount', 'newMatchCount', 'topMatchScore', 'lastCheckedAt', 'visualMatchCostUsd', 'hasVisualMatch'])
       );
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.ownerId == request.auth.uid);
 

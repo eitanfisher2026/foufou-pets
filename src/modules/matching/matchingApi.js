@@ -21,11 +21,14 @@ const NOTABLE_VISUAL_VERDICTS = new Set(['likely_same', 'possibly_same']);
  * Never throws - a failed photo check (missing photos, a transient AI
  * error) just means no visualSimilarity gets attached to this match, not a
  * failed scan. Returns null when skipped or failed, otherwise
- * { verdict, explanation, label, costUsd, checkedAt }, where `label`
- * identifies the OTHER side of the pair (built here, since this is where
- * both full records are already in hand) for a caller to show in an alert.
+ * { verdict, explanation, label, lostCaseId, foundReportId, costUsd,
+ * checkedAt } - lostCaseId/foundReportId let a caller (see
+ * VisualMatchAlertDialog.jsx) link straight to the match, since an alert
+ * can be shown from a page (like the Settings bulk actions) that has no
+ * other way to identify which pair it's even about. `label` identifies the
+ * OTHER side of the pair for display.
  */
-async function maybeCheckPhotoSimilarity(lostCase, foundReport, score, config, labelSide) {
+async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config, labelSide) {
   if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return null;
   const lostPhotoUrl = lostCase.photos?.[0]?.url;
   const foundPhotoUrl = foundReport.photos?.[0]?.url;
@@ -43,6 +46,8 @@ async function maybeCheckPhotoSimilarity(lostCase, foundReport, score, config, l
       verdict,
       explanation,
       label,
+      lostCaseId,
+      foundReportId,
       costUsd: _aiUsage?.estimatedCostUsd || 0,
       checkedAt: serverTimestamp(),
     };
@@ -87,6 +92,11 @@ async function recomputeLostCaseCounts(lostCaseId) {
       matchCount: all.length,
       newMatchCount: all.filter((m) => m.status === REPORT_STATUS.NEW).length,
       topMatchScore: all.reduce((max, m) => Math.max(max, m.score || 0), 0),
+      // Denormalized so this can be a search filter (see recordSearch.js)
+      // without every search needing to read every lost case's matches
+      // subcollection - kept in sync here, same as the other counts above,
+      // so it's always current whenever matches change for any reason.
+      hasVisualMatch: all.some((m) => NOTABLE_VISUAL_VERDICTS.has(m.visualSimilarity?.verdict)),
       lastCheckedAt: serverTimestamp(),
     },
     { merge: true }
@@ -119,7 +129,7 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const ranked = rankMatches(lostCase, newCandidates, config);
 
   const visuals = await Promise.all(
-    ranked.map(({ report, score }) => maybeCheckPhotoSimilarity(lostCase, report, score, config, 'found'))
+    ranked.map(({ report, score }) => maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found'))
   );
 
   const batch = writeBatch(db);
@@ -216,7 +226,9 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
         ? REPORT_STATUS.NO_MATCH
         : REPORT_STATUS.NEW;
 
-  const visual = prevData?.visualSimilarity || (await maybeCheckPhotoSimilarity(lostCase, foundReport, score, config));
+  const visual =
+    prevData?.visualSimilarity ||
+    (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config));
   await setDoc(
     matchRef,
     { foundReportId, score, reasons, breakdown, status, checkedAt: serverTimestamp(), ...(visual ? { visualSimilarity: visual } : {}) },
@@ -320,7 +332,15 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
         candidates.map((m, idx) => {
           const reportSnap = foundReportSnaps[idx];
           if (!reportSnap.exists()) return null;
-          return maybeCheckPhotoSimilarity(lostCase, reportSnap.data(), m.data.score, config, 'found');
+          return maybeCheckPhotoSimilarity(
+            lostCase,
+            lostCase.id,
+            reportSnap.data(),
+            m.data.foundReportId,
+            m.data.score,
+            config,
+            'found'
+          );
         })
       );
 
@@ -338,6 +358,10 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       if (costUsd > 0) {
         await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(costUsd) }, { merge: true });
       }
+      // Keeps the denormalized hasVisualMatch search flag current - this
+      // function writes match docs directly (never through
+      // checkMatchesForLostCase), so nothing else would recompute it.
+      await recomputeLostCaseCounts(lostCase.id);
     }
 
     onProgress?.(i + 1, lostCases.length);
@@ -376,7 +400,9 @@ export async function checkMatchesForFoundReport(foundReportId) {
   const config = await getMatchConfig();
   const scored = newCandidates.map((lostCase) => ({ lostCase, ...scoreMatch(lostCase, report, config) }));
   const visuals = await Promise.all(
-    scored.map(({ lostCase, score }) => maybeCheckPhotoSimilarity(lostCase, report, score, config, 'lost'))
+    scored.map(({ lostCase, score }) =>
+      maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost')
+    )
   );
 
   const batch = writeBatch(db);

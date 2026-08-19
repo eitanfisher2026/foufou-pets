@@ -1,3 +1,5 @@
+import { Link } from 'react-router-dom';
+
 const VERDICT_LABELS = {
   likely_same: 'דמיון חזותי גבוה',
   possibly_same: 'דמיון חזותי אפשרי',
@@ -9,7 +11,11 @@ const VERDICT_LABELS = {
  * useVisualMatchAlert(). Never blocks anything: by the time this shows, the
  * result is already saved on the match itself, this is purely an alert so
  * a promising visual match isn't missed among everything else a scan
- * touches.
+ * touches. Each entry links to the match's own "ניתוח מלא" page - the same
+ * canonical route regardless of which page the alert itself is shown on
+ * (a lost case's own detail page already lists the match right below, but
+ * the Settings bulk actions have no match list at all, so this is the only
+ * way to actually reach the pair from there).
  */
 export default function VisualMatchAlertDialog({ matches, onClose }) {
   return (
@@ -26,6 +32,15 @@ export default function VisualMatchAlertDialog({ matches, onClose }) {
                 {VERDICT_LABELS[m.verdict] || m.verdict} · {m.label}
               </p>
               <p className="mt-1 text-amber-800">{m.explanation}</p>
+              {m.lostCaseId && m.foundReportId && (
+                <Link
+                  to={`/lost/${m.lostCaseId}/analysis/${m.foundReportId}`}
+                  onClick={onClose}
+                  className="mt-2 inline-block text-xs font-medium text-amber-900 underline"
+                >
+                  צפייה בהתאמה
+                </Link>
+              )}
             </div>
           ))}
         </div>

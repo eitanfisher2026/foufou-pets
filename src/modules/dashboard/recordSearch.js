@@ -37,6 +37,11 @@ export const SEARCH_FIELDS = [
   { key: 'hasCollar', label: 'קולר/רתמה', type: 'boolean', group: 'traits' },
   { key: 'collarColor', label: 'צבע הקולר', options: COLLAR_COLORS, group: 'traits' },
   { key: 'hasClippedEar', label: 'אוזן קטומה (סימון עיקור)', type: 'boolean', group: 'traits', speciesOnly: SPECIES.CAT },
+  // Denormalized on the lost case only (see hasVisualMatch in
+  // recomputeLostCaseCounts, matchingApi.js) - a found report doesn't
+  // carry its own copy of this, since a match belongs to the lost case's
+  // own matches subcollection regardless of which side triggered it.
+  { key: 'hasVisualMatch', label: 'AI סימן דמיון חזותי בתמונות', type: 'boolean', group: 'traits', recordTypeOnly: 'lost' },
   { key: 'city', label: 'עיר', type: 'text', group: 'location' },
   { key: 'neighborhood', label: 'שכונה', type: 'text', group: 'location' },
   { key: 'keyword', label: 'מילת חיפוש (שם / סימנים / הערות)', type: 'text', group: 'location' },
