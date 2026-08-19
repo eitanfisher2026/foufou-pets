@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
@@ -43,10 +43,23 @@ export default function Dashboard() {
   const [foundCount, setFoundCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
-  // null = no search applied yet; otherwise { recordType, ...fields } from
-  // SearchDialog. Found reports for a 'found'/'both' search live in their
-  // own state below, fetched only when actually needed.
-  const [searchCriteria, setSearchCriteria] = useState(null);
+  // Search criteria lives in the URL (via useSearchParams), not just
+  // component state - opening a search result navigates away to a whole
+  // different route, which unmounts this component and wipes any plain
+  // state. Without the URL round-trip, pressing "back" from that result
+  // landed on a blank, freshly-mounted dashboard with no memory a search
+  // had even happened, regardless of which back button was used - it
+  // wasn't a navigation bug, the search results just weren't a real place
+  // to return to. null = no search applied yet; otherwise
+  // { recordType, ...fields } matching what SearchDialog produces. Found
+  // reports for a 'found'/'both' search live in their own state below,
+  // fetched only when actually needed (including once, on mount, if
+  // restoring a 'found'/'both' search from the URL).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchCriteria, setSearchCriteriaState] = useState(() => {
+    const fromUrl = Object.fromEntries(searchParams.entries());
+    return Object.keys(fromUrl).length > 0 ? fromUrl : null;
+  });
   const [foundReportsForSearch, setFoundReportsForSearch] = useState([]);
   const [loadingFoundSearch, setLoadingFoundSearch] = useState(false);
   const labels = petLabels(preferredSpecies);
@@ -58,15 +71,32 @@ export default function Dashboard() {
   // doesn't count as an active search worth showing a "clear" link for.
   const hasActiveSearch = searchCriteria !== null && (activeRecordType !== 'lost' || Object.values(activeFields).some((v) => v));
 
+  function applySearchCriteria(criteria) {
+    setSearchCriteriaState(criteria);
+    setSearchParams(criteria || {}, { replace: true });
+  }
+
   useEffect(() => {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
 
   // Some search fields are species-specific (e.g. "תבנית פרווה" only
   // applies to cats) - clearing on toggle switch avoids a stale filter
-  // silently carrying over to a species it was never meant for.
+  // silently carrying over to a species it was never meant for. Compares
+  // against the last-seen species (initialized to the current one, not a
+  // boolean "have I run yet" flag) rather than just skipping the first
+  // run - a plain skip-first-run flag breaks under StrictMode, which
+  // double-invokes an effect on mount in development: the first
+  // invocation flips the flag, so the second one - still logically part
+  // of the same mount, not a real dependency change - runs the "real"
+  // body anyway and wipes out a search just restored from the URL before
+  // it's ever seen. Comparing values instead of counting invocations
+  // survives being called an extra time with the same value.
+  const prevSpeciesRef = useRef(preferredSpecies);
   useEffect(() => {
-    setSearchCriteria(null);
+    if (prevSpeciesRef.current === preferredSpecies) return;
+    prevSpeciesRef.current = preferredSpecies;
+    applySearchCriteria(null);
     setFoundReportsForSearch([]);
   }, [preferredSpecies]);
 
@@ -79,8 +109,24 @@ export default function Dashboard() {
     countFoundReports(preferredSpecies).then(setFoundCount);
   }, [preferredSpecies, roleLoading]);
 
+  // Restores the found-reports fetch a 'found'/'both' search from the URL
+  // needs - handleSearch below already does this for a search performed in
+  // this same session, but a search restored from the URL on load never
+  // went through handleSearch at all.
+  useEffect(() => {
+    if (roleLoading) return;
+    if (searchCriteria?.recordType === 'found' || searchCriteria?.recordType === 'both') {
+      setLoadingFoundSearch(true);
+      listFoundReports(preferredSpecies)
+        .then((reports) =>
+          setFoundReportsForSearch(reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED))
+        )
+        .finally(() => setLoadingFoundSearch(false));
+    }
+  }, [roleLoading]);
+
   async function handleSearch(criteria) {
-    setSearchCriteria(criteria);
+    applySearchCriteria(criteria);
     setShowSearch(false);
     if (criteria.recordType === 'found' || criteria.recordType === 'both') {
       setLoadingFoundSearch(true);
@@ -94,7 +140,7 @@ export default function Dashboard() {
   }
 
   function handleClearSearch() {
-    setSearchCriteria(null);
+    applySearchCriteria(null);
     setFoundReportsForSearch([]);
   }
 
