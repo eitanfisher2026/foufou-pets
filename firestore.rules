@@ -73,10 +73,17 @@ service cloud.firestore {
       }
     }
 
+    // hasVisualMatch is the same denormalized-field carve-out as
+    // lostCases' matchCount etc. above - a match-check can set this on a
+    // found report you don't own just as easily as on your own.
     match /foundReports/{reportId} {
       allow read: if signedIn();
       allow create: if signedIn();
-      allow update: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
+      allow update: if signedIn() && (
+        isEditorOrAdmin() ||
+        resource.data.reportedByUid == request.auth.uid ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasVisualMatch'])
+      );
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
     }
 

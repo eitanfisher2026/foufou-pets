@@ -103,6 +103,22 @@ async function recomputeLostCaseCounts(lostCaseId) {
   );
 }
 
+// The found-report-side mirror of recomputeLostCaseCounts's hasVisualMatch -
+// a found report doesn't own a matches subcollection of its own (matches
+// always live under the lost case, see getMatchesForFoundReport below), so
+// this reads back every match referencing this found report across every
+// lost case to answer "does ANY of them have a notable visual verdict
+// right now". Same read-cost tradeoff already accepted for
+// getMatchesForFoundReport itself at this project's scale.
+async function recomputeFoundReportVisualFlag(foundReportId) {
+  const matches = await getMatchesForFoundReport(foundReportId);
+  await setDoc(
+    doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId),
+    { hasVisualMatch: matches.some((m) => NOTABLE_VISUAL_VERDICTS.has(m.visualSimilarity?.verdict)) },
+    { merge: true }
+  );
+}
+
 /**
  * Manual "check for matches" action: scores this lost case against every
  * active found/seen report that doesn't already have a match record here -
@@ -160,6 +176,9 @@ export async function checkMatchesForLostCase(lostCaseId) {
   if (visualCostUsd > 0) {
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { visualMatchCostUsd: increment(visualCostUsd) }, { merge: true });
   }
+  await Promise.all(
+    visuals.filter(Boolean).map((visual) => recomputeFoundReportVisualFlag(visual.foundReportId))
+  );
 
   return { newCount: newCandidates.length, visualMatches };
 }
@@ -238,6 +257,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   if (visual && visual !== prevData?.visualSimilarity && visual.costUsd > 0) {
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { visualMatchCostUsd: increment(visual.costUsd) }, { merge: true });
   }
+  if (visual) await recomputeFoundReportVisualFlag(foundReportId);
 
   return { score, reasons, breakdown, status, visualMatch: visual && NOTABLE_VISUAL_VERDICTS.has(visual.verdict) ? visual : null };
 }
@@ -309,20 +329,37 @@ export async function rescanAllLostCases(onProgress) {
  * visualSimilarity result yet - the normal case right after first turning
  * this feature on, or after lowering the threshold so more existing
  * matches now qualify - and runs just the AI photo check for those.
- * onProgress(done, total) reports lost cases scanned, for a progress bar.
+ *
+ * Also backfills the denormalized hasVisualMatch search flag (see
+ * recomputeLostCaseCounts/recomputeFoundReportVisualFlag) onto EVERY
+ * scanned lost case and every found report referenced by a notable match,
+ * not just ones this particular run happened to check - otherwise a
+ * verdict saved before this flag existed (or before it was correctly
+ * wired up) would stay invisible to search forever, since nothing else
+ * would ever recompute it. onProgress(done, total) reports lost cases
+ * scanned, for a progress bar.
  */
 export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
   const lostCases = await activeLostCasesForSpecies(null);
   const config = await getMatchConfig();
   let pairsChecked = 0;
   const visualMatches = [];
+  const foundReportIdsToRecompute = new Set();
 
   for (let i = 0; i < lostCases.length; i++) {
     const lostCase = lostCases[i];
     const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches'));
-    const candidates = matchesSnap.docs
-      .map((d) => ({ ref: d.ref, data: d.data() }))
-      .filter((m) => !m.data.visualSimilarity && confidenceMeetsThreshold(m.data.score, config.photoMatchThreshold));
+    const allMatches = matchesSnap.docs.map((d) => ({ ref: d.ref, data: d.data() }));
+
+    // Already has a result from before this run (or before this flag
+    // existed) - still needs its found report's flag caught up.
+    allMatches.forEach((m) => {
+      if (m.data.visualSimilarity) foundReportIdsToRecompute.add(m.data.foundReportId);
+    });
+
+    const candidates = allMatches.filter(
+      (m) => !m.data.visualSimilarity && confidenceMeetsThreshold(m.data.score, config.photoMatchThreshold)
+    );
 
     if (candidates.length > 0) {
       const foundReportSnaps = await Promise.all(
@@ -352,20 +389,22 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
         batch.set(m.ref, { visualSimilarity: visual }, { merge: true });
         costUsd += visual.costUsd;
         pairsChecked += 1;
+        foundReportIdsToRecompute.add(m.data.foundReportId);
         if (NOTABLE_VISUAL_VERDICTS.has(visual.verdict)) visualMatches.push(visual);
       });
       await batch.commit();
       if (costUsd > 0) {
         await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(costUsd) }, { merge: true });
       }
-      // Keeps the denormalized hasVisualMatch search flag current - this
-      // function writes match docs directly (never through
-      // checkMatchesForLostCase), so nothing else would recompute it.
-      await recomputeLostCaseCounts(lostCase.id);
     }
 
+    // Unconditional - a lost case with nothing new to check this run may
+    // still have an older visualSimilarity whose flag was never set.
+    await recomputeLostCaseCounts(lostCase.id);
     onProgress?.(i + 1, lostCases.length);
   }
+
+  await Promise.all([...foundReportIdsToRecompute].map((id) => recomputeFoundReportVisualFlag(id)));
 
   return { casesScanned: lostCases.length, pairsChecked, visualMatches };
 }
@@ -430,6 +469,9 @@ export async function checkMatchesForFoundReport(foundReportId) {
       return setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(cost) }, { merge: true });
     })
   );
+  // Every visual here (if any) is about this same single found report, so
+  // one recompute covers the whole batch, not one per lost case.
+  if (visuals.some(Boolean)) await recomputeFoundReportVisualFlag(foundReportId);
 
   return { newCount: newCandidates.length, visualMatches };
 }
@@ -491,6 +533,7 @@ export async function clearMatchesForFoundReport(foundReportId) {
   });
   await batch.commit();
   await Promise.all(existing.map(({ lostCase }) => recomputeLostCaseCounts(lostCase.id)));
+  await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId), { hasVisualMatch: false }, { merge: true });
 }
 
 export async function getMatch(lostCaseId, foundReportId) {
