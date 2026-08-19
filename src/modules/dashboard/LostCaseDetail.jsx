@@ -49,6 +49,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
@@ -435,6 +436,11 @@ export default function LostCaseDetail() {
                 labels={LOST_CASE_STATUS_LABELS}
                 onChange={handleRecordStatusChange}
               />
+              {lostCase.hasVisualMatch && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                  🔎 AI זיהה דמיון חזותי
+                </span>
+              )}
             </div>
             <p className="mb-2 text-sm text-slate-500">
               {lostCase.color} · {lostCase.neighborhood} · {lostCase.lastSeenAt}
@@ -999,6 +1005,8 @@ function MatchCard({
           />
         </button>
       )}
+
+      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} />
 
       <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
         {match.reasons.map((reason, i) => (

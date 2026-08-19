@@ -57,6 +57,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
 
@@ -397,6 +398,11 @@ export default function FoundReportDetail() {
                 labels={FOUND_REPORT_STATUS_LABELS}
                 onChange={handleRecordStatusChange}
               />
+              {report.hasVisualMatch && (
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+                  🔎 AI זיהה דמיון חזותי
+                </span>
+              )}
             </div>
             <p className="mb-2 text-sm text-slate-500">
               {report.color} · {report.neighborhood} · {report.dateText}
@@ -948,6 +954,8 @@ function ReverseMatchCard({
           />
         </button>
       )}
+
+      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} />
 
       <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
         {match.reasons.map((reason, i) => (

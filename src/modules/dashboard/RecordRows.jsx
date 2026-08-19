@@ -120,6 +120,11 @@ export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showT
           <StatusBadge status={c.status} labels={statusLabels} />
         </div>
         <p className="mt-1 truncate text-xs text-slate-400">{c.neighborhood}</p>
+        {c.hasVisualMatch && (
+          <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+            🔎 AI זיהה דמיון חזותי
+          </span>
+        )}
         {c.matchCount > 0 && (
           <div className="mt-1">
             <MatchSummaryRow
@@ -153,6 +158,11 @@ export function FoundReportRow({ report: r, statusLabels, showTypeBadge }) {
           <StatusBadge status={r.status} labels={statusLabels} />
         </div>
         <p className="mt-1 truncate text-xs text-slate-400">{r.neighborhood}</p>
+        {r.hasVisualMatch && (
+          <span className="mt-1 inline-block rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
+            🔎 AI זיהה דמיון חזותי
+          </span>
+        )}
         {r.sourceGroupName && <p className="mt-1 text-xs text-slate-400">מקור: {r.sourceGroupName}</p>}
       </Link>
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />

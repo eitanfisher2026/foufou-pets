@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { getMatch } from './matchingApi.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { getMatchConfig } from './matchConfigApi.js';
 
@@ -32,10 +33,14 @@ function formatFieldValue(v) {
  * This page lists every enabled parameter from breakdown (persisted at
  * check-match time, see matchingApi.js) with its own verdict, so "why did/
  * didn't this match" has a complete answer, not just the parts that
- * happened to contribute.
+ * happened to contribute. It's also the page the visual-match alert links
+ * to (see VisualMatchAlertDialog.jsx), so it leads with the two photos
+ * side by side and the AI's own verdict - that's usually the entire reason
+ * someone lands here, and neither used to be shown at all.
  */
 export default function MatchAnalysisPage() {
   const { caseId, foundReportId } = useParams();
+  const navigate = useNavigate();
   const [match, setMatch] = useState(null);
   const [lostCase, setLostCase] = useState(null);
   const [foundReport, setFoundReport] = useState(null);
@@ -56,7 +61,13 @@ export default function MatchAnalysisPage() {
 
   return (
     <div className="p-4">
-      <BackLink to={`/lost/${caseId}`}>חזרה לתיק החיפוש</BackLink>
+      {/* Reached from several different places (a lost case's own match
+          list, a found report's, or the visual-match alert popup) -
+          returning to wherever that actually was, not a fixed page, is
+          what "back" should mean here. */}
+      <BackLink onBack={() => navigate(-1)} to={`/lost/${caseId}`}>
+        חזרה לתיק החיפוש
+      </BackLink>
 
       <h1 className="mb-1 text-xl font-bold text-slate-800">ניתוח התאמה מלא</h1>
       <p className="mb-4 text-sm text-slate-500">
@@ -67,6 +78,37 @@ export default function MatchAnalysisPage() {
         <span className="text-sm font-medium text-slate-600">רמת התאמה כוללת:</span>
         <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
       </div>
+
+      {(lostCase.photos?.[0]?.url || foundReport.photos?.[0]?.url) && (
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div>
+            <p className="mb-1 text-center text-xs text-slate-400">תיק החיפוש</p>
+            {lostCase.photos?.[0]?.url ? (
+              <img
+                src={lostCase.photos[0].url}
+                alt=""
+                className="h-40 w-full rounded-lg bg-slate-50 object-contain"
+              />
+            ) : (
+              <div className="flex h-40 items-center justify-center rounded-lg bg-slate-50 text-2xl">🐾</div>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-center text-xs text-slate-400">הדיווח</p>
+            {foundReport.photos?.[0]?.url ? (
+              <img
+                src={foundReport.photos[0].url}
+                alt=""
+                className="h-40 w-full rounded-lg bg-slate-50 object-contain"
+              />
+            ) : (
+              <div className="flex h-40 items-center justify-center rounded-lg bg-slate-50 text-2xl">🐾</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} />
 
       <div className="space-y-2">
         {(match.breakdown || []).map((b, i) => {
