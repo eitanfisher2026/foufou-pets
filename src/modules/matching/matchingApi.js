@@ -57,6 +57,42 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
   }
 }
 
+/**
+ * A confident "likely_different" photo verdict outweighs whatever the
+ * field-based score said - the same way a disqualifying field (color,
+ * breed) already zeroes a match's score, just discovered a step later, once
+ * an actual photo comparison exists. Forces score to 0 and records the AI's
+ * explanation as the leading reason, so both the confidence badge
+ * (ConfidenceBadge reads match.score directly) and the reasons list
+ * correctly reflect the disqualification, not just the visualSimilarity
+ * note sitting unconnected next to a stale high score. Every other verdict
+ * (likely_same/possibly_same/unclear) leaves score and reasons untouched -
+ * still purely additive/informational, per the original design.
+ */
+function applyVisualVerdict(score, reasons, visual) {
+  if (visual?.verdict !== 'likely_different') return { score, reasons, disqualifiedByPhoto: false };
+  return {
+    score: 0,
+    reasons: [`השוואת תמונות AI: ${visual.explanation}`, ...reasons],
+    disqualifiedByPhoto: true,
+  };
+}
+
+// NO_MATCH_PHOTO is NO_MATCH's photo-driven sibling (see collections.js) -
+// picking between the two, or NEW, is otherwise identical to the original
+// score-only rule.
+function autoStatusFor(score, disqualifiedByPhoto) {
+  if (disqualifiedByPhoto) return REPORT_STATUS.NO_MATCH_PHOTO;
+  return score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+}
+
+// Both check functions' status-preservation rule: only a genuine human
+// triage status should survive a re-score untouched - NEW/NO_MATCH/
+// NO_MATCH_PHOTO are all the algorithm's own verdict, never a person's.
+function isAutoStatus(status) {
+  return !status || status === REPORT_STATUS.NEW || status === REPORT_STATUS.NO_MATCH || status === REPORT_STATUS.NO_MATCH_PHOTO;
+}
+
 // A pairing only ever gets scored once by the "check" action. After that,
 // its match record (score, reasons, status) is left alone until either a
 // person changes its status by hand, or the whole set is explicitly reset
@@ -151,9 +187,10 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const batch = writeBatch(db);
   const visualMatches = [];
   let visualCostUsd = 0;
-  ranked.forEach(({ report, score, reasons, breakdown }, i) => {
-    const status = score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+  ranked.forEach(({ report, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
+    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+    const status = autoStatusFor(score, disqualifiedByPhoto);
     // breakdown is stored alongside score/reasons (not recomputed on demand)
     // so the "full analysis" view always shows exactly what was checked at
     // the time this match was scored, even if the config changes later.
@@ -223,31 +260,27 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   const foundReport = reportSnap.data();
 
   const config = await getMatchConfig();
-  const { score, reasons, breakdown } = scoreMatch(lostCase, foundReport, config);
+  const { score: rawScore, reasons: rawReasons, breakdown } = scoreMatch(lostCase, foundReport, config);
 
   const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
   const prevSnap = await getDoc(matchRef);
   const prevData = prevSnap.exists() ? prevSnap.data() : null;
   const prevStatus = prevData?.status;
-  // NEW and NO_MATCH are both the algorithm's own verdict, never a person's
-  // - "האלגוריתם קבע: אין התאמה" literally says so. Only a real triage
-  // status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH, CONTACTED, CLOSED, ...)
-  // means a person actually looked at this pairing, and only that should
-  // survive a re-score untouched. Otherwise the auto-verdict needs to track
-  // whatever the current score actually says - a re-check that now
-  // disqualifies a pairing (or un-disqualifies one) should visibly move it
-  // out of "ממתינות לבדיקה" into "ללא התאמה" (or back), not leave a stale
-  // status sitting on a score that no longer matches it.
-  const status =
-    prevStatus && prevStatus !== REPORT_STATUS.NEW && prevStatus !== REPORT_STATUS.NO_MATCH
-      ? prevStatus
-      : score === 0
-        ? REPORT_STATUS.NO_MATCH
-        : REPORT_STATUS.NEW;
 
   const visual =
     prevData?.visualSimilarity ||
-    (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config));
+    (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
+  const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+
+  // Only a real triage status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH,
+  // CONTACTED, CLOSED, ...) means a person actually looked at this pairing,
+  // and only that should survive a re-score untouched. Otherwise the
+  // auto-verdict needs to track whatever the current score/photo check
+  // actually says - a re-check that now disqualifies a pairing (or
+  // un-disqualifies one) should visibly move it, not leave a stale status
+  // sitting on a score that no longer matches it.
+  const status = isAutoStatus(prevStatus) ? autoStatusFor(score, disqualifiedByPhoto) : prevStatus;
+
   await setDoc(
     matchRef,
     { foundReportId, score, reasons, breakdown, status, checkedAt: serverTimestamp(), ...(visual ? { visualSimilarity: visual } : {}) },
@@ -386,7 +419,19 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       candidates.forEach((m, idx) => {
         const visual = visuals[idx];
         if (!visual) return;
-        batch.set(m.ref, { visualSimilarity: visual }, { merge: true });
+        const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(m.data.score, m.data.reasons || [], visual);
+        const updates = { visualSimilarity: visual };
+        // Unlike the live "check" actions, this backfill otherwise never
+        // touches score/reasons/status for existing matches - only a
+        // disqualifying photo verdict is worth overriding stored data for,
+        // and even then only if nobody has already triaged this pairing by
+        // hand (see isAutoStatus).
+        if (disqualifiedByPhoto) {
+          updates.score = score;
+          updates.reasons = reasons;
+          if (isAutoStatus(m.data.status)) updates.status = REPORT_STATUS.NO_MATCH_PHOTO;
+        }
+        batch.set(m.ref, updates, { merge: true });
         costUsd += visual.costUsd;
         pairsChecked += 1;
         foundReportIdsToRecompute.add(m.data.foundReportId);
@@ -446,9 +491,10 @@ export async function checkMatchesForFoundReport(foundReportId) {
 
   const batch = writeBatch(db);
   const visualMatches = [];
-  scored.forEach(({ lostCase, score, reasons, breakdown }, i) => {
-    const status = score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+  scored.forEach(({ lostCase, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
+    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+    const status = autoStatusFor(score, disqualifiedByPhoto);
     batch.set(doc(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches', foundReportId), {
       foundReportId,
       score,

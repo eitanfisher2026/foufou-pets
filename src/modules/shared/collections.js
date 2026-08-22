@@ -258,6 +258,16 @@ export const REPORT_STATUS = {
   // it out. Keeps a hard-disqualified pair out of the "needs review" count
   // without pretending someone actually reviewed it.
   NO_MATCH: 'no_match',
+  // The photo-comparison sibling of NO_MATCH above - also automatic, also
+  // means the algorithm itself ruled the pair out, just discovered a step
+  // later by the AI photo check (verdict "likely_different") rather than by
+  // the field comparison. Kept distinct from NO_MATCH so the reason a pair
+  // was ruled out ("fields don't line up" vs. "fields lined up but the
+  // photos clearly don't") stays visible instead of collapsing into one
+  // generic bucket. When this fires, the match's score is forced to 0 and
+  // its reasons record the AI's explanation, same as any other disqualifying
+  // field - see applyVisualVerdict in matchingApi.js.
+  NO_MATCH_PHOTO: 'no_match_photo',
   REVIEWING: 'reviewing',
   NEEDS_FOLLOWUP: 'needs_followup',
   NOT_RELEVANT: 'not_relevant',

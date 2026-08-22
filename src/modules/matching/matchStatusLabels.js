@@ -14,6 +14,7 @@ import { REPORT_STATUS } from '../shared/collections.js';
 export const MATCH_STATUS_LABELS = {
   [REPORT_STATUS.NEW]: 'ממתין לבדיקה',
   [REPORT_STATUS.NO_MATCH]: 'האלגוריתם קבע: אין התאמה',
+  [REPORT_STATUS.NO_MATCH_PHOTO]: 'השוואת תמונות AI: אין התאמה',
   [REPORT_STATUS.REVIEWING]: 'בבדיקה',
   [REPORT_STATUS.NEEDS_FOLLOWUP]: 'דורש מעקב',
   [REPORT_STATUS.NOT_RELEVANT]: 'נבדק ולא נמצא קשר',
@@ -25,6 +26,7 @@ export const MATCH_STATUS_LABELS = {
 export const MATCH_STATUS_COLORS = {
   [REPORT_STATUS.NEW]: 'bg-amber-100 text-amber-800',
   [REPORT_STATUS.NO_MATCH]: 'bg-slate-100 text-slate-600',
+  [REPORT_STATUS.NO_MATCH_PHOTO]: 'bg-rose-100 text-rose-700',
   [REPORT_STATUS.REVIEWING]: 'bg-blue-100 text-blue-800',
   [REPORT_STATUS.NEEDS_FOLLOWUP]: 'bg-amber-100 text-amber-800',
   [REPORT_STATUS.NOT_RELEVANT]: 'bg-slate-100 text-slate-600',

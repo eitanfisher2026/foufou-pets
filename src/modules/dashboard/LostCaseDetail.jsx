@@ -411,8 +411,10 @@ export default function LostCaseDetail() {
   // never scored at all) isn't one of these - it has no card to show yet,
   // so it only ever appears as a count on the check button itself.
   const pendingReview = matches.filter((m) => m.status === REPORT_STATUS.NEW);
-  const noMatch = matches.filter((m) => m.status === REPORT_STATUS.NO_MATCH);
-  const processedMatches = matches.filter((m) => m.status !== REPORT_STATUS.NEW && m.status !== REPORT_STATUS.NO_MATCH);
+  const noMatch = matches.filter((m) => m.status === REPORT_STATUS.NO_MATCH || m.status === REPORT_STATUS.NO_MATCH_PHOTO);
+  const processedMatches = matches.filter(
+    (m) => m.status !== REPORT_STATUS.NEW && m.status !== REPORT_STATUS.NO_MATCH && m.status !== REPORT_STATUS.NO_MATCH_PHOTO
+  );
 
   return (
     <div className="p-4">

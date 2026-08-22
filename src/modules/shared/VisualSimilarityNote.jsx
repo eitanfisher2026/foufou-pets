@@ -2,7 +2,7 @@ const VERDICT_META = {
   likely_same: { label: 'AI: דמיון חזותי גבוה', className: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
   possibly_same: { label: 'AI: דמיון חזותי אפשרי', className: 'border-amber-300 bg-amber-50 text-amber-900' },
   unclear: { label: 'AI: השוואת התמונות לא הייתה חד-משמעית', className: 'border-slate-300 bg-slate-50 text-slate-600' },
-  likely_different: { label: 'AI: נראות שונות בתמונה', className: 'border-slate-300 bg-slate-50 text-slate-500' },
+  likely_different: { label: 'AI: נראות שונות בתמונה - ההתאמה נפסלה', className: 'border-rose-300 bg-rose-50 text-rose-900' },
 };
 
 /**
