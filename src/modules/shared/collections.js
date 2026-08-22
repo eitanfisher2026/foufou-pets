@@ -199,7 +199,7 @@ export const DOG_FUR_TYPES = [
   { value: 'curly', label: 'מתולתל / גלי' },
 ];
 
-export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
+export const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'אפור', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 export const CAT_CONDITIONS = [
   { value: 'seen_only', label: 'נראה בלבד (לא נתפס)' },

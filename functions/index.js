@@ -129,7 +129,7 @@ const DOG_BREEDS = [
   'פומרניאן',
   'אחר',
 ];
-const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
+const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'אפור', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
 
 // Cat-only coat pattern, separate from base color. "אחיד" (solid/no
 // distinct pattern) is the common default, not a stand-in for "couldn't
