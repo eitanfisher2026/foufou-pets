@@ -80,6 +80,7 @@ const DOG_COLORS = [
   'לבן',
   'חום',
   'זהוב',
+  'אפור',
   'שחור-חום (בְּלֶק אנד טאן)',
   'ברינדל (מנומר בפסים)',
   'מנומר (מֶרְל)',
@@ -127,6 +128,7 @@ const DOG_BREEDS = [
   'אמריקן סטפורדשייר (פיטבול)',
   'פינצ׳ר',
   'פומרניאן',
+  'סלוקי',
   'אחר',
 ];
 const COLLAR_COLORS = ['אדום', 'כחול', 'ורוד', 'שחור', 'לבן', 'אפור', 'צהוב', 'ירוק', 'כתום', 'סגול', 'צבעוני/כמה צבעים', 'אחר'];
@@ -298,6 +300,7 @@ const DOG_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't 
   - "לבן" (white) is a solid white coat, the same way - reserve "חום-לבן"/"שחור-לבן" for a coat that's clearly two-toned, not a mostly-white coat with a tiny colored fleck.
   - "חום" (brown) is a warm but muted brown/chocolate tone.
   - "זהוב" (golden) is a warm honey/golden-blonde tone typical of breeds like Golden Retrievers or Labradors - a similar coat that leans more reddish than honey-blonde can still fit here; use whichever of חום/זהוב is the closer match.
+  - "אפור" (gray) is a cool, neutral gray with no red/orange/yellow undertone at all - like slate, silver, or ash (e.g. a Weimaraner or a gray-coated Husky). If the coat has any warm reddish or golden tint, it is not gray, even if it looks pale or faded.
   - "ברינדל (מנומר בפסים)" is a fine brindle stripe pattern, often on a tan/brown base. "מנומר (מרל)" is a mottled/marbled coat, often with mixed patches and sometimes blue/odd eyes. Use whichever pattern name actually matches what's visible.
   - "שחור-חום (בְּלֶק אנד טאן)" is a coat with a black body and sharply defined tan/brown points (muzzle, eyebrows, chest, legs).
   - "טריקולור" is for a coat with three distinct, clearly separated colors (typically black, white, and tan/brown patches) - common in breeds like ביגל, קולי, ברניז מאונטן דוג. Don't use this for a two-tone coat (that's שחור-לבן/חום-לבן) or for שחור-חום, which is a specific black-body-with-tan-points pattern, not three separately patched colors.`;
