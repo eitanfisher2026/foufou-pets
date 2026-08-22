@@ -957,7 +957,7 @@ function ReverseMatchCard({
         </button>
       )}
 
-      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} />
+      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} disqualified={match.status === REPORT_STATUS.NO_MATCH_PHOTO} />
 
       <ul className="mb-2 list-inside list-disc text-sm text-slate-600">
         {match.reasons.map((reason, i) => (

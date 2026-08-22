@@ -1,8 +1,15 @@
+import { normalizeVisualVerdict } from '../matching/matchingEngine.js';
+
+// Same four-level scale as the field-based confidence badge (see
+// CONFIDENCE_BUCKETS in matchingEngine.js) - "how likely is it these are the
+// same animal", from the AI's own photo read instead of the compared
+// fields. normalizeVisualVerdict handles a match checked before this scale
+// existed (old likely_same/possibly_same/unclear/likely_different strings).
 const VERDICT_META = {
-  likely_same: { label: 'AI: דמיון חזותי גבוה', className: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
-  possibly_same: { label: 'AI: דמיון חזותי אפשרי', className: 'border-amber-300 bg-amber-50 text-amber-900' },
-  unclear: { label: 'AI: השוואת התמונות לא הייתה חד-משמעית', className: 'border-slate-300 bg-slate-50 text-slate-600' },
-  likely_different: { label: 'AI: נראות שונות בתמונה - ההתאמה נפסלה', className: 'border-rose-300 bg-rose-50 text-rose-900' },
+  high: { label: 'AI: דמיון חזותי גבוה', className: 'border-emerald-300 bg-emerald-50 text-emerald-900' },
+  medium: { label: 'AI: דמיון חזותי בינוני', className: 'border-amber-300 bg-amber-50 text-amber-900' },
+  low: { label: 'AI: דמיון חזותי נמוך', className: 'border-orange-300 bg-orange-50 text-orange-900' },
+  noMatch: { label: 'AI: בוודאות לא אותה חיה', className: 'border-rose-300 bg-rose-50 text-rose-900' },
 };
 
 /**
@@ -12,15 +19,26 @@ const VERDICT_META = {
  * point of running this check was invisible unless someone happened to
  * catch the transient alert popup. Shown for every verdict, not just the
  * notable ones, for the same reason the field breakdown shows skipped
- * fields too - "checked, came back inconclusive" is a real, useful answer,
- * not something to hide.
+ * fields too - "checked, came back low-confidence" is a real, useful
+ * answer, not something to hide.
+ *
+ * `disqualified` (pass match.status === REPORT_STATUS.NO_MATCH_PHOTO) marks
+ * whether THIS verdict actually zeroed the match's score, per whatever
+ * photoDisqualifyThreshold was configured at check time - that can differ
+ * from what the verdict bucket alone would suggest if the threshold changes
+ * later, so it's passed in rather than re-derived here.
  */
-export default function VisualSimilarityNote({ visualSimilarity }) {
+export default function VisualSimilarityNote({ visualSimilarity, disqualified }) {
   if (!visualSimilarity) return null;
-  const meta = VERDICT_META[visualSimilarity.verdict] || VERDICT_META.unclear;
+  const verdict = normalizeVisualVerdict(visualSimilarity.verdict);
+  const meta = VERDICT_META[verdict] || VERDICT_META.low;
+  const className = disqualified ? 'border-rose-300 bg-rose-50 text-rose-900' : meta.className;
   return (
-    <div className={`mb-2 rounded-lg border p-2 text-xs ${meta.className}`}>
-      <p className="font-medium">🔎 {meta.label}</p>
+    <div className={`mb-2 rounded-lg border p-2 text-xs ${className}`}>
+      <p className="font-medium">
+        🔎 {meta.label}
+        {disqualified && ' - ההתאמה נפסלה'}
+      </p>
       <p className="mt-0.5">{visualSimilarity.explanation}</p>
     </div>
   );

@@ -45,9 +45,13 @@ export default function SettingsPage() {
   // that sets it, is what makes that possible to catch instead of looking
   // like the action itself is broken.
   const [photoMatchThreshold, setPhotoMatchThreshold] = useState(null);
+  const [photoDisqualifyThreshold, setPhotoDisqualifyThreshold] = useState(null);
 
   useEffect(() => {
-    getMatchConfig().then((c) => setPhotoMatchThreshold(c.photoMatchThreshold));
+    getMatchConfig().then((c) => {
+      setPhotoMatchThreshold(c.photoMatchThreshold);
+      setPhotoDisqualifyThreshold(c.photoDisqualifyThreshold);
+    });
   }, []);
   const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
 
@@ -126,6 +130,7 @@ export default function SettingsPage() {
         {photoMatchThreshold && (
           <p className="mb-3 text-xs text-slate-400">
             סף השוואת תמונות פעיל כרגע: <span className="font-medium text-slate-600">{photoThresholdLabel(photoMatchThreshold)}</span>
+            {' · '}סף פסילה לפי תמונה: <span className="font-medium text-slate-600">{photoThresholdLabel(photoDisqualifyThreshold)}</span>
           </p>
         )}
         <button
@@ -154,6 +159,7 @@ export default function SettingsPage() {
         {photoMatchThreshold && (
           <p className="mb-3 text-xs text-slate-400">
             סף השוואת תמונות פעיל כרגע: <span className="font-medium text-slate-600">{photoThresholdLabel(photoMatchThreshold)}</span>
+            {' · '}סף פסילה לפי תמונה: <span className="font-medium text-slate-600">{photoThresholdLabel(photoDisqualifyThreshold)}</span>
             {photoMatchThreshold === 'never' && ' - כבוי, ההרצה לא תבדוק כלום. שנו אותו ב"פרמטרים להתאמה" ולחצו שם על "שמירת ההגדרות".'}
           </p>
         )}

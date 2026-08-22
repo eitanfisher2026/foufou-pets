@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMatch } from './matchingApi.js';
+import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
@@ -108,7 +109,7 @@ export default function MatchAnalysisPage() {
         </div>
       )}
 
-      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} />
+      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} disqualified={match.status === REPORT_STATUS.NO_MATCH_PHOTO} />
 
       <div className="space-y-2">
         {(match.breakdown || []).map((b, i) => {

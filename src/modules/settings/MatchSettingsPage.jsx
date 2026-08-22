@@ -8,6 +8,7 @@ import {
   CONFIDENCE_BUCKETS,
   CONFIDENCE_COLOR_PALETTE,
   PHOTO_MATCH_THRESHOLD_OPTIONS,
+  PHOTO_DISQUALIFY_THRESHOLD_OPTIONS,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
@@ -57,6 +58,15 @@ const RECOMMENDED_PARAMETER_UPGRADES = {
   furType: { disqualifying: true },
   breed: { disqualifying: true },
 };
+
+// Shared by both photo-comparison SelectFields below (when to run the
+// check, and when a "different animal" verdict should disqualify) - both
+// pick from the same CONFIDENCE_BUCKETS vocabulary, plus a "never" opt-out
+// that isn't itself a bucket.
+function bucketOrNeverLabel(key) {
+  if (key === 'never') return 'כבוי';
+  return CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key;
+}
 
 function sameGroupContents(a, b) {
   return a.length === b.length && a.every((breed) => b.includes(breed));
@@ -427,9 +437,9 @@ export default function MatchSettingsPage() {
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
         <p className="mb-2 text-sm font-medium text-slate-700">השוואת תמונות AI (רענון)</p>
         <p className="mb-3 text-sm text-slate-500">
-          בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך דמיון חזותי -
-          פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על כל זוג). "כבוי"
-          מבטל את זה לגמרי.
+          בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
+          שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
+          כל זוג). "כבוי" מבטל את זה לגמרי.
         </p>
         <SelectField
           className="w-full max-w-[12rem]"
@@ -437,10 +447,21 @@ export default function MatchSettingsPage() {
           allowClear={false}
           value={config.photoMatchThreshold}
           onChange={(v) => setConfig((prev) => ({ ...prev, photoMatchThreshold: v }))}
-          options={PHOTO_MATCH_THRESHOLD_OPTIONS.map((key) => ({
-            value: key,
-            label: key === 'never' ? 'כבוי' : CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key,
-          }))}
+          options={PHOTO_MATCH_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
+        />
+
+        <p className="mb-2 mt-4 text-sm text-slate-500">
+          כשההשוואה רצה, היא מחזירה רמה - "סבירות גבוהה"/"בינונית"/"נמוכה" שמדובר באותה חיה, או "בוודאות אין
+          התאמה". רמה שמגיעה לסף שנבחר כאן פוסלת את ההתאמה לגמרי (ציון 0), בדיוק כמו אי-התאמת צבע או גזע - לא רק
+          מוצגת כהערה. "כבוי" משאיר את התוצאה כהערה מידעית בלבד, בלי להשפיע על הציון.
+        </p>
+        <SelectField
+          className="w-full max-w-[12rem]"
+          label="סף לפסילת התאמה לפי תמונה"
+          allowClear={false}
+          value={config.photoDisqualifyThreshold}
+          onChange={(v) => setConfig((prev) => ({ ...prev, photoDisqualifyThreshold: v }))}
+          options={PHOTO_DISQUALIFY_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
         />
       </div>
 

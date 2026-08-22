@@ -1,17 +1,26 @@
 import { collection, doc, getDoc, getDocs, increment, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
-import { rankMatches, scoreMatch, confidenceMeetsThreshold } from './matchingEngine.js';
+import {
+  rankMatches,
+  scoreMatch,
+  confidenceMeetsThreshold,
+  visualVerdictMeetsDisqualifyThreshold,
+  normalizeVisualVerdict,
+} from './matchingEngine.js';
 import { getMatchConfig } from './matchConfigApi.js';
 import { comparePhotoSimilarity } from './photoSimilarityApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 
 // A verdict worth actively surfacing to a person (see maybeCheckPhotoSimilarity
-// below and the visualMatches returned by the check functions) - "unclear"
-// and "likely_different" are still stored on the match for transparency (see
-// the "ניתוח מלא" page) but aren't worth interrupting anyone about.
-const NOTABLE_VISUAL_VERDICTS = new Set(['likely_same', 'possibly_same']);
+// below and the visualMatches returned by the check functions) - "low" and
+// "noMatch" are still stored on the match for transparency (see the "ניתוח
+// מלא" page) but aren't worth interrupting anyone about.
+const NOTABLE_VISUAL_VERDICTS = new Set(['high', 'medium']);
+function isNotableVisualVerdict(verdict) {
+  return NOTABLE_VISUAL_VERDICTS.has(normalizeVisualVerdict(verdict));
+}
 
 /**
  * Runs the AI photo-similarity check for one lost-case/found-report pair,
@@ -58,19 +67,22 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
 }
 
 /**
- * A confident "likely_different" photo verdict outweighs whatever the
- * field-based score said - the same way a disqualifying field (color,
- * breed) already zeroes a match's score, just discovered a step later, once
- * an actual photo comparison exists. Forces score to 0 and records the AI's
- * explanation as the leading reason, so both the confidence badge
- * (ConfidenceBadge reads match.score directly) and the reasons list
- * correctly reflect the disqualification, not just the visualSimilarity
- * note sitting unconnected next to a stale high score. Every other verdict
- * (likely_same/possibly_same/unclear) leaves score and reasons untouched -
+ * A photo verdict confident enough (per the admin-configured
+ * photoDisqualifyThreshold) that these are different animals outweighs
+ * whatever the field-based score said - the same way a disqualifying field
+ * (color, breed) already zeroes a match's score, just discovered a step
+ * later, once an actual photo comparison exists. Forces score to 0 and
+ * records the AI's explanation as the leading reason, so both the
+ * confidence badge (ConfidenceBadge reads match.score directly) and the
+ * reasons list correctly reflect the disqualification, not just the
+ * visualSimilarity note sitting unconnected next to a stale high score.
+ * Every verdict below the threshold leaves score and reasons untouched -
  * still purely additive/informational, per the original design.
  */
-function applyVisualVerdict(score, reasons, visual) {
-  if (visual?.verdict !== 'likely_different') return { score, reasons, disqualifiedByPhoto: false };
+function applyVisualVerdict(score, reasons, visual, disqualifyThreshold) {
+  if (!visualVerdictMeetsDisqualifyThreshold(visual?.verdict, disqualifyThreshold)) {
+    return { score, reasons, disqualifiedByPhoto: false };
+  }
   return {
     score: 0,
     reasons: [`השוואת תמונות AI: ${visual.explanation}`, ...reasons],
@@ -132,7 +144,7 @@ async function recomputeLostCaseCounts(lostCaseId) {
       // without every search needing to read every lost case's matches
       // subcollection - kept in sync here, same as the other counts above,
       // so it's always current whenever matches change for any reason.
-      hasVisualMatch: all.some((m) => NOTABLE_VISUAL_VERDICTS.has(m.visualSimilarity?.verdict)),
+      hasVisualMatch: all.some((m) => isNotableVisualVerdict(m.visualSimilarity?.verdict)),
       lastCheckedAt: serverTimestamp(),
     },
     { merge: true }
@@ -150,7 +162,7 @@ async function recomputeFoundReportVisualFlag(foundReportId) {
   const matches = await getMatchesForFoundReport(foundReportId);
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId),
-    { hasVisualMatch: matches.some((m) => NOTABLE_VISUAL_VERDICTS.has(m.visualSimilarity?.verdict)) },
+    { hasVisualMatch: matches.some((m) => isNotableVisualVerdict(m.visualSimilarity?.verdict)) },
     { merge: true }
   );
 }
@@ -189,7 +201,7 @@ export async function checkMatchesForLostCase(lostCaseId) {
   let visualCostUsd = 0;
   ranked.forEach(({ report, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
-    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
     const status = autoStatusFor(score, disqualifiedByPhoto);
     // breakdown is stored alongside score/reasons (not recomputed on demand)
     // so the "full analysis" view always shows exactly what was checked at
@@ -205,7 +217,7 @@ export async function checkMatchesForLostCase(lostCaseId) {
     });
     if (visual) {
       visualCostUsd += visual.costUsd;
-      if (NOTABLE_VISUAL_VERDICTS.has(visual.verdict)) visualMatches.push(visual);
+      if (isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
     }
   });
   await batch.commit();
@@ -270,7 +282,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   const visual =
     prevData?.visualSimilarity ||
     (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
-  const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+  const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
 
   // Only a real triage status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH,
   // CONTACTED, CLOSED, ...) means a person actually looked at this pairing,
@@ -292,7 +304,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   }
   if (visual) await recomputeFoundReportVisualFlag(foundReportId);
 
-  return { score, reasons, breakdown, status, visualMatch: visual && NOTABLE_VISUAL_VERDICTS.has(visual.verdict) ? visual : null };
+  return { score, reasons, breakdown, status, visualMatch: visual && isNotableVisualVerdict(visual.verdict) ? visual : null };
 }
 
 /**
@@ -419,7 +431,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       candidates.forEach((m, idx) => {
         const visual = visuals[idx];
         if (!visual) return;
-        const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(m.data.score, m.data.reasons || [], visual);
+        const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(m.data.score, m.data.reasons || [], visual, config.photoDisqualifyThreshold);
         const updates = { visualSimilarity: visual };
         // Unlike the live "check" actions, this backfill otherwise never
         // touches score/reasons/status for existing matches - only a
@@ -435,7 +447,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
         costUsd += visual.costUsd;
         pairsChecked += 1;
         foundReportIdsToRecompute.add(m.data.foundReportId);
-        if (NOTABLE_VISUAL_VERDICTS.has(visual.verdict)) visualMatches.push(visual);
+        if (isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
       });
       await batch.commit();
       if (costUsd > 0) {
@@ -493,7 +505,7 @@ export async function checkMatchesForFoundReport(foundReportId) {
   const visualMatches = [];
   scored.forEach(({ lostCase, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
-    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual);
+    const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
     const status = autoStatusFor(score, disqualifiedByPhoto);
     batch.set(doc(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches', foundReportId), {
       foundReportId,
@@ -504,7 +516,7 @@ export async function checkMatchesForFoundReport(foundReportId) {
       checkedAt: serverTimestamp(),
       ...(visual ? { visualSimilarity: visual } : {}),
     });
-    if (visual && NOTABLE_VISUAL_VERDICTS.has(visual.verdict)) visualMatches.push(visual);
+    if (visual && isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
   });
   await batch.commit();
   await Promise.all(newCandidates.map((lostCase) => recomputeLostCaseCounts(lostCase.id)));

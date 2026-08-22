@@ -114,6 +114,41 @@ export function confidenceMeetsThreshold(score, thresholdKey) {
   return bucketRank >= thresholdRank;
 }
 
+// A photo comparison run before this scale existed stored one of the old
+// verdict strings (likely_same/possibly_same/unclear/likely_different) -
+// normalizing to the current bucket keys lets old and new matches render
+// and compare identically, without a one-off data migration for what's a
+// small, already-shrinking set of records (rerunning the photo check
+// naturally replaces the old value the normal way).
+const LEGACY_VISUAL_VERDICT_MAP = { likely_same: 'high', possibly_same: 'medium', unclear: 'low', likely_different: 'noMatch' };
+export function normalizeVisualVerdict(verdict) {
+  return LEGACY_VISUAL_VERDICT_MAP[verdict] || verdict;
+}
+
+// Admin-configured: how confident the AI photo check has to be that two
+// animals are different before that outweighs the field-based score (see
+// photoDisqualifyThreshold in DEFAULT_MATCH_CONFIG and applyVisualVerdict in
+// matchingApi.js). Deliberately excludes "medium"/"high" as choosable
+// values - those verdicts support a match, disqualifying on them would be
+// backwards - on top of the "never" opt-out.
+export const PHOTO_DISQUALIFY_THRESHOLD_OPTIONS = ['never', 'noMatch', 'low'];
+
+/**
+ * Whether a photo verdict is a confident-enough "different animal" call to
+ * disqualify the match, per the admin-configured threshold key (one of
+ * PHOTO_DISQUALIFY_THRESHOLD_OPTIONS). Reuses CONFIDENCE_BUCKETS' own key
+ * order (noMatch < low < medium < high) as the rank, so "low" as a threshold
+ * means "noMatch or low", same relative-strictness idea as
+ * confidenceMeetsThreshold above.
+ */
+export function visualVerdictMeetsDisqualifyThreshold(verdict, thresholdKey) {
+  if (!thresholdKey || thresholdKey === 'never') return false;
+  const verdictRank = CONFIDENCE_BUCKETS.findIndex((b) => b.key === normalizeVisualVerdict(verdict));
+  const thresholdRank = CONFIDENCE_BUCKETS.findIndex((b) => b.key === thresholdKey);
+  if (verdictRank === -1 || thresholdRank === -1) return false;
+  return verdictRank <= thresholdRank;
+}
+
 // Words with no distinguishing power for THIS app's matching, filtered out
 // of every word-overlap comparison (city/neighborhood/remarks, and - where
 // it matters most - markList). Species nouns are always redundant here
@@ -374,6 +409,13 @@ export const DEFAULT_MATCH_CONFIG = {
   // matchingApi.js), keeping it a small, bounded refinement rather than a
   // cost that scales with the whole pool.
   photoMatchThreshold: 'high',
+  // How confident the AI photo check has to be that two photos show
+  // different animals before that outweighs the field-based score (see
+  // applyVisualVerdict in matchingApi.js). Default only disqualifies on the
+  // AI's most confident "noMatch" verdict - "low" (photos didn't give much
+  // to go on, or a weak lean toward different) is left purely informational
+  // by default, since that's real uncertainty, not a confident negative.
+  photoDisqualifyThreshold: 'noMatch',
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },

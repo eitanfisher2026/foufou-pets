@@ -260,8 +260,10 @@ export const REPORT_STATUS = {
   NO_MATCH: 'no_match',
   // The photo-comparison sibling of NO_MATCH above - also automatic, also
   // means the algorithm itself ruled the pair out, just discovered a step
-  // later by the AI photo check (verdict "likely_different") rather than by
-  // the field comparison. Kept distinct from NO_MATCH so the reason a pair
+  // later by the AI photo check (a verdict confident enough it's a
+  // different animal to clear the admin-configured photoDisqualifyThreshold
+  // - see matchingApi.js) rather than by the field comparison. Kept
+  // distinct from NO_MATCH so the reason a pair
   // was ruled out ("fields don't line up" vs. "fields lined up but the
   // photos clearly don't") stays visible instead of collapsing into one
   // generic bucket. When this fires, the match's score is forced to 0 and

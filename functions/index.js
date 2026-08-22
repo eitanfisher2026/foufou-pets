@@ -758,25 +758,32 @@ const PHOTO_SIMILARITY_MODEL = 'claude-haiku-4-5';
 const PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT = 1.0;
 const PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT = 5.0;
 
+// Verdict buckets deliberately reuse the exact same keys as
+// CONFIDENCE_BUCKETS in matchingEngine.js (noMatch/low/medium/high) - this
+// is the same "how likely is it these are the same animal" scale the app
+// already shows for the field-based score, just applied to a photo
+// comparison instead. That lets matchingApi.js's disqualify-threshold logic
+// reuse CONFIDENCE_BUCKETS' rank order directly instead of maintaining a
+// second, parallel scale.
 const PHOTO_SIMILARITY_SCHEMA = {
   type: 'object',
   properties: {
-    verdict: { type: 'string', enum: ['likely_same', 'possibly_same', 'unclear', 'likely_different'] },
+    verdict: { type: 'string', enum: ['high', 'medium', 'low', 'noMatch'] },
     explanation: { type: 'string' },
   },
   required: ['verdict', 'explanation'],
   additionalProperties: false,
 };
 
-const PHOTO_SIMILARITY_PROMPT = `You are comparing two photos to judge whether they could plausibly show the same individual cat or dog. One photo is from a "lost pet" report, the other from a "found/seen pet" report - they were taken by different people, at different times (anywhere from hours to weeks apart), possibly in different lighting/angles/photo quality. Focus on stable identifying features - coat color and pattern, distinctive markings, body/face/ear shape - not on pose, lighting, background, or image quality.
+const PHOTO_SIMILARITY_PROMPT = `You are comparing two photos to judge how likely it is that they show the same individual cat or dog. One photo is from a "lost pet" report, the other from a "found/seen pet" report - they were taken by different people, at different times (anywhere from hours to weeks apart), possibly in different lighting/angles/photo quality. Focus on stable identifying features - coat color and pattern, distinctive markings, body/face/ear shape - not on pose, lighting, background, or image quality.
 
-Classify into exactly one of:
-- "likely_same": strong visual evidence these are the same animal (matching distinctive markings/coloring/features, no conflicting evidence).
-- "possibly_same": plausibly the same animal, but with real uncertainty (e.g. limited photo quality/angle, or only partial visual evidence).
-- "unclear": the photos don't give enough basis to judge either way (too blurry, animal not clearly visible, or too different in framing to compare).
-- "likely_different": clear visual evidence these are different animals (mismatched color, pattern, or other clearly conflicting physical traits).
+Classify how likely these are the same animal into exactly one of:
+- "high": strong visual evidence these are the same animal (matching distinctive markings/coloring/features, no conflicting evidence).
+- "medium": plausibly the same animal, but with real uncertainty (e.g. limited photo quality/angle, or only partial visual evidence).
+- "low": more likely different than the same - weak or partial conflicting evidence, OR the photos are too poor/limited (blurry, animal not clearly visible, very different framing) to compare with any real confidence either way. Nothing here definitively rules it out, but there's no real basis to call it a match.
+- "noMatch": clear, confident visual evidence these are different animals (mismatched color, pattern, or other clearly conflicting physical traits that leave little doubt).
 
-"explanation" is a short (1-2 sentence), specific, plain-language reason for your verdict - name the actual visual feature(s) that drove it, in Hebrew.`;
+"explanation" is a short (1-2 sentence), specific, plain-language reason for your verdict - name the actual visual feature(s) that drove it (or, for "low", say plainly if it's because the photos themselves are hard to compare), in Hebrew.`;
 
 async function fetchImageAsBase64(url) {
   const res = await fetch(url);

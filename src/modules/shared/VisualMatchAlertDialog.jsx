@@ -1,8 +1,8 @@
 import { Link } from 'react-router-dom';
 
 const VERDICT_LABELS = {
-  likely_same: 'דמיון חזותי גבוה',
-  possibly_same: 'דמיון חזותי אפשרי',
+  high: 'דמיון חזותי גבוה',
+  medium: 'דמיון חזותי בינוני',
 };
 
 /**
