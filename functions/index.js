@@ -85,6 +85,7 @@ const DOG_COLORS = [
   'מנומר (מֶרְל)',
   'שחור-לבן',
   'חום-לבן',
+  'טריקולור',
   'אחר',
 ];
 const CAT_BREEDS = [
@@ -298,7 +299,8 @@ const DOG_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't 
   - "חום" (brown) is a warm but muted brown/chocolate tone.
   - "זהוב" (golden) is a warm honey/golden-blonde tone typical of breeds like Golden Retrievers or Labradors - a similar coat that leans more reddish than honey-blonde can still fit here; use whichever of חום/זהוב is the closer match.
   - "ברינדל (מנומר בפסים)" is a fine brindle stripe pattern, often on a tan/brown base. "מנומר (מרל)" is a mottled/marbled coat, often with mixed patches and sometimes blue/odd eyes. Use whichever pattern name actually matches what's visible.
-  - "שחור-חום (בְּלֶק אנד טאן)" is a coat with a black body and sharply defined tan/brown points (muzzle, eyebrows, chest, legs).`;
+  - "שחור-חום (בְּלֶק אנד טאן)" is a coat with a black body and sharply defined tan/brown points (muzzle, eyebrows, chest, legs).
+  - "טריקולור" is for a coat with three distinct, clearly separated colors (typically black, white, and tan/brown patches) - common in breeds like ביגל, קולי, ברניז מאונטן דוג. Don't use this for a two-tone coat (that's שחור-לבן/חום-לבן) or for שחור-חום, which is a specific black-body-with-tan-points pattern, not three separately patched colors.`;
 
 function buildColorBullet(species) {
   const anchors = species === 'dog' ? DOG_COLOR_ANCHORS : CAT_COLOR_ANCHORS;

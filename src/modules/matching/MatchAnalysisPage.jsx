@@ -9,6 +9,7 @@ import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import BackLink from '../shared/BackLink.jsx';
+import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import { getMatchConfig } from './matchConfigApi.js';
 
 const VERDICT_STYLES = {
@@ -47,6 +48,7 @@ export default function MatchAnalysisPage() {
   const [foundReport, setFoundReport] = useState(null);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [rechecking, setRechecking] = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
 
   useEffect(() => {
     Promise.all([getMatch(caseId, foundReportId), getLostCase(caseId), getFoundReport(foundReportId)]).then(
@@ -111,11 +113,13 @@ export default function MatchAnalysisPage() {
           <div>
             <p className="mb-1 text-center text-xs text-slate-400">תיק החיפוש</p>
             {lostCase.photos?.[0]?.url ? (
-              <img
-                src={lostCase.photos[0].url}
-                alt=""
-                className="h-40 w-full rounded-lg bg-slate-50 object-contain"
-              />
+              <button type="button" onClick={() => setLightboxUrl(lostCase.photos[0].url)} className="block w-full">
+                <img
+                  src={lostCase.photos[0].url}
+                  alt=""
+                  className="h-40 w-full rounded-lg bg-slate-50 object-contain"
+                />
+              </button>
             ) : (
               <div className="flex h-40 items-center justify-center rounded-lg bg-slate-50 text-2xl">🐾</div>
             )}
@@ -123,11 +127,13 @@ export default function MatchAnalysisPage() {
           <div>
             <p className="mb-1 text-center text-xs text-slate-400">הדיווח</p>
             {foundReport.photos?.[0]?.url ? (
-              <img
-                src={foundReport.photos[0].url}
-                alt=""
-                className="h-40 w-full rounded-lg bg-slate-50 object-contain"
-              />
+              <button type="button" onClick={() => setLightboxUrl(foundReport.photos[0].url)} className="block w-full">
+                <img
+                  src={foundReport.photos[0].url}
+                  alt=""
+                  className="h-40 w-full rounded-lg bg-slate-50 object-contain"
+                />
+              </button>
             ) : (
               <div className="flex h-40 items-center justify-center rounded-lg bg-slate-50 text-2xl">🐾</div>
             )}
@@ -184,6 +190,8 @@ export default function MatchAnalysisPage() {
           </p>
         )}
       </div>
+
+      <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
     </div>
   );
 }
