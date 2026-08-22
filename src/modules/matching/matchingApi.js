@@ -385,14 +385,26 @@ export async function rescanAllLostCases(onProgress) {
  * scanned, for a progress bar.
  */
 export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
-  const lostCases = await activeLostCasesForSpecies(null);
+  // Every lost case is scanned (not just active ones) so the reported
+  // counts are honest about what was actually looked at - active cases get
+  // fully processed; a case that's since been resolved/archived/suspended
+  // only has its un-checked matches counted, not spent on (checking a
+  // closed case's matches in bulk isn't worth the AI cost) - skippedClosed
+  // in the result tells you if that's hiding anything, and the per-match
+  // "סריקה חוזרת" button on that case's own page still works regardless of
+  // its status if you do want one checked.
+  const snap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
+  const allLostCases = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   const config = await getMatchConfig();
   let pairsChecked = 0;
+  let skippedBelowThreshold = 0;
+  let skippedClosed = 0;
   const visualMatches = [];
   const foundReportIdsToRecompute = new Set();
 
-  for (let i = 0; i < lostCases.length; i++) {
-    const lostCase = lostCases[i];
+  for (let i = 0; i < allLostCases.length; i++) {
+    const lostCase = allLostCases[i];
+    const isActive = (lostCase.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE;
     const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches'));
     const allMatches = matchesSnap.docs.map((d) => ({ ref: d.ref, data: d.data() }));
 
@@ -402,68 +414,86 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       if (m.data.visualSimilarity) foundReportIdsToRecompute.add(m.data.foundReportId);
     });
 
-    const candidates = allMatches.filter(
-      (m) => !m.data.visualSimilarity && confidenceMeetsThreshold(m.data.score, config.photoMatchThreshold)
-    );
+    const uncheckedMatches = allMatches.filter((m) => !m.data.visualSimilarity);
 
-    if (candidates.length > 0) {
+    if (!isActive) {
+      skippedClosed += uncheckedMatches.length;
+    } else if (uncheckedMatches.length > 0) {
       const foundReportSnaps = await Promise.all(
-        candidates.map((m) => getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, m.data.foundReportId)))
+        uncheckedMatches.map((m) => getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, m.data.foundReportId)))
       );
-      const visuals = await Promise.all(
-        candidates.map((m, idx) => {
-          const reportSnap = foundReportSnaps[idx];
-          if (!reportSnap.exists()) return null;
-          return maybeCheckPhotoSimilarity(
-            lostCase,
-            lostCase.id,
-            reportSnap.data(),
-            m.data.foundReportId,
-            m.data.score,
-            config,
-            'found'
-          );
-        })
-      );
-
-      const batch = writeBatch(db);
-      let costUsd = 0;
-      candidates.forEach((m, idx) => {
-        const visual = visuals[idx];
-        if (!visual) return;
-        const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(m.data.score, m.data.reasons || [], visual, config.photoDisqualifyThreshold);
-        const updates = { visualSimilarity: visual };
-        // Unlike the live "check" actions, this backfill otherwise never
-        // touches score/reasons/status for existing matches - only a
-        // disqualifying photo verdict is worth overriding stored data for,
-        // and even then only if nobody has already triaged this pairing by
-        // hand (see isAutoStatus).
-        if (disqualifiedByPhoto) {
-          updates.score = score;
-          updates.reasons = reasons;
-          if (isAutoStatus(m.data.status)) updates.status = REPORT_STATUS.NO_MATCH_PHOTO;
+      // Eligibility is decided from a FRESH score (recomputed right here),
+      // not the score stored on the match doc at whatever point it was last
+      // checked - the matching algorithm/config can (and here, repeatedly
+      // did) change since then, so a stale stored score can under- or
+      // over-report what the current config would actually decide. This is
+      // exactly what makes this action a trustworthy "is everything
+      // eligible actually checked" pass, matching what a per-match
+      // "סריקה חוזרת" already does.
+      const candidates = [];
+      uncheckedMatches.forEach((m, idx) => {
+        const reportSnap = foundReportSnaps[idx];
+        if (!reportSnap.exists()) return;
+        const foundReport = reportSnap.data();
+        const freshScore = scoreMatch(lostCase, foundReport, config).score;
+        if (confidenceMeetsThreshold(freshScore, config.photoMatchThreshold)) {
+          candidates.push({ m, foundReport, freshScore });
+        } else {
+          skippedBelowThreshold += 1;
         }
-        batch.set(m.ref, updates, { merge: true });
-        costUsd += visual.costUsd;
-        pairsChecked += 1;
-        foundReportIdsToRecompute.add(m.data.foundReportId);
-        if (isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
       });
-      await batch.commit();
-      if (costUsd > 0) {
-        await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(costUsd) }, { merge: true });
+
+      if (candidates.length > 0) {
+        const visuals = await Promise.all(
+          candidates.map(({ m, foundReport, freshScore }) =>
+            maybeCheckPhotoSimilarity(lostCase, lostCase.id, foundReport, m.data.foundReportId, freshScore, config, 'found')
+          )
+        );
+
+        const batch = writeBatch(db);
+        let costUsd = 0;
+        candidates.forEach(({ m }, idx) => {
+          const visual = visuals[idx];
+          if (!visual) return;
+          const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(
+            m.data.score,
+            m.data.reasons || [],
+            visual,
+            config.photoDisqualifyThreshold
+          );
+          const updates = { visualSimilarity: visual };
+          // Unlike the live "check" actions, this backfill otherwise never
+          // touches score/reasons/status for existing matches - only a
+          // disqualifying photo verdict is worth overriding stored data
+          // for, and even then only if nobody has already triaged this
+          // pairing by hand (see isAutoStatus).
+          if (disqualifiedByPhoto) {
+            updates.score = score;
+            updates.reasons = reasons;
+            if (isAutoStatus(m.data.status)) updates.status = REPORT_STATUS.NO_MATCH_PHOTO;
+          }
+          batch.set(m.ref, updates, { merge: true });
+          costUsd += visual.costUsd;
+          pairsChecked += 1;
+          foundReportIdsToRecompute.add(m.data.foundReportId);
+          if (isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
+        });
+        await batch.commit();
+        if (costUsd > 0) {
+          await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(costUsd) }, { merge: true });
+        }
       }
     }
 
     // Unconditional - a lost case with nothing new to check this run may
     // still have an older visualSimilarity whose flag was never set.
     await recomputeLostCaseCounts(lostCase.id);
-    onProgress?.(i + 1, lostCases.length);
+    onProgress?.(i + 1, allLostCases.length);
   }
 
   await Promise.all([...foundReportIdsToRecompute].map((id) => recomputeFoundReportVisualFlag(id)));
 
-  return { casesScanned: lostCases.length, pairsChecked, visualMatches };
+  return { casesScanned: allLostCases.length, pairsChecked, skippedBelowThreshold, skippedClosed, visualMatches };
 }
 
 /**

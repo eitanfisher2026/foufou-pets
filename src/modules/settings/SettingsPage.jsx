@@ -152,9 +152,10 @@ export default function SettingsPage() {
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-1 font-medium text-slate-700">השוואת תמונות AI להתאמות קיימות</h2>
         <p className="mb-3 text-sm text-slate-500">
-          בלי לאפס או לסרוק מחדש שום דבר אחר - עובר על ההתאמות הקיימות של כל תיק חיפוש פעיל, ולכל התאמה שכבר עוברת
-          את סף הסבירות שהוגדר ב"פרמטרים להתאמה" אבל עדיין לא עברה השוואת תמונות, מריץ אותה עכשיו. שימושי אחרי
-          שהפעלתם את הפיצ'ר הזה לראשונה או שינתם את הסף, כדי שגם התאמות שכבר נבדקו יקבלו את הבדיקה החזותית.
+          בלי לאפס או לסרוק מחדש שום דבר אחר - עובר על ההתאמות הקיימות של כל תיק חיפוש פעיל, ומחשב לכל התאמה שעדיין
+          לא עברה השוואת תמונות ציון עדכני (לפי הנתונים וההגדרות הנוכחיים, גם אם ההתאמה נבדקה לפני שינוי באלגוריתם) -
+          ואם הציון העדכני עובר את סף הסבירות שהוגדר ב"פרמטרים להתאמה", מריץ את ההשוואה עכשיו. תיקים שאינם פעילים
+          (טופלו/בארכיון/מושהים) לא נבדקים כאן בכלל - אפשר להריץ "סריקה חוזרת" על התאמה ספציפית בתוך תיק כזה אם צריך.
         </p>
         {photoMatchThreshold && (
           <p className="mb-3 text-xs text-slate-400">
@@ -176,6 +177,16 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm text-emerald-700">
             נסרקו {photoBackfillResult.casesScanned} תיקי חיפוש, הושוו תמונות ב-{photoBackfillResult.pairsChecked}{' '}
             התאמות.
+            {(photoBackfillResult.skippedBelowThreshold > 0 || photoBackfillResult.skippedClosed > 0) && (
+              <>
+                {' '}
+                <span className="text-slate-500">
+                  ({photoBackfillResult.skippedBelowThreshold} מתחת לסף לפי הציון העדכני
+                  {photoBackfillResult.skippedClosed > 0 && `, ${photoBackfillResult.skippedClosed} בתיקים לא פעילים`} -
+                  לא נבדקו)
+                </span>
+              </>
+            )}
           </p>
         )}
       </section>
