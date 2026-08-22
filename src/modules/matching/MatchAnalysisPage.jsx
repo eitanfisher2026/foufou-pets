@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMatch } from './matchingApi.js';
+import { getMatch, checkSingleMatch } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
@@ -46,6 +46,7 @@ export default function MatchAnalysisPage() {
   const [lostCase, setLostCase] = useState(null);
   const [foundReport, setFoundReport] = useState(null);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  const [rechecking, setRechecking] = useState(false);
 
   useEffect(() => {
     Promise.all([getMatch(caseId, foundReportId), getLostCase(caseId), getFoundReport(foundReportId)]).then(
@@ -57,6 +58,21 @@ export default function MatchAnalysisPage() {
     );
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, [caseId, foundReportId]);
+
+  // This page used to be pure read-only - seeing a stale or missing photo
+  // comparison here (e.g. a match scored before the photo threshold cleared
+  // it, or before this feature existed at all) meant navigating all the way
+  // back to the match card just to press "סריקה חוזרת" there. Same action,
+  // available from wherever "why does this look wrong" actually comes up.
+  async function handleRecheck() {
+    setRechecking(true);
+    try {
+      await checkSingleMatch(caseId, foundReportId);
+      setMatch(await getMatch(caseId, foundReportId));
+    } finally {
+      setRechecking(false);
+    }
+  }
 
   if (!match || !lostCase || !foundReport) return <p className="p-4 text-slate-500">טוען...</p>;
 
@@ -75,9 +91,19 @@ export default function MatchAnalysisPage() {
         {displayLostCaseName(lostCase)} מול {displayFoundReportName(foundReport)}
       </p>
 
-      <div className="mb-4 flex items-center gap-2">
-        <span className="text-sm font-medium text-slate-600">רמת התאמה כוללת:</span>
-        <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-600">רמת התאמה כוללת:</span>
+          <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
+        </div>
+        <button
+          type="button"
+          onClick={handleRecheck}
+          disabled={rechecking}
+          className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
+        >
+          {rechecking ? 'סורק מחדש...' : 'בדיקה חוזרת'}
+        </button>
       </div>
 
       {(lostCase.photos?.[0]?.url || foundReport.photos?.[0]?.url) && (
