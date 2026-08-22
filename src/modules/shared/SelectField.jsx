@@ -31,9 +31,27 @@ export default function SelectField({
   clearLabel = 'ללא בחירה',
   disabled = false,
   className = '',
+  // Opt-in, not the default: several callers (size small→large, condition,
+  // record-type lost/found/both, comparison method...) have a real logical
+  // order that alphabetizing would break. Only the pet-detail and search
+  // dialogs' open-ended, admin-editable lists (color/breed/pattern/collar
+  // color) pass this - sorted with the Hebrew locale collator so it
+  // actually reads right (not code-point order, which would misplace
+  // niqqud/final letters).
+  sortAlpha = false,
 }) {
   const [open, setOpen] = useState(false);
   const normalized = options.map(normalizeOption);
+  if (sortAlpha) {
+    // "אחר" (other) is a catch-all, not really "a value alphabetized among
+    // the rest" - every options list that includes it already treats it as
+    // a fixed, always-last entry (see colorOptionsApi.js etc.), so sorting
+    // keeps that convention instead of letting it land wherever א happens
+    // to fall alphabetically (first, misleadingly, most of the time).
+    const other = normalized.filter((o) => o.value === 'אחר');
+    const rest = normalized.filter((o) => o.value !== 'אחר').sort((a, b) => a.label.localeCompare(b.label, 'he'));
+    normalized.splice(0, normalized.length, ...rest, ...other);
+  }
   const selected = normalized.find((o) => o.value === value);
 
   function choose(v) {

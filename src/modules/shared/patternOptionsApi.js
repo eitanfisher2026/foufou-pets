@@ -14,12 +14,17 @@ const OTHER = 'אחר';
  * (config/patternOptions, { cat: [...] }), falling back to the built-in
  * default if never saved. Same live-editable convention as
  * colorOptionsApi.js/breedOptionsApi.js, just for one species since pattern
- * only applies to cats.
+ * only applies to cats - including the same merge-in of any new code
+ * default not already present, so a pattern added to CAT_PATTERNS in code
+ * reaches an already-customized list automatically.
  */
 export async function getPatternOptions() {
+  const defaultsWithoutOther = CAT_PATTERNS.filter((p) => p !== OTHER);
   const snap = await getDoc(doc(db, ...CONFIG_DOC_PATH));
   const saved = snap.exists() ? snap.data().cat : null;
-  const custom = Array.isArray(saved) ? saved : CAT_PATTERNS.filter((p) => p !== OTHER);
+  const custom = Array.isArray(saved)
+    ? [...saved, ...defaultsWithoutOther.filter((p) => !saved.includes(p))]
+    : defaultsWithoutOther;
   return [...custom, OTHER];
 }
 

@@ -332,6 +332,7 @@ export default function FoundReportForm() {
             value={fields.breed}
             onChange={(v) => setField('breed', v)}
             options={breedOptions}
+            sortAlpha
           />
         </Field>
 
@@ -343,6 +344,7 @@ export default function FoundReportForm() {
             value={fields.condition}
             onChange={(v) => setField('condition', v)}
             options={CAT_CONDITIONS}
+            sortAlpha
           />
         </Field>
 
@@ -354,6 +356,7 @@ export default function FoundReportForm() {
             value={fields.color}
             onChange={(v) => setField('color', v)}
             options={colorOptions}
+            sortAlpha
           />
         </Field>
 
@@ -366,6 +369,7 @@ export default function FoundReportForm() {
               value={fields.pattern}
               onChange={(v) => setField('pattern', v)}
               options={patternSelectOptions}
+              sortAlpha
             />
           </Field>
         )}
@@ -394,6 +398,7 @@ export default function FoundReportForm() {
                 value={fields.collarColor}
                 onChange={(v) => setField('collarColor', v)}
                 options={COLLAR_COLORS}
+                sortAlpha
               />
             </Field>
             <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -456,11 +461,12 @@ export default function FoundReportForm() {
             value={fields.furType}
             onChange={(v) => setField('furType', v)}
             options={furTypeOptions}
+            sortAlpha
           />
         </Field>
 
         <Field label="גודל" inline>
-          <SelectField className="w-full max-w-[9rem]" label="בחירת גודל" value={fields.size} onChange={(v) => setField('size', v)} options={CAT_SIZES} />
+          <SelectField className="w-full max-w-[9rem]" label="בחירת גודל" value={fields.size} onChange={(v) => setField('size', v)} options={CAT_SIZES} sortAlpha />
         </Field>
       </FormSection>
 

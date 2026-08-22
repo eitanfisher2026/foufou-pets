@@ -27,6 +27,7 @@ import { SPECIES, COLLAR_COLORS, CAT_CONDITIONS } from '../shared/collections.js
  * reports).
  */
 export const SEARCH_FIELDS = [
+  { key: 'name', label: 'שם החיה', type: 'text', group: 'traits' },
   { key: 'breed', label: 'גזע', optionsKey: 'breedOptions', group: 'traits' },
   { key: 'color', label: 'צבע', optionsKey: 'colorOptions', group: 'traits' },
   { key: 'pattern', label: 'תבנית פרווה', optionsKey: 'patternOptions', group: 'traits', speciesOnly: SPECIES.CAT },
@@ -82,6 +83,13 @@ export function matchesSearch(record, criteria) {
     if (field.type === 'text') {
       if (field.key === 'keyword') {
         const haystack = normalize(`${record.name || ''} ${record.title || ''} ${record.markings || ''} ${record.notes || ''}`);
+        if (!haystack.includes(normalize(value))) return false;
+      } else if (field.key === 'name') {
+        // A lost case's name lives in `name`, a found report's in `title`
+        // (its identifying label is often a generic descriptor, not a real
+        // known name - see foundFieldMapping.js) - checking both is what
+        // makes this one field work the same for either record type.
+        const haystack = normalize(`${record.name || ''} ${record.title || ''}`);
         if (!haystack.includes(normalize(value))) return false;
       } else if (field.key === 'createdBy') {
         // "who created it" is named differently on each record type

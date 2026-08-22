@@ -21,12 +21,24 @@ const DEFAULTS = {
  * time). Used everywhere a "color" dropdown is shown, and by the AI
  * extraction function, so a color added here shows up in both without a
  * code change.
+ *
+ * A saved list fully replaces the code default rather than starting from
+ * it, so a color added to DOG_COLORS/CAT_COLORS in code (e.g. for the AI to
+ * recognize) silently never reached anyone who'd already customized that
+ * species' list once - same gap mergeNewDefaultParameters already closed
+ * for match-config parameters. Any default color not already present gets
+ * appended here (never touching colors the admin already has), so a code
+ * addition reaches an already-customized list automatically instead of
+ * needing the same value re-added by hand in settings.
  */
 export async function getColorOptions(species) {
   const defaults = DEFAULTS[species] || DEFAULTS[SPECIES.CAT];
+  const defaultsWithoutOther = defaults.filter((c) => c !== OTHER);
   const snap = await getDoc(doc(db, ...CONFIG_DOC_PATH));
   const saved = snap.exists() ? snap.data()[species] : null;
-  const custom = Array.isArray(saved) ? saved : defaults.filter((c) => c !== OTHER);
+  const custom = Array.isArray(saved)
+    ? [...saved, ...defaultsWithoutOther.filter((c) => !saved.includes(c))]
+    : defaultsWithoutOther;
   return [...custom, OTHER];
 }
 

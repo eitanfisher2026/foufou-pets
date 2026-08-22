@@ -129,6 +129,7 @@ export default function SearchDialog({ species, initialCriteria, onSearch, onClo
                           field.type === 'boolean' ? BOOLEAN_OPTIONS : field.options || resolvedOptions[field.optionsKey] || []
                         }
                         clearLabel="לא משנה"
+                        sortAlpha={field.type !== 'boolean'}
                       />
                     )}
                   </Field>
