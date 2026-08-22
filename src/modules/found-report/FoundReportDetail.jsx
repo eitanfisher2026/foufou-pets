@@ -464,6 +464,7 @@ export default function FoundReportDetail() {
                 value={fields.breed || ''}
                 onChange={(v) => setField('breed', v)}
                 options={breedOptions}
+                sortAlpha
               />
             </Field>
             <Field label={labels.conditionLabel} inline>
@@ -474,6 +475,7 @@ export default function FoundReportDetail() {
                 value={fields.condition || 'seen_only'}
                 onChange={(v) => setField('condition', v)}
                 options={CAT_CONDITIONS}
+                sortAlpha
               />
             </Field>
             <Field label="צבע" inline>
@@ -484,6 +486,7 @@ export default function FoundReportDetail() {
                 value={fields.color || ''}
                 onChange={(v) => setField('color', v)}
                 options={colorOptions}
+                sortAlpha
               />
             </Field>
             {report.species === SPECIES.CAT && (
@@ -495,6 +498,7 @@ export default function FoundReportDetail() {
                   value={fields.pattern || ''}
                   onChange={(v) => setField('pattern', v)}
                   options={patternSelectOptions}
+                  sortAlpha
                 />
               </Field>
             )}
@@ -520,6 +524,7 @@ export default function FoundReportDetail() {
                     value={fields.collarColor || ''}
                     onChange={(v) => setField('collarColor', v)}
                     options={COLLAR_COLORS}
+                    sortAlpha
                   />
                 </Field>
                 <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -576,6 +581,7 @@ export default function FoundReportDetail() {
                 value={fields.furType || ''}
                 onChange={(v) => setField('furType', v)}
                 options={furTypeOptions}
+                sortAlpha
               />
             </Field>
             <Field label="גודל" inline>
@@ -585,6 +591,7 @@ export default function FoundReportDetail() {
                 value={fields.size || ''}
                 onChange={(v) => setField('size', v)}
                 options={CAT_SIZES}
+                sortAlpha
               />
             </Field>
           </FormSection>

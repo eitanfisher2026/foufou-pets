@@ -33,7 +33,7 @@ export default function ColorCheckDialog({ colorOptions, onSave, onSkip }) {
         </p>
 
         <div className="mb-4">
-          <SelectField label="בחירת צבע" placeholder="בחר/י צבע" value={color} onChange={setColor} options={colorOptions} />
+          <SelectField label="בחירת צבע" placeholder="בחר/י צבע" value={color} onChange={setColor} options={colorOptions} sortAlpha />
         </div>
 
         <div className="flex gap-2">

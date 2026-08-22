@@ -34,7 +34,7 @@ export default function BreedCheckDialog({ breedOptions, onSave, onSkip }) {
         </p>
 
         <div className="mb-4">
-          <SelectField label="בחירת גזע" placeholder="בחר/י גזע" value={breed} onChange={setBreed} options={breedOptions} />
+          <SelectField label="בחירת גזע" placeholder="בחר/י גזע" value={breed} onChange={setBreed} options={breedOptions} sortAlpha />
         </div>
 
         <div className="flex gap-2">
