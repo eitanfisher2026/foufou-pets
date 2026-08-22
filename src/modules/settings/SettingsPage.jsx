@@ -1,10 +1,17 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { rescanAllLostCases, backfillPhotoSimilarityForExistingMatches } from '../matching/matchingApi.js';
+import { getMatchConfig } from '../matching/matchConfigApi.js';
+import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
+
+function photoThresholdLabel(key) {
+  if (key === 'never') return 'כבוי';
+  return CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key;
+}
 
 function ProgressBar({ progress }) {
   if (!progress) return null;
@@ -31,6 +38,17 @@ export default function SettingsPage() {
   const [photoBackfilling, setPhotoBackfilling] = useState(false);
   const [photoBackfillProgress, setPhotoBackfillProgress] = useState(null);
   const [photoBackfillResult, setPhotoBackfillResult] = useState(null);
+  // Both actions below silently do nothing if the threshold set in
+  // "פרמטרים להתאמה" was never actually saved there (it's a separate page,
+  // with its own save button at the bottom of a long form) - showing the
+  // value actually in effect right here, not just on the settings page
+  // that sets it, is what makes that possible to catch instead of looking
+  // like the action itself is broken.
+  const [photoMatchThreshold, setPhotoMatchThreshold] = useState(null);
+
+  useEffect(() => {
+    getMatchConfig().then((c) => setPhotoMatchThreshold(c.photoMatchThreshold));
+  }, []);
   const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
 
   async function handleRescanAll() {
@@ -105,6 +123,11 @@ export default function SettingsPage() {
           שההתאמות הקיימות ישקפו את הלוגיקה העדכנית ולא רק תיקים שמישהו פתח וסרק ידנית. כולל גם השוואת תמונות AI
           להתאמות שעוברות את הסף שהוגדר ב"פרמטרים להתאמה" - יכול לקחת זמן ולעלות יותר מהרגיל אם יש הרבה תיקים.
         </p>
+        {photoMatchThreshold && (
+          <p className="mb-3 text-xs text-slate-400">
+            סף השוואת תמונות פעיל כרגע: <span className="font-medium text-slate-600">{photoThresholdLabel(photoMatchThreshold)}</span>
+          </p>
+        )}
         <button
           type="button"
           onClick={handleRescanAll}
@@ -128,6 +151,12 @@ export default function SettingsPage() {
           את סף הסבירות שהוגדר ב"פרמטרים להתאמה" אבל עדיין לא עברה השוואת תמונות, מריץ אותה עכשיו. שימושי אחרי
           שהפעלתם את הפיצ'ר הזה לראשונה או שינתם את הסף, כדי שגם התאמות שכבר נבדקו יקבלו את הבדיקה החזותית.
         </p>
+        {photoMatchThreshold && (
+          <p className="mb-3 text-xs text-slate-400">
+            סף השוואת תמונות פעיל כרגע: <span className="font-medium text-slate-600">{photoThresholdLabel(photoMatchThreshold)}</span>
+            {photoMatchThreshold === 'never' && ' - כבוי, ההרצה לא תבדוק כלום. שנו אותו ב"פרמטרים להתאמה" ולחצו שם על "שמירת ההגדרות".'}
+          </p>
+        )}
         <button
           type="button"
           onClick={handlePhotoBackfill}
