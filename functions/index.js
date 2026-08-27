@@ -862,6 +862,11 @@ export const comparePhotoSimilarity = onCall(
 
     try {
       const parsed = JSON.parse(textBlock.text);
+      // Lets the client tell a verdict from a since-retired model apart
+      // from one that's still current - see isVisualSimilarityStale in
+      // matchingApi.js, which otherwise has no way to know a verdict was
+      // produced by an older, less reliable model version.
+      parsed.model = PHOTO_SIMILARITY_MODEL;
       parsed._aiUsage = {
         inputTokens: response.usage?.input_tokens || 0,
         outputTokens: response.usage?.output_tokens || 0,

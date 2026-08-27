@@ -13,6 +13,15 @@ import { comparePhotoSimilarity } from './photoSimilarityApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 
+// Must match PHOTO_SIMILARITY_MODEL in functions/index.js - the functions
+// package doesn't share modules with the client, so this is kept in sync by
+// hand (same pattern already used for CAT_COLORS/DOG_COLORS/etc. there).
+// Bump this alongside the server whenever the model changes, so every
+// verdict from a retired model is treated as stale (see
+// isVisualSimilarityStale below) instead of being trusted forever just
+// because its photos never changed.
+const CURRENT_PHOTO_SIMILARITY_MODEL = 'claude-sonnet-5';
+
 // A verdict worth actively surfacing to a person (see maybeCheckPhotoSimilarity
 // below and the visualMatches returned by the check functions) - "low" and
 // "noMatch" are still stored on the match for transparency (see the "ניתוח
@@ -31,13 +40,13 @@ function isNotableVisualVerdict(verdict) {
  * error) just means no visualSimilarity gets attached to this match, not a
  * failed scan. Returns null when skipped or failed, otherwise
  * { verdict, explanation, label, lostCaseId, foundReportId, lostPhotoUrl,
- * foundPhotoUrl, costUsd, checkedAt } - lostCaseId/foundReportId let a
- * caller (see VisualMatchAlertDialog.jsx) link straight to the match, since
- * an alert can be shown from a page (like the Settings bulk actions) that
- * has no other way to identify which pair it's even about. `label`
+ * foundPhotoUrl, model, costUsd, checkedAt } - lostCaseId/foundReportId let
+ * a caller (see VisualMatchAlertDialog.jsx) link straight to the match,
+ * since an alert can be shown from a page (like the Settings bulk actions)
+ * that has no other way to identify which pair it's even about. `label`
  * identifies the OTHER side of the pair for display. lostPhotoUrl/
- * foundPhotoUrl record exactly which photos were actually compared - see
- * isVisualSimilarityStale below, the reason this is stored at all.
+ * foundPhotoUrl/model record exactly what produced this verdict - see
+ * isVisualSimilarityStale below, the reason they're stored at all.
  */
 async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config, labelSide) {
   if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return null;
@@ -46,7 +55,7 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
   if (!lostPhotoUrl || !foundPhotoUrl) return null;
 
   try {
-    const { verdict, explanation, _aiUsage } = await comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl);
+    const { verdict, explanation, model, _aiUsage } = await comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl);
     const label =
       labelSide === 'lost'
         ? displayLostCaseName(lostCase)
@@ -61,6 +70,7 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
       foundReportId,
       lostPhotoUrl,
       foundPhotoUrl,
+      model,
       costUsd: _aiUsage?.estimatedCostUsd || 0,
       checkedAt: serverTimestamp(),
     };
@@ -72,21 +82,30 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
 
 /**
  * A stored visualSimilarity is only trustworthy as long as it's still
- * describing the two photos actually shown today - either side's main
- * photo can change after the fact (a new photo uploaded and made primary,
- * an old one removed), and nothing about that touches the match doc at
- * all. Before this, a reused cached verdict had no way to notice its own
- * photos had moved on, so "בדיקה חוזרת" could keep repeating a
- * now-meaningless comparison indefinitely - exactly what made LC087/FC008
- * confidently disqualify itself by describing a photo that wasn't the
- * current one. A verdict saved before this field existed (no
- * lostPhotoUrl/foundPhotoUrl recorded at all) is treated as stale too,
- * rather than assumed still valid - safe default given there's no way to
- * know either way.
+ * describing the two photos actually shown today, AND was produced by the
+ * model currently in use. Either side's main photo can change after the
+ * fact (a new photo uploaded and made primary, an old one removed), and
+ * nothing about that touches the match doc at all - before the photo-URL
+ * check, a reused cached verdict had no way to notice its own photos had
+ * moved on, so "בדיקה חוזרת" could keep repeating a now-meaningless
+ * comparison indefinitely (exactly what made LC087/FC008 confidently
+ * disqualify itself by describing a photo that wasn't the current one).
+ * The model check exists for the same reason on a different axis: swapping
+ * PHOTO_SIMILARITY_MODEL (e.g. after a confirmed accuracy problem) is
+ * pointless if every existing match just keeps reusing verdicts the old
+ * model already produced - a "recheck" needs to mean a fresh AI call in
+ * that case too, not just when the photos themselves changed. A verdict
+ * saved before either field existed (no lostPhotoUrl/model recorded at
+ * all) is treated as stale on both counts, rather than assumed still
+ * valid - safe default given there's no way to know either way.
  */
 function isVisualSimilarityStale(visual, lostCase, foundReport) {
   if (!visual) return false;
-  return visual.lostPhotoUrl !== lostCase.photos?.[0]?.url || visual.foundPhotoUrl !== foundReport.photos?.[0]?.url;
+  return (
+    visual.lostPhotoUrl !== lostCase.photos?.[0]?.url ||
+    visual.foundPhotoUrl !== foundReport.photos?.[0]?.url ||
+    visual.model !== CURRENT_PHOTO_SIMILARITY_MODEL
+  );
 }
 
 /**
@@ -399,9 +418,11 @@ export async function rescanAllLostCases(onProgress) {
  * this never clears or re-scores anything (field scores, reasons, and
  * breakdown are left exactly as they are). It only looks at matches that
  * already clear the configured photo-match threshold but don't have a
- * visualSimilarity result yet - the normal case right after first turning
- * this feature on, or after lowering the threshold so more existing
- * matches now qualify - and runs just the AI photo check for those.
+ * CURRENT visualSimilarity result yet - either no result at all (the normal
+ * case right after first turning this feature on, or after lowering the
+ * threshold so more existing matches now qualify), or one produced by a
+ * model that's since been swapped out - and runs just the AI photo check
+ * for those.
  *
  * Also backfills the denormalized hasVisualMatch search flag (see
  * recomputeLostCaseCounts/recomputeFoundReportVisualFlag) onto EVERY
@@ -442,7 +463,16 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       if (m.data.visualSimilarity) foundReportIdsToRecompute.add(m.data.foundReportId);
     });
 
-    const uncheckedMatches = allMatches.filter((m) => !m.data.visualSimilarity);
+    // "Unchecked" also covers a result produced by a model that's since
+    // been retired (see CURRENT_PHOTO_SIMILARITY_MODEL) - otherwise
+    // upgrading the model (e.g. after a confirmed accuracy problem) would
+    // silently do nothing here, since every match that already has SOME
+    // verdict would keep being skipped forever regardless of which model
+    // produced it. Doesn't re-check the photo URLs themselves in bulk
+    // (that's what the per-match "סריקה חוזרת" is for) - just the model.
+    const uncheckedMatches = allMatches.filter(
+      (m) => !m.data.visualSimilarity || m.data.visualSimilarity.model !== CURRENT_PHOTO_SIMILARITY_MODEL
+    );
 
     if (!isActive) {
       skippedClosed += uncheckedMatches.length;
