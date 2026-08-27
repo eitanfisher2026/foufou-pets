@@ -754,15 +754,18 @@ export const generatePhotoThumbnail = onCall({ region: 'europe-west1', cors: tru
 
 // Haiku, not Sonnet: this is a single visual-similarity judgment between two
 // already-known photos, not open-ended extraction - the same reasoning as
-// SPECIES_DETECT_MODEL above. Kept cheap on purpose since, unlike the
-// extraction call (once per uploaded report), the caller (see
-// matchingApi.js) can run this once per lost-case/found-report pair that
-// crosses the admin-configured confidence threshold - a small minority of
-// pairs, but still more than one call per report, so per-call cost matters
-// more here than for extraction.
-const PHOTO_SIMILARITY_MODEL = 'claude-haiku-4-5';
-const PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT = 1.0;
-const PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT = 5.0;
+// Upgraded from claude-haiku-4-5 after two confirmed cases of confidently
+// wrong verdicts - not vague hedging, but flatly misdescribing a photo
+// (missing an obvious orange patch covering a cat's whole head/ears) even
+// after two rounds of prompt tuning aimed at exactly that failure mode.
+// Costs roughly 3x more per call, but this only ever runs on pairs that
+// already cleared the admin-configured field-score threshold (see
+// matchingApi.js) - a small minority of the whole pool, not every pair -
+// so the absolute cost stays small while accuracy matters a lot more here:
+// a wrong "noMatch" silently zeroes out a real match's score.
+const PHOTO_SIMILARITY_MODEL = 'claude-sonnet-5';
+const PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT = 3.0;
+const PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT = 15.0;
 
 // Verdict buckets deliberately reuse the exact same keys as
 // CONFIDENCE_BUCKETS in matchingEngine.js (noMatch/low/medium/high) - this
@@ -835,8 +838,8 @@ export const comparePhotoSimilarity = onCall(
 
     const response = await client.messages.create({
       model: PHOTO_SIMILARITY_MODEL,
-      max_tokens: 300,
-      thinking: { type: 'disabled' },
+      max_tokens: 1200,
+      thinking: { type: 'adaptive' },
       system: PHOTO_SIMILARITY_PROMPT,
       output_config: { format: { type: 'json_schema', schema: PHOTO_SIMILARITY_SCHEMA } },
       messages: [
