@@ -30,12 +30,14 @@ function isNotableVisualVerdict(verdict) {
  * Never throws - a failed photo check (missing photos, a transient AI
  * error) just means no visualSimilarity gets attached to this match, not a
  * failed scan. Returns null when skipped or failed, otherwise
- * { verdict, explanation, label, lostCaseId, foundReportId, costUsd,
- * checkedAt } - lostCaseId/foundReportId let a caller (see
- * VisualMatchAlertDialog.jsx) link straight to the match, since an alert
- * can be shown from a page (like the Settings bulk actions) that has no
- * other way to identify which pair it's even about. `label` identifies the
- * OTHER side of the pair for display.
+ * { verdict, explanation, label, lostCaseId, foundReportId, lostPhotoUrl,
+ * foundPhotoUrl, costUsd, checkedAt } - lostCaseId/foundReportId let a
+ * caller (see VisualMatchAlertDialog.jsx) link straight to the match, since
+ * an alert can be shown from a page (like the Settings bulk actions) that
+ * has no other way to identify which pair it's even about. `label`
+ * identifies the OTHER side of the pair for display. lostPhotoUrl/
+ * foundPhotoUrl record exactly which photos were actually compared - see
+ * isVisualSimilarityStale below, the reason this is stored at all.
  */
 async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config, labelSide) {
   if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return null;
@@ -57,6 +59,8 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
       label,
       lostCaseId,
       foundReportId,
+      lostPhotoUrl,
+      foundPhotoUrl,
       costUsd: _aiUsage?.estimatedCostUsd || 0,
       checkedAt: serverTimestamp(),
     };
@@ -64,6 +68,25 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
     console.error('photo similarity check failed', err);
     return null;
   }
+}
+
+/**
+ * A stored visualSimilarity is only trustworthy as long as it's still
+ * describing the two photos actually shown today - either side's main
+ * photo can change after the fact (a new photo uploaded and made primary,
+ * an old one removed), and nothing about that touches the match doc at
+ * all. Before this, a reused cached verdict had no way to notice its own
+ * photos had moved on, so "בדיקה חוזרת" could keep repeating a
+ * now-meaningless comparison indefinitely - exactly what made LC087/FC008
+ * confidently disqualify itself by describing a photo that wasn't the
+ * current one. A verdict saved before this field existed (no
+ * lostPhotoUrl/foundPhotoUrl recorded at all) is treated as stale too,
+ * rather than assumed still valid - safe default given there's no way to
+ * know either way.
+ */
+function isVisualSimilarityStale(visual, lostCase, foundReport) {
+  if (!visual) return false;
+  return visual.lostPhotoUrl !== lostCase.photos?.[0]?.url || visual.foundPhotoUrl !== foundReport.photos?.[0]?.url;
 }
 
 /**
@@ -259,7 +282,10 @@ export async function countNewCandidatesForLostCase(lostCaseId) {
  * action. Keeps whatever review status the match already had (or picks the
  * same NEW/NO_MATCH default a fresh check would for a pairing that somehow
  * has none yet). Reuses an already-stored visualSimilarity rather than
- * re-spending on the AI photo check every time someone presses recheck.
+ * re-spending on the AI photo check every time someone presses recheck -
+ * but only when it's still actually describing the current photos (see
+ * isVisualSimilarityStale); a stale one is treated the same as having none
+ * at all, so a photo change is exactly what "recheck" needs to catch.
  */
 export async function checkSingleMatch(lostCaseId, foundReportId) {
   const [caseSnap, reportSnap] = await Promise.all([
@@ -279,9 +305,11 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   const prevData = prevSnap.exists() ? prevSnap.data() : null;
   const prevStatus = prevData?.status;
 
-  const visual =
-    prevData?.visualSimilarity ||
-    (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
+  const reusableVisual =
+    prevData?.visualSimilarity && !isVisualSimilarityStale(prevData.visualSimilarity, lostCase, foundReport)
+      ? prevData.visualSimilarity
+      : null;
+  const visual = reusableVisual || (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
   const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
 
   // Only a real triage status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH,
@@ -299,7 +327,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
     { merge: true }
   );
   await recomputeLostCaseCounts(lostCaseId);
-  if (visual && visual !== prevData?.visualSimilarity && visual.costUsd > 0) {
+  if (visual && visual !== reusableVisual && visual.costUsd > 0) {
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { visualMatchCostUsd: increment(visual.costUsd) }, { merge: true });
   }
   if (visual) await recomputeFoundReportVisualFlag(foundReportId);
