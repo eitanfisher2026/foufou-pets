@@ -136,6 +136,28 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
   }
 }
 
+/**
+ * Rare escape hatch for a genuinely wrong species (the AI or the person
+ * filling in the form mistook a dog for a cat, or vice versa) - not exposed
+ * as a normal editable field, since almost every record's species is
+ * correct and a visible dropdown here would just invite accidental changes
+ * to the one field nothing else can recover from cleanly. Resets every
+ * species-scoped field (breed/color/pattern/furType all draw from
+ * different option lists per species - a value carried over from the old
+ * species could easily not even exist in the new one's list) - the caller
+ * is still responsible for clearing this record's matches (see
+ * clearMatches/clearMatchesForFoundReport in matchingApi.js), since those
+ * were computed against entirely the wrong species' pool and are
+ * meaningless once this changes.
+ */
+export async function fixLostCaseSpecies(caseId, species) {
+  await setDoc(
+    doc(db, COLLECTIONS.LOST_CASES, caseId),
+    { species, breed: '', color: '', pattern: '', furType: '', updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
 export async function updateLostCaseStatus(caseId, status) {
   await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseId), { status, updatedAt: serverTimestamp() }, { merge: true });
 }

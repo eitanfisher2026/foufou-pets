@@ -142,6 +142,28 @@ export async function updateFoundReportStatus(reportId, status) {
 }
 
 /**
+ * Rare escape hatch for a genuinely wrong species (the AI or the person
+ * filling in the form mistook a dog for a cat, or vice versa) - not exposed
+ * as a normal editable field, since almost every record's species is
+ * correct and a visible dropdown here would just invite accidental changes
+ * to the one field nothing else can recover from cleanly. Resets every
+ * species-scoped field (breed/color/pattern/furType all draw from
+ * different option lists per species - a value carried over from the old
+ * species could easily not even exist in the new one's list) - the caller
+ * is still responsible for clearing this record's matches (see
+ * clearMatchesForFoundReport in matchingApi.js), since those were computed
+ * against entirely the wrong species' pool and are meaningless once this
+ * changes.
+ */
+export async function fixFoundReportSpecies(reportId, species) {
+  await setDoc(
+    doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
+    { species, breed: '', color: '', pattern: '', furType: '', updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
+/**
  * Deletes one photo immediately: removes it from storage and updates the
  * report's `photos` array to match. Returns the resulting photo list.
  */

@@ -13,6 +13,7 @@ import {
   DOG_FUR_TYPES,
   COLLAR_COLORS,
   SPECIES,
+  SPECIES_LABELS,
   CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
@@ -29,6 +30,7 @@ import {
   removeLostCasePhoto,
   makeLostCasePhotoMain,
   deleteLostCase,
+  fixLostCaseSpecies,
 } from '../lost-report/lostReportApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { buildLostCaseSections } from '../lost-report/lostCaseSections.js';
@@ -323,6 +325,26 @@ export default function LostCaseDetail() {
     const reordered = await makeLostCasePhotoMain(caseId, photo, lostCase.photos || []);
     setLostCase((prev) => ({ ...prev, photos: reordered }));
     setFields((prev) => ({ ...prev, photos: reordered }));
+  }
+
+  // A rare AI/human mistake (a dog read as a cat, or vice versa) with no
+  // other way to correct it - species isn't part of the normal edit form at
+  // all, since almost every record's species is right and a visible
+  // dropdown would just invite accidental changes. Resets breed/color/
+  // pattern/furType (different option lists per species) and clears
+  // existing matches (computed against entirely the wrong species' pool,
+  // meaningless once this changes) - the confirm dialog spells both out
+  // since neither is reversible.
+  async function handleFixSpecies() {
+    const newSpecies = lostCase.species === SPECIES.DOG ? SPECIES.CAT : SPECIES.DOG;
+    const ok = await confirm(
+      `לשנות את סוג החיה ל${SPECIES_LABELS[newSpecies]}? גזע, צבע, תבנית וסוג פרווה יתאפסו (הרשימות שונות לכל סוג חיה), וכל ההתאמות הקיימות יימחקו וידרשו סריקה מחדש.`,
+      { confirmLabel: `שינוי ל${SPECIES_LABELS[newSpecies]}`, danger: true }
+    );
+    if (!ok) return;
+    await fixLostCaseSpecies(caseId, newSpecies);
+    await clearMatches(caseId);
+    await load();
   }
 
   async function handleDelete() {
@@ -731,6 +753,13 @@ export default function LostCaseDetail() {
               />
             </Field>
           </FormSection>
+
+          <p className="text-xs text-slate-400">
+            סוג החיה סומן בטעות ({SPECIES_LABELS[lostCase.species]})?{' '}
+            <button type="button" onClick={handleFixSpecies} className="underline">
+              שינוי ל{SPECIES_LABELS[lostCase.species === SPECIES.DOG ? SPECIES.CAT : SPECIES.DOG]}
+            </button>
+          </p>
 
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
             <label className="mb-2 block text-sm font-medium text-slate-600">
