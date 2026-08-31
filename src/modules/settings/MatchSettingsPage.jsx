@@ -187,7 +187,16 @@ export default function MatchSettingsPage() {
     setColorInput('');
   }
 
-  function removeColorOption(color) {
+  // Removing a color drops it from the picklist AND silently pulls it out
+  // of any similarity group it was in - a one-click ✕ with no confirmation
+  // is exactly how "color" (the parameter) got deleted by mistake before,
+  // and a color is just as easy to lose the same way.
+  async function removeColorOption(color) {
+    const ok = await confirm(`להסיר את הצבע "${color}"? הוא יוסר גם מכל קבוצת דמיון צבעים שהוא נמצא בה.`, {
+      confirmLabel: 'הסרה',
+      danger: true,
+    });
+    if (!ok) return;
     setColorOptions((prev) => prev.filter((c) => c !== color));
     // A color removed from the list shouldn't linger in a similarity group -
     // only this species' groups, colorGroups is keyed by species (see
@@ -208,11 +217,17 @@ export default function MatchSettingsPage() {
     setBreedInput('');
   }
 
-  function removeBreedOption(breed) {
+  // Same reasoning as removeColorOption above.
+  async function removeBreedOption(breed) {
+    const ok = await confirm(`להסיר את הגזע "${breed}"? הוא יוסר גם מכל קבוצת דמיון גזעים שהוא נמצא בה.`, {
+      confirmLabel: 'הסרה',
+      danger: true,
+    });
+    if (!ok) return;
     setBreedOptions((prev) => prev.filter((b) => b !== breed));
-    // Same reasoning as removeColorOption - a breed removed from the list
-    // shouldn't linger in a similarity group. breedGroups is keyed by
-    // species, same as colorGroups (see matchingEngine.js).
+    // A breed removed from the list shouldn't linger in a similarity group.
+    // breedGroups is keyed by species, same as colorGroups (see
+    // matchingEngine.js).
     setConfig((prev) => ({
       ...prev,
       breedGroups: {
@@ -229,7 +244,9 @@ export default function MatchSettingsPage() {
     setPatternInput('');
   }
 
-  function removePatternOption(pattern) {
+  async function removePatternOption(pattern) {
+    const ok = await confirm(`להסיר את תבנית הפרווה "${pattern}"?`, { confirmLabel: 'הסרה', danger: true });
+    if (!ok) return;
     setPatternOptions((prev) => prev.filter((p) => p !== pattern));
   }
 
@@ -267,7 +284,13 @@ export default function MatchSettingsPage() {
     }));
   }
 
-  function removeColorGroup(index) {
+  async function removeColorGroup(index) {
+    const group = config.colorGroups[listSpecies][index];
+    const ok = await confirm(
+      group.length > 0 ? `למחוק את קבוצת הצבעים "${group.join(', ')}"? הצבעים עצמם יישארו ברשימה, רק הקבוצה תימחק.` : 'למחוק את הקבוצה הריקה?',
+      { confirmLabel: 'מחיקה', danger: true }
+    );
+    if (!ok) return;
     setConfig((prev) => ({
       ...prev,
       colorGroups: { ...prev.colorGroups, [listSpecies]: prev.colorGroups[listSpecies].filter((_, i) => i !== index) },
@@ -297,7 +320,13 @@ export default function MatchSettingsPage() {
     }));
   }
 
-  function removeBreedGroup(index) {
+  async function removeBreedGroup(index) {
+    const group = config.breedGroups[listSpecies][index];
+    const ok = await confirm(
+      group.length > 0 ? `למחוק את קבוצת הגזעים "${group.join(', ')}"? הגזעים עצמם יישארו ברשימה, רק הקבוצה תימחק.` : 'למחוק את הקבוצה הריקה?',
+      { confirmLabel: 'מחיקה', danger: true }
+    );
+    if (!ok) return;
     setConfig((prev) => ({
       ...prev,
       breedGroups: { ...prev.breedGroups, [listSpecies]: prev.breedGroups[listSpecies].filter((_, i) => i !== index) },
