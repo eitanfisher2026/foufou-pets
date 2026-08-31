@@ -245,6 +245,13 @@ export const CLOSURE_REASON = {
   NOT_FOUND_TOO_LONG: 'not_found_too_long',
   DIED: 'died',
   OTHER: 'other',
+  // Set automatically (never by a person) by the admin "archive records
+  // older than X days" bulk action (see archiveOldRecordsApi.js) - kept
+  // distinct from NOT_FOUND_TOO_LONG, which implies someone actually looked
+  // at the case and concluded the search failed. This one means nothing
+  // was determined either way - the record just aged out of the working
+  // list on its own.
+  SYSTEM_ARCHIVED_OLD: 'system_archived_old',
 };
 
 export const CLOSURE_REASON_LABELS = {
@@ -252,6 +259,7 @@ export const CLOSURE_REASON_LABELS = {
   [CLOSURE_REASON.NOT_FOUND_TOO_LONG]: 'לא אותר/ה זמן רב',
   [CLOSURE_REASON.DIED]: 'נפטר/ה',
   [CLOSURE_REASON.OTHER]: 'אחר',
+  [CLOSURE_REASON.SYSTEM_ARCHIVED_OLD]: 'ארכוב אוטומטי - מעל חודש במערכת',
 };
 
 export const REPORT_STATUS = {

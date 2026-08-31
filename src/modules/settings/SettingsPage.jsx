@@ -6,11 +6,18 @@ import { rescanAllLostCases, backfillPhotoSimilarityForExistingMatches } from '.
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
+import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
 import AppFooter from '../shared/AppFooter.jsx';
 
 function photoThresholdLabel(key) {
   if (key === 'never') return 'כבוי';
   return CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key;
+}
+
+function defaultArchiveCutoffDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 30);
+  return d.toISOString().slice(0, 10);
 }
 
 function ProgressBar({ progress }) {
@@ -46,6 +53,12 @@ export default function SettingsPage() {
   // like the action itself is broken.
   const [photoMatchThreshold, setPhotoMatchThreshold] = useState(null);
   const [photoDisqualifyThreshold, setPhotoDisqualifyThreshold] = useState(null);
+  const [archiveCutoffDate, setArchiveCutoffDate] = useState(defaultArchiveCutoffDate);
+  const [archivePreview, setArchivePreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [archiveProgress, setArchiveProgress] = useState(null);
+  const [archiveResult, setArchiveResult] = useState(null);
 
   useEffect(() => {
     getMatchConfig().then((c) => {
@@ -80,6 +93,41 @@ export default function SettingsPage() {
       notifyVisualMatch(result.visualMatches);
     } finally {
       setPhotoBackfilling(false);
+    }
+  }
+
+  // Two-step on purpose - counting first, archiving only once the admin has
+  // actually seen how many records (and of which species) a given cutoff
+  // date would touch, since this isn't reversible from within the app.
+  // Changing the date after a preview was shown clears it, so the counts on
+  // screen can never end up describing a date that's no longer selected.
+  async function handlePreviewArchive() {
+    setPreviewing(true);
+    setArchiveResult(null);
+    try {
+      const counts = await countOldActiveRecords(new Date(archiveCutoffDate));
+      setArchivePreview({ cutoffDate: archiveCutoffDate, ...counts });
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  function handleCutoffDateChange(value) {
+    setArchiveCutoffDate(value);
+    setArchivePreview(null);
+  }
+
+  async function handleConfirmArchive() {
+    setArchiving(true);
+    setArchiveProgress({ done: 0, total: 0 });
+    try {
+      const result = await archiveOldRecords(new Date(archivePreview.cutoffDate), user?.displayName || user?.email || '', (done, total) =>
+        setArchiveProgress({ done, total })
+      );
+      setArchiveResult(result);
+      setArchivePreview(null);
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -188,6 +236,77 @@ export default function SettingsPage() {
                 </span>
               </>
             )}
+          </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-1 font-medium text-slate-700">העברת רשומות ישנות לארכיון</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          מעביר לארכיון כל תיק חיפוש ודיווח פעילים (חתולים וכלבים) שנוצרו לפני התאריך שנבחר - שימושי לפינוי רשימות
+          עבודה מרשומות ישנות שכנראה לא רלוונטיות יותר. תיק שהועבר לארכיון בדרך זו מסומן ב"ארכוב אוטומטי - מעל חודש
+          במערכת" (נראה בעמוד הארכיון), ומפסיק להיבדק בסריקות התאמה עתידיות - בדיוק כמו כל רשומה לא פעילה אחרת.
+          הסטוריית ההתאמות הקיימת שלו נשארת כפי שהיא, לצפייה בלבד.
+        </p>
+        <label className="mb-3 block text-sm text-slate-600">
+          תיקים ודיווחים שנוצרו לפני תאריך זה יועברו לארכיון
+          <input
+            type="date"
+            dir="ltr"
+            className="input mt-1 block w-full max-w-[10rem]"
+            value={archiveCutoffDate}
+            onChange={(e) => handleCutoffDateChange(e.target.value)}
+          />
+        </label>
+
+        {!archivePreview && !archiveResult && (
+          <button
+            type="button"
+            onClick={handlePreviewArchive}
+            disabled={previewing || !archiveCutoffDate}
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+          >
+            {previewing ? 'בודק...' : 'בדיקה'}
+          </button>
+        )}
+
+        {archivePreview && !archiving && (
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="mb-3 text-sm text-slate-700">
+              נמצאו לארכוב: <strong>{archivePreview.lostCats + archivePreview.lostDogs}</strong> תיקי חיפוש (
+              {archivePreview.lostCats} חתולים, {archivePreview.lostDogs} כלבים) ו-
+              <strong>{archivePreview.foundCats + archivePreview.foundDogs}</strong> דיווחים ({archivePreview.foundCats}{' '}
+              חתולים, {archivePreview.foundDogs} כלבים).
+            </p>
+            {archivePreview.lostCats + archivePreview.lostDogs + archivePreview.foundCats + archivePreview.foundDogs === 0 ? (
+              <button type="button" onClick={() => setArchivePreview(null)} className="text-sm text-slate-500 underline">
+                אין מה לארכב - סגירה
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleConfirmArchive}
+                  className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
+                >
+                  אישור והעברה לארכיון
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setArchivePreview(null)}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600"
+                >
+                  ביטול
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {archiving && <ProgressBar progress={archiveProgress} />}
+        {archiveResult && (
+          <p className="mt-2 text-sm text-emerald-700">
+            הועברו לארכיון {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.
           </p>
         )}
       </section>

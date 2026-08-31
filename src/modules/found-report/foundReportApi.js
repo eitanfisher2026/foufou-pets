@@ -142,6 +142,30 @@ export async function updateFoundReportStatus(reportId, status) {
 }
 
 /**
+ * Sets status together with the closure record (date/reason/comment) in one
+ * write - the found-report equivalent of updateLostCaseClosure in
+ * lostReportApi.js. Found reports don't have their own archive-browsing
+ * page or manual closure UI yet (see ArchivePage.jsx, currently lost-cases
+ * only), but the fields are still worth recording consistently - right now
+ * the only caller is the admin "archive records older than X days" bulk
+ * action (see archiveOldRecordsApi.js).
+ */
+export async function archiveFoundReport(reportId, closure) {
+  await setDoc(
+    doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
+    {
+      status: RECORD_STATUS.ARCHIVED,
+      closureDate: closure.closureDate || '',
+      closureReason: closure.closureReason || '',
+      closedBy: closure.closedBy || '',
+      closingComment: closure.closingComment || '',
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/**
  * Rare escape hatch for a genuinely wrong species (the AI or the person
  * filling in the form mistook a dog for a cat, or vice versa) - not exposed
  * as a normal editable field, since almost every record's species is
