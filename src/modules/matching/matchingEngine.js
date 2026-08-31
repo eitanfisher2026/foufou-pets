@@ -34,7 +34,10 @@ const DATE_PROXIMITY_CUTOFF_DAYS = 14;
 // inconclusive, not a mismatch.
 export const DEFAULT_COLOR_GROUPS = {
   [SPECIES.CAT]: [['לבן', 'אפור']],
-  [SPECIES.DOG]: [],
+  // Dogs got a real "אפור" color option later than cats did - same
+  // lighting/white-balance confusion applies equally once it exists, so
+  // this mirrors the cat default rather than starting empty.
+  [SPECIES.DOG]: [['לבן', 'אפור']],
 };
 
 // Same idea as DEFAULT_COLOR_GROUPS, for breed - starts empty for both

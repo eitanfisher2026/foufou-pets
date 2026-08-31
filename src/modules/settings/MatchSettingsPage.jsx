@@ -72,6 +72,30 @@ function sameGroupContents(a, b) {
   return a.length === b.length && a.every((breed) => b.includes(breed));
 }
 
+// A color or breed should belong to at most one similarity group per
+// species - membership in two groups at once doesn't make the comparison
+// logic itself wrong (compareColor/compareBreed just check "is this pair in
+// ANY shared group"), but it silently links two otherwise-unrelated groups
+// together through that one shared value, which is never what an admin
+// actually intended when building each group separately. Cleans up any
+// value already in more than one group (keeping its first appearance, in
+// saved group order, dropping the rest) - toggleColorInGroup/
+// toggleBreedInGroup below stop this from happening again going forward.
+function dedupeGroupsBySpecies(groupsBySpecies) {
+  const result = {};
+  for (const species of Object.keys(groupsBySpecies || {})) {
+    const seen = new Set();
+    result[species] = (groupsBySpecies[species] || []).map((group) =>
+      group.filter((value) => {
+        if (seen.has(value)) return false;
+        seen.add(value);
+        return true;
+      })
+    );
+  }
+  return result;
+}
+
 // The AI extraction (functions/index.js) reads its own static copies of
 // any customizable vocabulary - not a live Firestore read, kept simple and
 // fast on purpose, the same pattern as Roy News' static include/exclude
@@ -146,7 +170,9 @@ export default function MatchSettingsPage() {
   const setBreedOptions = listSpecies === SPECIES.DOG ? setDogBreedOptions : setCatBreedOptions;
 
   useEffect(() => {
-    getMatchConfig().then(setConfig);
+    getMatchConfig().then((c) =>
+      setConfig({ ...c, colorGroups: dedupeGroupsBySpecies(c.colorGroups), breedGroups: dedupeGroupsBySpecies(c.breedGroups) })
+    );
     getColorOptions(SPECIES.CAT).then((colors) => setCatColorOptions(colors.filter((c) => c !== OTHER)));
     getColorOptions(SPECIES.DOG).then((colors) => setDogColorOptions(colors.filter((c) => c !== OTHER)));
     getBreedOptions(SPECIES.CAT).then((breeds) => setCatBreedOptions(breeds.filter((b) => b !== OTHER)));
@@ -248,16 +274,20 @@ export default function MatchSettingsPage() {
     }));
   }
 
+  // A color can only ever belong to one group at a time - checking it here
+  // removes it from wherever else it already was, so two groups can never
+  // silently overlap (see dedupeGroupsBySpecies above for cleaning up any
+  // overlap that predates this).
   function toggleColorInGroup(groupIndex, color) {
-    setConfig((prev) => ({
-      ...prev,
-      colorGroups: {
-        ...prev.colorGroups,
-        [listSpecies]: prev.colorGroups[listSpecies].map((g, i) =>
-          i === groupIndex ? (g.includes(color) ? g.filter((c) => c !== color) : [...g, color]) : g
-        ),
-      },
-    }));
+    setConfig((prev) => {
+      const groups = prev.colorGroups[listSpecies];
+      const isAdding = !groups[groupIndex].includes(color);
+      const nextGroups = groups.map((g, i) => {
+        if (i === groupIndex) return isAdding ? [...g, color] : g.filter((c) => c !== color);
+        return isAdding ? g.filter((c) => c !== color) : g;
+      });
+      return { ...prev, colorGroups: { ...prev.colorGroups, [listSpecies]: nextGroups } };
+    });
   }
 
   function addBreedGroup() {
@@ -274,16 +304,17 @@ export default function MatchSettingsPage() {
     }));
   }
 
+  // Same one-group-at-a-time rule as toggleColorInGroup above.
   function toggleBreedInGroup(groupIndex, breed) {
-    setConfig((prev) => ({
-      ...prev,
-      breedGroups: {
-        ...prev.breedGroups,
-        [listSpecies]: prev.breedGroups[listSpecies].map((g, i) =>
-          i === groupIndex ? (g.includes(breed) ? g.filter((b) => b !== breed) : [...g, breed]) : g
-        ),
-      },
-    }));
+    setConfig((prev) => {
+      const groups = prev.breedGroups[listSpecies];
+      const isAdding = !groups[groupIndex].includes(breed);
+      const nextGroups = groups.map((g, i) => {
+        if (i === groupIndex) return isAdding ? [...g, breed] : g.filter((b) => b !== breed);
+        return isAdding ? g.filter((b) => b !== breed) : g;
+      });
+      return { ...prev, breedGroups: { ...prev.breedGroups, [listSpecies]: nextGroups } };
+    });
   }
 
   // Fills in RECOMMENDED_BREED_GROUPS for both species at once (not just
@@ -565,7 +596,7 @@ export default function MatchSettingsPage() {
           <p className="mb-3 text-sm text-slate-500">
             צבעים שנמצאים באותה קבוצה לא נחשבים כאי-התאמה כשמשווים ביניהם (רק כהתאמה חלקית) - מיועד לצבעים שקל לבלבל
             ביניהם בגלל תאורת הצילום, כמו לבן/אפור, ולא לצבעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה
-            "צבע".
+            "צבע". כל צבע יכול להיות בקבוצה אחת בלבד - סימון אותו בקבוצה חדשה יוציא אותו אוטומטית מהקבוצה הקודמת.
           </p>
           <div className="space-y-3">
             {(config.colorGroups?.[listSpecies] || []).map((group, i) => (
@@ -661,7 +692,8 @@ export default function MatchSettingsPage() {
             לבלבל ביניהם בתמונה, לא לגזעים שבאמת שונים. רלוונטי לפרמטרים שמשתמשים בשיטת ההשוואה "גזע". השוואת גזע
             מדלגת (לא ציון גבוה ולא נמוך) כשאחד הצדדים לפחות מסומן כ"מעורב" (ברירת המחדל) - אין דרך לדעת. אבל ברגע
             ששני הצדדים ציינו גזע ספציפי, ההשוואה מחייבת: גזע זהה מקבל ציון גבוה, זוג גזעים שהוגדר כאן כקבוצה מקבל
-            ציון בינוני, וכל זוג גזעים ספציפיים אחר פוסל את ההתאמה כליל - בדיוק כמו אי-התאמת צבע.
+            ציון בינוני, וכל זוג גזעים ספציפיים אחר פוסל את ההתאמה כליל - בדיוק כמו אי-התאמת צבע. כל גזע יכול להיות
+            בקבוצה אחת בלבד - סימון אותו בקבוצה חדשה יוציא אותו אוטומטית מהקבוצה הקודמת.
           </p>
           <div className="space-y-3">
             {(config.breedGroups?.[listSpecies] || []).map((group, i) => (
