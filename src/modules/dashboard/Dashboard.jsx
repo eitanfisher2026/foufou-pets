@@ -11,6 +11,7 @@ import ProfileMenu from '../shared/ProfileMenu.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import HelpDialog from '../shared/HelpDialog.jsx';
+import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import SearchDialog from './SearchDialog.jsx';
 import { matchesSearch } from './recordSearch.js';
 import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
@@ -24,7 +25,7 @@ import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 // reports only ever get fetched here on demand, when a search explicitly
 // asks to include them (see handleSearch below).
 export default function Dashboard() {
-  const { preferredSpecies, setPreferredSpecies, roleLoading } = useAuth();
+  const { preferredSpecies, setPreferredSpecies, roleLoading, hasSeenOnboarding, dismissOnboarding, isAdmin } = useAuth();
   // Firestore does the species filtering now (see dashboardApi.js) rather
   // than fetching both species and filtering client-side - re-runs
   // whenever the toggle switches, so switching species re-fetches just
@@ -42,6 +43,15 @@ export default function Dashboard() {
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [foundCount, setFoundCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // Gated on !roleLoading too, not just hasSeenOnboarding, since
+  // hasSeenOnboarding defaults to true until the live profile subscription
+  // actually resolves (see AuthProvider.jsx) - checking only the flag would
+  // let this open, then immediately close, for a genuinely new user on
+  // every load.
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  useEffect(() => {
+    if (!roleLoading && !hasSeenOnboarding) setShowOnboarding(true);
+  }, [roleLoading, hasSeenOnboarding]);
   const [showSearch, setShowSearch] = useState(false);
   // Search criteria lives in the URL (via useSearchParams), not just
   // component state - opening a search result navigates away to a whole
@@ -171,7 +181,18 @@ export default function Dashboard() {
             ℹ️
           </button>
         </div>
-        <ProfileMenu />
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Link
+              to="/settings"
+              aria-label="הגדרות"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-500"
+            >
+              ⚙️
+            </Link>
+          )}
+          <ProfileMenu />
+        </div>
       </header>
 
       <div className="mb-4 flex items-center justify-between gap-2">
@@ -255,6 +276,14 @@ export default function Dashboard() {
       <AppFooter />
 
       {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
+      {showOnboarding && (
+        <OnboardingDialog
+          onClose={() => {
+            setShowOnboarding(false);
+            dismissOnboarding();
+          }}
+        />
+      )}
       {showSearch && (
         <SearchDialog species={preferredSpecies} initialCriteria={searchCriteria} onSearch={handleSearch} onClose={() => setShowSearch(false)} />
       )}

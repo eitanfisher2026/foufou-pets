@@ -1,18 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from './usePwaInstall.js';
 import AboutDialog from './AboutDialog.jsx';
 import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 
 /**
- * The account entry point on the dashboard header: a round profile-photo
- * button that opens a small menu (settings for admins, share, install,
- * sign out) instead of a bare "הגדרות" link - settings itself is admin-
- * only, so it can't be the one always-visible account action anymore.
+ * The personal-account entry point on the dashboard header: a round
+ * profile-photo button that opens a small menu (feedback, about, share,
+ * install, sign out). Settings moved out to its own admin-only ⚙️ icon
+ * right in the header (see Dashboard.jsx) - it's app configuration, not a
+ * personal action, and burying the one thing an admin actually needs
+ * regularly inside a menu named after their own photo was never a great
+ * fit anyway. The small chevron badge on the avatar exists purely so this
+ * reads as "tap for a menu" rather than "here's my photo" - the menu
+ * contents were never really the discoverability problem.
  */
 export default function ProfileMenu() {
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
@@ -70,7 +74,7 @@ export default function ProfileMenu() {
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="block shrink-0">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="relative block shrink-0">
         {user?.photoURL ? (
           <img
             src={user.photoURL}
@@ -83,6 +87,12 @@ export default function ProfileMenu() {
             {(user?.displayName || user?.email || '?')[0]}
           </span>
         )}
+        <span
+          aria-hidden="true"
+          className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] leading-none text-white ring-2 ring-white"
+        >
+          ▾
+        </span>
       </button>
 
       {open && (
@@ -94,16 +104,6 @@ export default function ProfileMenu() {
             <p className="truncate font-medium text-slate-800">{user?.displayName}</p>
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
           </div>
-
-          {isAdmin && (
-            <Link
-              to="/settings"
-              onClick={() => setOpen(false)}
-              className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              הגדרות
-            </Link>
-          )}
 
           <button
             type="button"

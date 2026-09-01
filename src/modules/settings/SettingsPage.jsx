@@ -7,6 +7,7 @@ import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
+import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 
 function photoThresholdLabel(key) {
@@ -59,6 +60,11 @@ export default function SettingsPage() {
   const [archiving, setArchiving] = useState(false);
   const [archiveProgress, setArchiveProgress] = useState(null);
   const [archiveResult, setArchiveResult] = useState(null);
+  // Pure preview, no side effects - unlike the real onboarding flow (see
+  // Dashboard.jsx), closing this never touches hasSeenOnboarding, so
+  // reviewing it here can't accidentally leave the admin's own account
+  // (or anyone else's) in a test state.
+  const [showOnboardingPreview, setShowOnboardingPreview] = useState(false);
 
   useEffect(() => {
     getMatchConfig().then((c) => {
@@ -161,6 +167,15 @@ export default function SettingsPage() {
           <span className="font-medium text-slate-700">עלויות</span>
           <span className="text-slate-400">‹</span>
         </Link>
+
+        <button
+          type="button"
+          onClick={() => setShowOnboardingPreview(true)}
+          className="flex w-full items-center justify-between p-4 text-right hover:bg-slate-50"
+        >
+          <span className="font-medium text-slate-700">תצוגה מקדימה של מסך הכניסה הראשונה</span>
+          <span className="text-slate-400">‹</span>
+        </button>
 
         <button type="button" onClick={signOut} className="w-full p-4 text-right font-medium text-red-600">
           התנתקות
@@ -313,6 +328,7 @@ export default function SettingsPage() {
 
       <AppFooter />
       {visualMatchDialog}
+      {showOnboardingPreview && <OnboardingDialog onClose={() => setShowOnboardingPreview(false)} />}
     </div>
   );
 }

@@ -47,6 +47,14 @@ export async function upsertUserOnLogin(firebaseUser) {
       // follows them across devices), not a permission. Defaults to cats,
       // the only species that existed before this field did.
       preferredSpecies: SPECIES.CAT,
+      // Only ever written here, at the exact moment a profile doc is first
+      // created - never touched again after that (see markOnboardingSeen
+      // below, which flips it once the dialog is dismissed). That's what
+      // makes "field missing" a safe way to mean "already onboarded" for
+      // everyone who signed in before this existed: their doc was created
+      // long before this line did, so it was never written for them at
+      // all, and OnboardingDialog treats that the same as true.
+      hasSeenOnboarding: false,
       createdAt: serverTimestamp(),
       lastLoginAt: serverTimestamp(),
     });
@@ -74,6 +82,11 @@ export async function listUsers() {
 /** Admin-only: promotes/demotes one user. */
 export async function updateUserRole(uid, role) {
   await setDoc(doc(db, COLLECTION, uid), { role }, { merge: true });
+}
+
+/** Self-service: marks the first-login onboarding dialog as seen, for good. */
+export async function markOnboardingSeen(uid) {
+  await setDoc(doc(db, COLLECTION, uid), { hasSeenOnboarding: true }, { merge: true });
 }
 
 /** Self-service: switches which species this person is currently working in. */

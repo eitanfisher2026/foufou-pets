@@ -2,7 +2,13 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, googleProvider, db } from '../../firebase.js';
-import { COLLECTION as USERS_COLLECTION, ROLES, upsertUserOnLogin, updatePreferredSpecies } from '../users/usersApi.js';
+import {
+  COLLECTION as USERS_COLLECTION,
+  ROLES,
+  upsertUserOnLogin,
+  updatePreferredSpecies,
+  markOnboardingSeen,
+} from '../users/usersApi.js';
 import { SPECIES } from '../shared/collections.js';
 
 const AuthContext = createContext(null);
@@ -13,6 +19,11 @@ export function AuthProvider({ children }) {
   const [role, setRole] = useState(null);
   const [roleLoading, setRoleLoading] = useState(true);
   const [preferredSpecies, setPreferredSpeciesState] = useState(SPECIES.CAT);
+  // Defaults true ("already onboarded") for the brief window before the
+  // live subscription below resolves - so a returning user's screen never
+  // even flashes the onboarding dialog open. Only a genuinely brand-new
+  // profile doc has this explicitly false (see upsertUserOnLogin).
+  const [hasSeenOnboarding, setHasSeenOnboardingState] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -38,6 +49,10 @@ export function AuthProvider({ children }) {
     const unsubscribe = onSnapshot(doc(db, USERS_COLLECTION, user.uid), (snap) => {
       setRole(snap.exists() ? snap.data().role || ROLES.REGULAR : ROLES.REGULAR);
       setPreferredSpeciesState(snap.exists() ? snap.data().preferredSpecies || SPECIES.CAT : SPECIES.CAT);
+      // ?? not || - false is a real, meaningful value here (unlike the
+      // other two fields above, where "" or missing both mean "use the
+      // default"), so it must not get coerced into the true default.
+      setHasSeenOnboardingState(snap.exists() ? (snap.data().hasSeenOnboarding ?? true) : true);
       setRoleLoading(false);
     });
     return unsubscribe;
@@ -56,6 +71,14 @@ export function AuthProvider({ children }) {
     if (user) updatePreferredSpecies(user.uid, species);
   }
 
+  // Optimistic, same reasoning as setPreferredSpecies above - the dialog
+  // closes immediately rather than waiting on the live subscription to
+  // confirm the write.
+  function dismissOnboarding() {
+    setHasSeenOnboardingState(true);
+    if (user) markOnboardingSeen(user.uid);
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -69,6 +92,8 @@ export function AuthProvider({ children }) {
         isEditorOrAdmin,
         preferredSpecies,
         setPreferredSpecies,
+        hasSeenOnboarding,
+        dismissOnboarding,
       }}
     >
       {children}
