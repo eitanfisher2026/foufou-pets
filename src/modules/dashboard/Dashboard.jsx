@@ -25,7 +25,7 @@ import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
 // reports only ever get fetched here on demand, when a search explicitly
 // asks to include them (see handleSearch below).
 export default function Dashboard() {
-  const { preferredSpecies, setPreferredSpecies, roleLoading, hasSeenOnboarding, dismissOnboarding, isAdmin } = useAuth();
+  const { preferredSpecies, setPreferredSpecies, roleLoading, hasSeenOnboarding, dismissOnboarding } = useAuth();
   // Firestore does the species filtering now (see dashboardApi.js) rather
   // than fetching both species and filtering client-side - re-runs
   // whenever the toggle switches, so switching species re-fetches just
@@ -181,18 +181,7 @@ export default function Dashboard() {
             ℹ️
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Link
-              to="/settings"
-              aria-label="הגדרות"
-              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm text-slate-500"
-            >
-              ⚙️
-            </Link>
-          )}
-          <ProfileMenu />
-        </div>
+        <ProfileMenu />
       </header>
 
       <div className="mb-4 flex items-center justify-between gap-2">

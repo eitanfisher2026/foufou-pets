@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import BackLink from '../shared/BackLink.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listUsers, updateUserRole, ROLES, ROLE_LABELS } from '../users/usersApi.js';
+import { listUsers, updateUserRole, deleteUser, ROLES, ROLE_LABELS } from '../users/usersApi.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import SelectField from '../shared/SelectField.jsx';
+import { useConfirm } from '../shared/useConfirm.jsx';
 
 const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
@@ -17,6 +18,8 @@ export default function UsersSettingsPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savingUid, setSavingUid] = useState(null);
+  const [disconnectingUid, setDisconnectingUid] = useState(null);
+  const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
     load();
@@ -37,6 +40,27 @@ export default function UsersSettingsPage() {
       setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role } : u)));
     } finally {
       setSavingUid(null);
+    }
+  }
+
+  // Removes their profile doc entirely - drops them straight to REGULAR if
+  // they're mid-session right now, and back to a brand-new REGULAR profile
+  // if they ever sign in again (see deleteUser in usersApi.js). Doesn't
+  // block them from using the app going forward - there's no "banned"
+  // state here, only a reset - so the confirmation spells that out instead
+  // of implying this is a permanent ban.
+  async function handleDisconnect(u) {
+    const ok = await confirm(
+      `לנתק את ${u.displayName || u.email}? הפרופיל שלהם יימחק - אם הם עורך/ת או מנהל/ת, התפקיד יאופס מיד. זה לא חוסם אותם: אם יתחברו שוב, ייווצר להם פרופיל רגיל חדש, בדיוק כמו משתמש/ת חדש/ה.`,
+      { confirmLabel: 'ניתוק', danger: true }
+    );
+    if (!ok) return;
+    setDisconnectingUid(u.id);
+    try {
+      await deleteUser(u.id);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } finally {
+      setDisconnectingUid(null);
     }
   }
 
@@ -77,10 +101,23 @@ export default function UsersSettingsPage() {
                 options={ROLE_OPTIONS}
               />
             </div>
-            {u.id === currentUser.uid && <p className="mt-1 text-xs text-slate-400">זה אתה - לא ניתן לשנות לעצמך</p>}
+            {u.id === currentUser.uid ? (
+              <p className="mt-1 text-xs text-slate-400">זה אתה - לא ניתן לשנות או לנתק את עצמך</p>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleDisconnect(u)}
+                disabled={disconnectingUid === u.id}
+                className="mt-2 text-xs text-red-600 underline disabled:opacity-50"
+              >
+                {disconnectingUid === u.id ? 'מנתק...' : 'ניתוק'}
+              </button>
+            )}
           </li>
         ))}
       </ul>
+
+      {dialog}
     </div>
   );
 }

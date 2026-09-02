@@ -1,22 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from './usePwaInstall.js';
 import AboutDialog from './AboutDialog.jsx';
 import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 
 /**
- * The personal-account entry point on the dashboard header: a round
- * profile-photo button that opens a small menu (feedback, about, share,
- * install, sign out). Settings moved out to its own admin-only ⚙️ icon
- * right in the header (see Dashboard.jsx) - it's app configuration, not a
- * personal action, and burying the one thing an admin actually needs
- * regularly inside a menu named after their own photo was never a great
- * fit anyway. The small chevron badge on the avatar exists purely so this
- * reads as "tap for a menu" rather than "here's my photo" - the menu
- * contents were never really the discoverability problem.
+ * The single account entry point on the dashboard header. For a regular
+ * user/editor, the trigger is their own profile photo with a small chevron
+ * badge (so it reads as "tap for a menu" rather than "here's my photo" -
+ * the menu contents were never really the discoverability problem, the
+ * invisible trigger was). For an admin, the trigger is a plain ⚙️ icon
+ * instead of their photo - one icon covers both "app settings" and "my
+ * account", rather than two separate header controls competing for the
+ * same limited row on mobile; the menu itself just gains a "הגדרות" link
+ * at the top in that case.
  */
 export default function ProfileMenu() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
@@ -74,8 +75,10 @@ export default function ProfileMenu() {
 
   return (
     <div ref={rootRef} className="relative shrink-0">
-      <button type="button" onClick={() => setOpen((v) => !v)} className="relative block shrink-0">
-        {user?.photoURL ? (
+      <button type="button" onClick={() => setOpen((v) => !v)} className="relative block shrink-0" aria-label="תפריט חשבון">
+        {isAdmin ? (
+          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow">⚙️</span>
+        ) : user?.photoURL ? (
           <img
             src={user.photoURL}
             alt=""
@@ -87,12 +90,14 @@ export default function ProfileMenu() {
             {(user?.displayName || user?.email || '?')[0]}
           </span>
         )}
-        <span
-          aria-hidden="true"
-          className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] leading-none text-white ring-2 ring-white"
-        >
-          ▾
-        </span>
+        {!isAdmin && (
+          <span
+            aria-hidden="true"
+            className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] leading-none text-white ring-2 ring-white"
+          >
+            ▾
+          </span>
+        )}
       </button>
 
       {open && (
@@ -104,6 +109,16 @@ export default function ProfileMenu() {
             <p className="truncate font-medium text-slate-800">{user?.displayName}</p>
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
           </div>
+
+          {isAdmin && (
+            <Link
+              to="/settings"
+              onClick={() => setOpen(false)}
+              className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              ⚙️ הגדרות
+            </Link>
+          )}
 
           <button
             type="button"

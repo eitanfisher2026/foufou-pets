@@ -1,4 +1,4 @@
-import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { SPECIES } from '../shared/collections.js';
 
@@ -82,6 +82,19 @@ export async function listUsers() {
 /** Admin-only: promotes/demotes one user. */
 export async function updateUserRole(uid, role) {
   await setDoc(doc(db, COLLECTION, uid), { role }, { merge: true });
+}
+
+// "Disconnect" a user: removes their profile doc entirely, dropping them
+// back to REGULAR (least privilege) the moment their role check next runs
+// (AuthProvider's live subscription treats a missing doc the same as
+// REGULAR) - so an admin/editor loses those permissions immediately even
+// if they're mid-session right now. This doesn't block them from using the
+// app at all, though: if they sign in again, upsertUserOnLogin (see above)
+// just creates them a fresh REGULAR profile doc, same as any brand-new
+// user - there's no "banned" state in this app, this only ever resets
+// someone back to the default, it never locks them out.
+export async function deleteUser(uid) {
+  await deleteDoc(doc(db, COLLECTION, uid));
 }
 
 /** Self-service: marks the first-login onboarding dialog as seen, for good. */
