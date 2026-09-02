@@ -43,6 +43,24 @@ export default function Dashboard() {
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [foundCount, setFoundCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  // A dialog left open when the app is backgrounded (switching apps,
+  // locking the phone) can resurface as a brief stale frame the instant
+  // the OS resumes the tab, before React's real current state repaints
+  // over it a moment later - reads as "this opens on its own and vanishes
+  // after a second" even though nothing in this component's own logic
+  // opened it. Forcing every dismissible dialog closed the moment the app
+  // becomes visible again removes that stale state to repaint from,
+  // regardless of how it was left. Deliberately not applied to
+  // showOnboarding below - a genuinely new user reading it who briefly
+  // switches apps shouldn't lose their place, since there's no way for
+  // them to reopen it themselves.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') setShowHelp(false);
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, []);
   // Gated on !roleLoading too, not just hasSeenOnboarding, since
   // hasSeenOnboarding defaults to true until the live profile subscription
   // actually resolves (see AuthProvider.jsx) - checking only the flag would
