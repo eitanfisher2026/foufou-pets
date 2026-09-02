@@ -17,7 +17,7 @@ import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
  * at the top in that case.
  */
 export default function ProfileMenu() {
-  const { user, signOut, isAdmin } = useAuth();
+  const { user, signOut, isAdmin, roleLoading } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
@@ -76,7 +76,14 @@ export default function ProfileMenu() {
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button type="button" onClick={() => setOpen((v) => !v)} className="relative block shrink-0" aria-label="תפריט חשבון">
-        {isAdmin ? (
+        {roleLoading ? (
+          // isAdmin is false (its own default) until the role check
+          // actually resolves - rendering straight off it here briefly
+          // showed the photo, then swapped to the gear icon a moment
+          // later for an admin. A neutral placeholder while roleLoading is
+          // true means committing to the real icon only once, correctly.
+          <span className="block h-9 w-9 animate-pulse rounded-full bg-slate-200 shadow" />
+        ) : isAdmin ? (
           <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow">⚙️</span>
         ) : user?.photoURL ? (
           <img
@@ -90,7 +97,7 @@ export default function ProfileMenu() {
             {(user?.displayName || user?.email || '?')[0]}
           </span>
         )}
-        {!isAdmin && (
+        {!roleLoading && !isAdmin && (
           <span
             aria-hidden="true"
             className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] leading-none text-white ring-2 ring-white"
