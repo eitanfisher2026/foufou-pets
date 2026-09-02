@@ -61,9 +61,12 @@ export default function OnboardingDialog({ onClose }) {
             {!installed && (canPrompt || isIOS) && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <p className="mb-2 text-sm font-medium text-amber-900">📲 התקנה למסך הבית</p>
-                <p className="mb-3 text-xs leading-relaxed text-amber-800">
+                <p className="mb-1 text-xs leading-relaxed text-amber-800">
                   כדי שיהיה אפשר לשתף פוסט מפייסבוק (Meta) ישירות לתוך האפליקציה, היא צריכה קודם להיות מותקנת על המסך
-                  הבית - שיתוף לדפדפן רגיל לא עובד לצורך זה.
+                  הבית - בלי התקנה, האפליקציה פשוט לא תופיע ברשימת האפשרויות לשיתוף בפייסבוק.
+                </p>
+                <p className="mb-3 text-xs leading-relaxed text-amber-700">
+                  רק רוצים לדווח על חיה בלי פוסט קיים? זה לא נדרש בכלל - אפשר לדלג ולמלא טופס רגיל באפליקציה.
                 </p>
                 <button
                   type="button"
