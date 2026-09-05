@@ -4,7 +4,7 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import SpeciesToggle from '../shared/SpeciesToggle.jsx';
-import { listLostCases, listFoundReports, listLostCasesPage, countFoundReports } from './dashboardApi.js';
+import { listLostCases, listFoundReports, listLostCasesPage, countFoundReports, countLostCases } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow, FoundReportRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
@@ -46,6 +46,10 @@ export default function Dashboard() {
   );
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [foundCount, setFoundCount] = useState(null);
+  // Total lost-case count for the species, just to show pagination
+  // progress ("20/64" etc.) next to the load-more button - a cheap
+  // count-only query, same idea as foundCount below.
+  const [totalLostCount, setTotalLostCount] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   // A dialog left open when the app is backgrounded (switching apps,
   // locking the phone) can resurface as a brief stale frame the instant
@@ -146,6 +150,12 @@ export default function Dashboard() {
     if (roleLoading) return;
     setFoundCount(null);
     countFoundReports(preferredSpecies).then(setFoundCount);
+  }, [preferredSpecies, roleLoading]);
+
+  useEffect(() => {
+    if (roleLoading) return;
+    setTotalLostCount(null);
+    countLostCases(preferredSpecies).then(setTotalLostCount);
   }, [preferredSpecies, roleLoading]);
 
   // Restores the found-reports fetch a 'found'/'both' search from the URL
@@ -282,7 +292,14 @@ export default function Dashboard() {
       <section>
         <h2 className="mb-1 flex flex-wrap items-center gap-2 text-lg font-semibold text-slate-700">
           {hasActiveSearch ? 'תוצאות חיפוש' : labels.openCasesSection}
-          {resultCount > 0 && <span className="text-sm font-normal text-slate-400">({resultCount})</span>}
+          {hasActiveSearch
+            ? resultCount > 0 && <span className="text-sm font-normal text-slate-400">({resultCount})</span>
+            : lostCases.length > 0 && (
+                <span className="text-sm font-normal text-slate-400">
+                  ({lostCases.length}
+                  {totalLostCount != null && totalLostCount !== lostCases.length ? `/${totalLostCount}` : ''})
+                </span>
+              )}
         </h2>
         {hasActiveSearch && (
           <button type="button" onClick={handleClearSearch} className="mb-3 text-xs text-slate-500 underline">

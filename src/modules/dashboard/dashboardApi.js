@@ -81,3 +81,11 @@ export async function countFoundReports(species) {
   const snap = await getCountFromServer(query(collection(db, COLLECTIONS.FOUND_REPORTS), where('species', '==', species)));
   return snap.data().count;
 }
+
+// Same idea as countFoundReports, for the lost-cases pagination progress
+// ("20/64" etc. - see usePaginatedList/Dashboard.jsx). Counts every status
+// for the species, same "close enough" tradeoff as countFoundReports.
+export async function countLostCases(species) {
+  const snap = await getCountFromServer(query(collection(db, COLLECTIONS.LOST_CASES), where('species', '==', species)));
+  return snap.data().count;
+}

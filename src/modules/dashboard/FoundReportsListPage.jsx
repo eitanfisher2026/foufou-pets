@@ -1,7 +1,8 @@
+import { useEffect, useState } from 'react';
 import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listFoundReportsPage } from './dashboardApi.js';
+import { listFoundReportsPage, countFoundReports } from './dashboardApi.js';
 import { FoundReportRow } from './RecordRows.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import { usePaginatedList } from '../shared/usePaginatedList.js';
@@ -27,6 +28,14 @@ export default function FoundReportsListPage() {
     !roleLoading
   );
   const labels = petLabels(preferredSpecies);
+  // Total count for the species, just to show pagination progress
+  // ("20/64" etc.) - same idea as Dashboard.jsx's totalLostCount.
+  const [totalCount, setTotalCount] = useState(null);
+  useEffect(() => {
+    if (roleLoading) return;
+    setTotalCount(null);
+    countFoundReports(preferredSpecies).then(setTotalCount);
+  }, [preferredSpecies, roleLoading]);
 
   const visibleReports = reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED);
 
@@ -35,7 +44,13 @@ export default function FoundReportsListPage() {
       <BackLink to="/">חזרה לעמוד הראשי</BackLink>
       <h1 className="mb-4 text-xl font-bold text-slate-800">
         {labels.allFoundReportsTitle}
-        {visibleReports.length > 0 && <span className="text-sm font-normal text-slate-400"> ({visibleReports.length})</span>}
+        {reports.length > 0 && (
+          <span className="text-sm font-normal text-slate-400">
+            {' '}
+            ({reports.length}
+            {totalCount != null && totalCount !== reports.length ? `/${totalCount}` : ''})
+          </span>
+        )}
       </h1>
 
       {loading && <p className="text-slate-500">טוען...</p>}
