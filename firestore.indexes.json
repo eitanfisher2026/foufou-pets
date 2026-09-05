@@ -1,4 +1,10 @@
 {
   "indexes": [],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    {
+      "collectionGroup": "matches",
+      "fieldPath": "foundReportId",
+      "indexes": [{ "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }]
+    }
+  ]
 }

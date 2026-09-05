@@ -1,4 +1,16 @@
-import { collection, doc, getDoc, getDocs, increment, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import {
+  collection,
+  collectionGroup,
+  doc,
+  getDoc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  setDoc,
+  where,
+  writeBatch,
+} from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
 import {
@@ -571,14 +583,15 @@ export async function checkMatchesForFoundReport(foundReportId) {
   if (!reportSnap.exists()) throw new Error('found report not found');
   const report = reportSnap.data();
 
-  const lostCases = await activeLostCasesForSpecies(report.species);
-  const newCandidates = [];
-  await Promise.all(
-    lostCases.map(async (lostCase) => {
-      const existing = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches', foundReportId));
-      if (!existing.exists()) newCandidates.push(lostCase);
-    })
-  );
+  // Same collection-group-query fix as getMatchesForFoundReport/
+  // countNewCandidatesForFoundReport above - one getDoc per active lost
+  // case (fine when the pool was tiny) doesn't scale.
+  const [lostCases, matchesSnap] = await Promise.all([
+    activeLostCasesForSpecies(report.species),
+    getDocs(query(collectionGroup(db, 'matches'), where('foundReportId', '==', foundReportId))),
+  ]);
+  const matchedCaseIds = new Set(matchesSnap.docs.map((d) => d.ref.parent.parent.id));
+  const newCandidates = lostCases.filter((lostCase) => !matchedCaseIds.has(lostCase.id));
   if (newCandidates.length === 0) return { newCount: 0, visualMatches: [] };
 
   const config = await getMatchConfig();
@@ -625,37 +638,48 @@ export async function checkMatchesForFoundReport(foundReportId) {
 /**
  * How many active lost cases (matching species) don't yet have a match
  * record against this found report - the found-report-detail equivalent of
- * countNewCandidatesForLostCase.
+ * countNewCandidatesForLostCase. Same collection-group-query fix as
+ * getMatchesForFoundReport above, for the same reason - one getDoc per
+ * active lost case (this ran on every found-report page load) doesn't
+ * scale the way it did when the pool was tiny.
  */
 export async function countNewCandidatesForFoundReport(foundReportId) {
   const reportSnap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId));
   if (!reportSnap.exists()) return 0;
   const report = reportSnap.data();
-  const lostCases = await activeLostCasesForSpecies(report.species);
-  const existsFlags = await Promise.all(
-    lostCases.map((lostCase) => getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches', foundReportId)))
-  );
-  return existsFlags.filter((snap) => !snap.exists()).length;
+  const [lostCases, matchesSnap] = await Promise.all([
+    activeLostCasesForSpecies(report.species),
+    getDocs(query(collectionGroup(db, 'matches'), where('foundReportId', '==', foundReportId))),
+  ]);
+  const matchedCaseIds = new Set(matchesSnap.docs.map((d) => d.ref.parent.parent.id));
+  return lostCases.filter((lostCase) => !matchedCaseIds.has(lostCase.id)).length;
 }
 
 /**
  * Reads back whatever matches were last persisted for this found report
  * (across every lost case's subcollection) without re-scoring anything -
  * the found-report-detail equivalent of getMatches, used on page load so
- * revisiting the page doesn't silently re-run a fresh check. No top-level
- * "matches" collection exists to query directly (see checkMatchesForFoundReport),
- * so this reads one match doc per lost case - fine at this project's scale,
- * and avoids needing a Firestore collection-group index just to list them.
+ * revisiting the page doesn't silently re-run a fresh check.
+ *
+ * Uses a collection-group query on "matches" filtered by foundReportId,
+ * not one getDoc per lost case - the original version fired one read PER
+ * ACTIVE LOST CASE, in parallel, every single time this ran. That was fine
+ * at this project's very first, tiny scale, but recomputeFoundReportVisualFlag
+ * calls this once per notable visual match found during a single scan (see
+ * checkMatchesForLostCase) - with the lost-case count grown into the
+ * hundreds, a scan turning up even a handful of notable matches multiplied
+ * out to hundreds of simultaneous reads, enough to trip Firestore's
+ * client-side "too many outstanding requests" limit and silently kill the
+ * whole scan partway through. This reads exactly the matches that actually
+ * reference this found report - a handful at most, never one query per
+ * lost case in the whole database.
  */
 export async function getMatchesForFoundReport(foundReportId) {
-  const casesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
-  const results = [];
-  await Promise.all(
-    casesSnap.docs.map(async (caseDoc) => {
-      const matchSnap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseDoc.id, 'matches', foundReportId));
-      if (matchSnap.exists()) {
-        results.push({ lostCase: { id: caseDoc.id, ...caseDoc.data() }, ...matchSnap.data() });
-      }
+  const matchesSnap = await getDocs(query(collectionGroup(db, 'matches'), where('foundReportId', '==', foundReportId)));
+  const results = await Promise.all(
+    matchesSnap.docs.map(async (matchDoc) => {
+      const caseSnap = await getDoc(matchDoc.ref.parent.parent);
+      return { lostCase: { id: caseSnap.id, ...caseSnap.data() }, ...matchDoc.data() };
     })
   );
   return results.sort((a, b) => b.score - a.score);
