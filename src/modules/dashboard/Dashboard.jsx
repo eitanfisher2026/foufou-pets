@@ -4,17 +4,16 @@ import { useAuth } from '../auth/AuthProvider.jsx';
 import { RECORD_STATUS, LOST_CASE_STATUS_LABELS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import SpeciesToggle from '../shared/SpeciesToggle.jsx';
-import { listLostCases, listFoundReports, countFoundReports } from './dashboardApi.js';
+import { listLostCases, listFoundReports, listLostCasesPage, countFoundReports } from './dashboardApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow, FoundReportRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
-import ProgressBar from '../shared/ProgressBar.jsx';
 import HelpDialog from '../shared/HelpDialog.jsx';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import SearchDialog from './SearchDialog.jsx';
 import { matchesSearch } from './recordSearch.js';
-import { useLoadWithProgress } from '../shared/useLoadWithProgress.js';
+import { usePaginatedList } from '../shared/usePaginatedList.js';
 
 // A found report doesn't need its own eagerly-loaded browsing list on every
 // dashboard visit - matching already runs its own independent query against
@@ -35,8 +34,13 @@ export default function Dashboard() {
   // its default ('cat') for a moment on every load, and fetching against
   // that default only to immediately re-fetch once the real value arrives
   // is exactly the double round-trip that made this feel slow to load.
-  const { items: lostCases, loading, progress } = useLoadWithProgress(
-    () => listLostCases(preferredSpecies),
+  // Paginated - the default open-cases view only ever needs what's on
+  // screen, not the whole species' worth up front (see usePaginatedList).
+  // Search is the exception: it needs the complete list to search
+  // correctly, so it fetches separately in full (lostCasesForSearch below),
+  // same pattern already used for a found-side search.
+  const { items: lostCases, loading, hasMore, loadingMore, error: loadError, loadMore } = usePaginatedList(
+    (pageSize, cursor) => listLostCasesPage(preferredSpecies, pageSize, cursor),
     [preferredSpecies],
     !roleLoading
   );
@@ -90,6 +94,12 @@ export default function Dashboard() {
   });
   const [foundReportsForSearch, setFoundReportsForSearch] = useState([]);
   const [loadingFoundSearch, setLoadingFoundSearch] = useState(false);
+  // Same on-demand full fetch as foundReportsForSearch, now needed on the
+  // lost side too since lostCases above is only ever a paginated slice -
+  // a search has to run against everything, not just whatever page
+  // happened to be loaded already.
+  const [lostCasesForSearch, setLostCasesForSearch] = useState([]);
+  const [loadingLostSearch, setLoadingLostSearch] = useState(false);
   const labels = petLabels(preferredSpecies);
 
   const { recordType: activeRecordType = 'lost', ...activeFields } = searchCriteria || {};
@@ -126,6 +136,7 @@ export default function Dashboard() {
     prevSpeciesRef.current = preferredSpecies;
     applySearchCriteria(null);
     setFoundReportsForSearch([]);
+    setLostCasesForSearch([]);
   }, [preferredSpecies]);
 
   // Just a count query (no documents fetched) - cheap enough to run
@@ -151,6 +162,12 @@ export default function Dashboard() {
         )
         .finally(() => setLoadingFoundSearch(false));
     }
+    if (searchCriteria?.recordType === 'lost' || searchCriteria?.recordType === 'both') {
+      setLoadingLostSearch(true);
+      listLostCases(preferredSpecies)
+        .then((cases) => setLostCasesForSearch(cases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED)))
+        .finally(() => setLoadingLostSearch(false));
+    }
   }, [roleLoading]);
 
   async function handleSearch(criteria) {
@@ -165,11 +182,21 @@ export default function Dashboard() {
         setLoadingFoundSearch(false);
       }
     }
+    if (criteria.recordType === 'lost' || criteria.recordType === 'both') {
+      setLoadingLostSearch(true);
+      try {
+        const cases = await listLostCases(preferredSpecies);
+        setLostCasesForSearch(cases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED));
+      } finally {
+        setLoadingLostSearch(false);
+      }
+    }
   }
 
   function handleClearSearch() {
     applySearchCriteria(null);
     setFoundReportsForSearch([]);
+    setLostCasesForSearch([]);
   }
 
   // Archived and resolved cases move to their own archive view (see
@@ -180,7 +207,11 @@ export default function Dashboard() {
   // above only ever returns the current species to begin with.
   const openLostCases = lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED);
   const lostResults =
-    activeRecordType === 'found' ? [] : hasActiveSearch ? openLostCases.filter((c) => matchesSearch(c, activeFields)) : openLostCases;
+    activeRecordType === 'found'
+      ? []
+      : hasActiveSearch
+      ? lostCasesForSearch.filter((c) => matchesSearch(c, activeFields))
+      : openLostCases;
   const foundResults =
     hasActiveSearch && activeRecordType !== 'lost' ? foundReportsForSearch.filter((r) => matchesSearch(r, activeFields)) : [];
   const resultCount = lostResults.length + foundResults.length;
@@ -258,10 +289,11 @@ export default function Dashboard() {
             ניקוי חיפוש וחזרה לכל {labels.openCasesSection}
           </button>
         )}
-        {progress && <ProgressBar current={progress.current} total={progress.total} />}
-        {loading && !progress && <p className="text-slate-500">טוען...</p>}
+        {loading && <p className="text-slate-500">טוען...</p>}
+        {loadError && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">טעינת הרשימה נכשלה: {loadError}</p>}
+        {loadingLostSearch && <p className="text-sm text-slate-400">מחפשים בכל התיקים...</p>}
         {loadingFoundSearch && <p className="text-sm text-slate-400">טוענים גם את הדיווחים שנמצאו...</p>}
-        {!loading && !loadingFoundSearch && resultCount === 0 && (
+        {!loading && !loadingFoundSearch && !loadingLostSearch && resultCount === 0 && (
           <p className="text-sm text-slate-400">{hasActiveSearch ? 'אין תוצאות לחיפוש הזה.' : 'אין תיקים פתוחים עדיין.'}</p>
         )}
         <ul className="space-y-2">
@@ -278,6 +310,16 @@ export default function Dashboard() {
             <FoundReportRow key={r.id} report={r} statusLabels={FOUND_REPORT_STATUS_LABELS} showTypeBadge={activeRecordType === 'both'} />
           ))}
         </ul>
+        {!hasActiveSearch && !loading && hasMore && (
+          <button
+            type="button"
+            onClick={loadMore}
+            disabled={loadingMore}
+            className="mt-3 w-full rounded-lg bg-slate-100 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+          >
+            {loadingMore ? 'טוען...' : 'טען עוד'}
+          </button>
+        )}
       </section>
 
       <AppFooter />

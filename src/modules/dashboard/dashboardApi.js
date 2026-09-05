@@ -1,4 +1,4 @@
-import { collection, getCountFromServer, getDocs, orderBy, query, where } from 'firebase/firestore';
+import { collection, getCountFromServer, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 
@@ -34,6 +34,41 @@ export async function listFoundReports(species) {
   }
   const snap = await getDocs(query(base, where('species', '==', species)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort(byCreatedAtDesc);
+}
+
+// Paginated variants of the two lists above, for the default browse views
+// (Dashboard's open-cases list, FoundReportsListPage) - those fetch every
+// record for the species up front today, which only gets slower as the
+// collection grows. Needs species+createdAt as a real composite index
+// (see firestore.indexes.json) since combining an equality filter with an
+// orderBy on a different field isn't covered by Firestore's automatic
+// single-field indexes. Status (archived/resolved) is still filtered
+// client-side per page, same as before - folding it into the query too
+// would need status to be part of that same composite index in a way
+// that's fragile against adding more statuses later, for a filter that's
+// cheap to apply to 20 docs at a time anyway. Search still needs the
+// complete, unpaginated list to search correctly (see Dashboard.jsx) -
+// only the default browse view is paginated.
+export async function listLostCasesPage(species, pageSize, cursor) {
+  const constraints = [where('species', '==', species), orderBy('createdAt', 'desc'), limit(pageSize)];
+  if (cursor) constraints.push(startAfter(cursor));
+  const snap = await getDocs(query(collection(db, COLLECTIONS.LOST_CASES), ...constraints));
+  return {
+    items: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    cursor: snap.docs[snap.docs.length - 1] || null,
+    hasMore: snap.docs.length === pageSize,
+  };
+}
+
+export async function listFoundReportsPage(species, pageSize, cursor) {
+  const constraints = [where('species', '==', species), orderBy('createdAt', 'desc'), limit(pageSize)];
+  if (cursor) constraints.push(startAfter(cursor));
+  const snap = await getDocs(query(collection(db, COLLECTIONS.FOUND_REPORTS), ...constraints));
+  return {
+    items: snap.docs.map((d) => ({ id: d.id, ...d.data() })),
+    cursor: snap.docs[snap.docs.length - 1] || null,
+    hasMore: snap.docs.length === pageSize,
+  };
 }
 
 // A count-only aggregation query (no documents actually transferred) -
