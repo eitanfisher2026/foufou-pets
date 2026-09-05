@@ -73,6 +73,19 @@ service cloud.firestore {
       }
     }
 
+    // Collection-group read access for "matches" (see getMatchesForFoundReport
+    // in matchingApi.js, which queries across every lostCases/*/matches
+    // subcollection at once instead of one read per lost case). A rule
+    // nested under a specific parent path (lostCases/{caseId}/matches/{id}
+    // above) only ever covers reads scoped to that one case's own
+    // subcollection - Firestore requires this separate {path=**} wildcard
+    // rule to authorize a query that spans every "matches" subcollection
+    // regardless of which lost case it's under. Read-only here; writes to
+    // an individual match still go through the rule above.
+    match /{path=**}/matches/{matchId} {
+      allow read: if signedIn();
+    }
+
     // hasVisualMatch is the same denormalized-field carve-out as
     // lostCases' matchCount etc. above - a match-check can set this on a
     // found report you don't own just as easily as on your own.

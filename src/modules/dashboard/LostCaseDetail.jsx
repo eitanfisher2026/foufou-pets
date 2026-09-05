@@ -112,6 +112,11 @@ export default function LostCaseDetail() {
   // took a while deserves a result that's still there to read once it
   // finishes, not a message gone in a couple of seconds.
   const [checkResult, setCheckResult] = useState(null);
+  // A scan failing used to be completely silent - the button just reset
+  // with no explanation, indistinguishable from a scan that quietly found
+  // nothing. Now surfaced explicitly instead of being left to an unhandled
+  // promise rejection nobody but DevTools would ever see.
+  const [checkError, setCheckError] = useState('');
   const [recheckingId, setRecheckingId] = useState(null);
   // Lets a link jump straight into edit mode (e.g. "עריכה" on a reverse
   // match card, from a found report's matching lost cases) instead of
@@ -227,12 +232,15 @@ export default function LostCaseDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     setCheckResult(null);
+    setCheckError('');
     setCheckProgress({ done: 0, total: 0 });
     try {
       const result = await checkMatchesForLostCase(caseId, (done, total) => setCheckProgress({ done, total }));
       await load();
       setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setCheckError(`הסריקה נכשלה: ${err.message || 'שגיאה לא ידועה'}`);
     } finally {
       setChecking(false);
     }
@@ -246,6 +254,7 @@ export default function LostCaseDetail() {
     if (!ok) return;
     setChecking(true);
     setCheckResult(null);
+    setCheckError('');
     setCheckProgress({ done: 0, total: 0 });
     try {
       await clearMatches(caseId);
@@ -253,6 +262,8 @@ export default function LostCaseDetail() {
       await load();
       setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setCheckError(`הסריקה נכשלה: ${err.message || 'שגיאה לא ידועה'}`);
     } finally {
       setChecking(false);
     }
@@ -838,6 +849,9 @@ export default function LostCaseDetail() {
           ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
           {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
         </p>
+      )}
+      {!checking && checkError && (
+        <p className="mt-2 rounded-xl bg-red-50 p-3 text-center text-sm font-medium text-red-700">{checkError}</p>
       )}
       {matches.length > 0 && (
         <button

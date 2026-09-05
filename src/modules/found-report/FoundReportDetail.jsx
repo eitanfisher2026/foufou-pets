@@ -117,6 +117,10 @@ export default function FoundReportDetail() {
   const [checkProgress, setCheckProgress] = useState(null);
   // Persists until the next scan starts (not a timed flash).
   const [checkResult, setCheckResult] = useState(null);
+  // See the same state in LostCaseDetail.jsx - a scan failing used to be
+  // completely silent (an unhandled promise rejection nobody but DevTools
+  // would see), the button just reset with no explanation.
+  const [checkError, setCheckError] = useState('');
   const [recheckingId, setRecheckingId] = useState(null);
   const [showProcessedMatches, setShowProcessedMatches] = useState(false);
   const [showNoMatch, setShowNoMatch] = useState(false);
@@ -193,6 +197,7 @@ export default function FoundReportDetail() {
   async function handleCheckMatches() {
     setChecking(true);
     setCheckResult(null);
+    setCheckError('');
     setCheckProgress({ done: 0, total: 0 });
     try {
       const result = await checkMatchesForFoundReport(reportId, (done, total) => setCheckProgress({ done, total }));
@@ -200,6 +205,8 @@ export default function FoundReportDetail() {
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
       setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setCheckError(`הסריקה נכשלה: ${err.message || 'שגיאה לא ידועה'}`);
     } finally {
       setChecking(false);
     }
@@ -213,6 +220,7 @@ export default function FoundReportDetail() {
     if (!ok) return;
     setChecking(true);
     setCheckResult(null);
+    setCheckError('');
     setCheckProgress({ done: 0, total: 0 });
     try {
       await clearMatchesForFoundReport(reportId);
@@ -221,6 +229,8 @@ export default function FoundReportDetail() {
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
       setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setCheckError(`הסריקה נכשלה: ${err.message || 'שגיאה לא ידועה'}`);
     } finally {
       setChecking(false);
     }
@@ -790,6 +800,9 @@ export default function FoundReportDetail() {
               ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
               {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
             </p>
+          )}
+          {!checking && checkError && (
+            <p className="mt-2 rounded-xl bg-red-50 p-3 text-center text-sm font-medium text-red-700">{checkError}</p>
           )}
           {matches.length > 0 && (
             <button
