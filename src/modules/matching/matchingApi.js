@@ -231,8 +231,16 @@ async function recomputeFoundReportVisualFlag(foundReportId) {
  * before the single batched Firestore write. Returns
  * { newCount, visualMatches } - visualMatches lists only the notable
  * verdicts (see NOTABLE_VISUAL_VERDICTS), for a caller to alert on.
+ *
+ * onProgress(done, total) fires as each candidate's photo check settles
+ * (done still counts a candidate that skipped the AI call entirely,
+ * immediately) - the field scoring above is instant, but with dozens of
+ * candidates clearing the photo threshold, the AI calls are what can
+ * actually take a while, and a caller has no other way to show real
+ * progress through a batch that's running in parallel rather than one at a
+ * time.
  */
-export async function checkMatchesForLostCase(lostCaseId) {
+export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   const caseSnap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId));
   if (!caseSnap.exists()) throw new Error('lost case not found');
   const lostCase = caseSnap.data();
@@ -246,8 +254,15 @@ export async function checkMatchesForLostCase(lostCaseId) {
   const config = await getMatchConfig();
   const ranked = rankMatches(lostCase, newCandidates, config);
 
+  let done = 0;
+  onProgress?.(done, ranked.length);
   const visuals = await Promise.all(
-    ranked.map(({ report, score }) => maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found'))
+    ranked.map(async ({ report, score }) => {
+      const result = await maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found');
+      done += 1;
+      onProgress?.(done, ranked.length);
+      return result;
+    })
   );
 
   const batch = writeBatch(db);
@@ -576,9 +591,10 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
  * only ever one match record per lost-case/found-report pair. Same photo-
  * similarity refinement as checkMatchesForLostCase, just gated per lost
  * case (each candidate is a different lost-case doc, so cost increments
- * per-doc rather than once). Returns { newCount, visualMatches }.
+ * per-doc rather than once). Returns { newCount, visualMatches }. Same
+ * onProgress(done, total) contract as checkMatchesForLostCase.
  */
-export async function checkMatchesForFoundReport(foundReportId) {
+export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   const reportSnap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId));
   if (!reportSnap.exists()) throw new Error('found report not found');
   const report = reportSnap.data();
@@ -596,10 +612,15 @@ export async function checkMatchesForFoundReport(foundReportId) {
 
   const config = await getMatchConfig();
   const scored = newCandidates.map((lostCase) => ({ lostCase, ...scoreMatch(lostCase, report, config) }));
+  let done = 0;
+  onProgress?.(done, scored.length);
   const visuals = await Promise.all(
-    scored.map(({ lostCase, score }) =>
-      maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost')
-    )
+    scored.map(async ({ lostCase, score }) => {
+      const result = await maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost');
+      done += 1;
+      onProgress?.(done, scored.length);
+      return result;
+    })
   );
 
   const batch = writeBatch(db);

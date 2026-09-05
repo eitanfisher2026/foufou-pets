@@ -51,6 +51,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import ProgressBar from '../shared/ProgressBar.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
@@ -102,12 +103,15 @@ export default function LostCaseDetail() {
   const [matches, setMatches] = useState([]);
   const [reportsById, setReportsById] = useState({});
   const [checking, setChecking] = useState(false);
-  // Brief "✓ done" confirmation right after a check completes, so pressing
-  // the button always gives visible feedback that something happened -
-  // without making any lasting claim about whether the check is "current"
-  // or "up to date", since new lost cases/found reports can be added to
-  // the pool at any time and only a fresh click ever reflects that.
-  const [justChecked, setJustChecked] = useState(false);
+  // { done, total } while a scan is running - candidates whose field score
+  // doesn't even clear the photo threshold resolve instantly, so this
+  // mostly tracks the slower AI photo checks among the real candidate
+  // pool, not a fixed step count.
+  const [checkProgress, setCheckProgress] = useState(null);
+  // Persists until the next scan starts (not a timed flash) - a scan that
+  // took a while deserves a result that's still there to read once it
+  // finishes, not a message gone in a couple of seconds.
+  const [checkResult, setCheckResult] = useState(null);
   const [recheckingId, setRecheckingId] = useState(null);
   // Lets a link jump straight into edit mode (e.g. "עריכה" on a reverse
   // match card, from a found report's matching lost cases) instead of
@@ -220,17 +224,14 @@ export default function LostCaseDetail() {
     setReportsById(snapshots);
   }
 
-  function flashJustChecked() {
-    setJustChecked(true);
-    setTimeout(() => setJustChecked(false), 2500);
-  }
-
   async function handleCheckMatches() {
     setChecking(true);
+    setCheckResult(null);
+    setCheckProgress({ done: 0, total: 0 });
     try {
-      const result = await checkMatchesForLostCase(caseId);
+      const result = await checkMatchesForLostCase(caseId, (done, total) => setCheckProgress({ done, total }));
       await load();
-      flashJustChecked();
+      setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
@@ -244,11 +245,13 @@ export default function LostCaseDetail() {
     );
     if (!ok) return;
     setChecking(true);
+    setCheckResult(null);
+    setCheckProgress({ done: 0, total: 0 });
     try {
       await clearMatches(caseId);
-      const result = await checkMatchesForLostCase(caseId);
+      const result = await checkMatchesForLostCase(caseId, (done, total) => setCheckProgress({ done, total }));
       await load();
-      flashJustChecked();
+      setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
@@ -813,6 +816,8 @@ export default function LostCaseDetail() {
         </div>
       )}
 
+      {checking && checkProgress?.total > 0 && <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />}
+
       <button
         onClick={handleCheckMatches}
         disabled={checking || newCandidateCount === 0}
@@ -824,12 +829,16 @@ export default function LostCaseDetail() {
       >
         {checking
           ? 'סורקים התאמות...'
-          : justChecked
-            ? '✓ הסריקה הושלמה'
-            : newCandidateCount > 0
-              ? `סריקת ${newCandidateCount} חדשות`
-              : 'אין חדשות לסריקה'}
+          : newCandidateCount > 0
+            ? `סריקת ${newCandidateCount} חדשות`
+            : 'אין חדשות לסריקה'}
       </button>
+      {!checking && checkResult && (
+        <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-center text-sm text-emerald-800">
+          ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
+          {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
+        </p>
+      )}
       {matches.length > 0 && (
         <button
           onClick={handleReset}

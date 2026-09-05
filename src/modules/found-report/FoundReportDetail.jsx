@@ -59,6 +59,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
+import ProgressBar from '../shared/ProgressBar.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
@@ -110,12 +111,12 @@ export default function FoundReportDetail() {
   const [showDetails, setShowDetails] = useState(false);
   const [matches, setMatches] = useState([]);
   const [checking, setChecking] = useState(false);
-  // Brief "✓ done" confirmation right after a check completes, so pressing
-  // the button always gives visible feedback that something happened -
-  // without making any lasting claim about whether the check is "current"
-  // or "up to date", since new lost cases/found reports can be added to
-  // the pool at any time and only a fresh click ever reflects that.
-  const [justChecked, setJustChecked] = useState(false);
+  // { done, total } while a scan is running - see the same state in
+  // LostCaseDetail.jsx for why this counts settled photo checks, not a
+  // fixed step count.
+  const [checkProgress, setCheckProgress] = useState(null);
+  // Persists until the next scan starts (not a timed flash).
+  const [checkResult, setCheckResult] = useState(null);
   const [recheckingId, setRecheckingId] = useState(null);
   const [showProcessedMatches, setShowProcessedMatches] = useState(false);
   const [showNoMatch, setShowNoMatch] = useState(false);
@@ -189,18 +190,15 @@ export default function FoundReportDetail() {
     setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
   }
 
-  function flashJustChecked() {
-    setJustChecked(true);
-    setTimeout(() => setJustChecked(false), 2500);
-  }
-
   async function handleCheckMatches() {
     setChecking(true);
+    setCheckResult(null);
+    setCheckProgress({ done: 0, total: 0 });
     try {
-      const result = await checkMatchesForFoundReport(reportId);
+      const result = await checkMatchesForFoundReport(reportId, (done, total) => setCheckProgress({ done, total }));
       setMatches(await getMatchesForFoundReport(reportId));
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
-      flashJustChecked();
+      setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
@@ -214,12 +212,14 @@ export default function FoundReportDetail() {
     );
     if (!ok) return;
     setChecking(true);
+    setCheckResult(null);
+    setCheckProgress({ done: 0, total: 0 });
     try {
       await clearMatchesForFoundReport(reportId);
-      const result = await checkMatchesForFoundReport(reportId);
+      const result = await checkMatchesForFoundReport(reportId, (done, total) => setCheckProgress({ done, total }));
       setMatches(await getMatchesForFoundReport(reportId));
       setNewCandidateCount(await countNewCandidatesForFoundReport(reportId));
-      flashJustChecked();
+      setCheckResult(result);
       notifyVisualMatch(result.visualMatches);
     } finally {
       setChecking(false);
@@ -767,6 +767,9 @@ export default function FoundReportDetail() {
 
       {!showEditForm && (
         <>
+          {checking && checkProgress?.total > 0 && (
+            <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+          )}
           <button
             onClick={handleCheckMatches}
             disabled={checking || newCandidateCount === 0}
@@ -778,12 +781,16 @@ export default function FoundReportDetail() {
           >
             {checking
               ? 'סורקים התאמות...'
-              : justChecked
-                ? '✓ הסריקה הושלמה'
-                : newCandidateCount > 0
-                  ? `סריקת ${newCandidateCount} חדשים`
-                  : 'אין חדשים לסריקה'}
+              : newCandidateCount > 0
+                ? `סריקת ${newCandidateCount} חדשים`
+                : 'אין חדשים לסריקה'}
           </button>
+          {!checking && checkResult && (
+            <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-center text-sm text-emerald-800">
+              ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
+              {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
+            </p>
+          )}
           {matches.length > 0 && (
             <button
               onClick={handleReset}
