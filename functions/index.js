@@ -60,7 +60,7 @@ function estimateCostUsd(usage, priceInput = PRICE_PER_MTOK_INPUT, priceOutput =
 // that changes rarely, same pattern as the static include/exclude word
 // lists in Roy News).
 // Base color only - the striped/mottled "tabby" pattern lives in
-// CAT_PATTERNS below instead (a cat can be color="תלת-גוני" AND
+// CAT_PATTERNS below instead (a cat can be color="טריקולור" AND
 // pattern="קליקו" at once - that's expected, not a conflict).
 const CAT_COLORS = [
   'לבן',
@@ -71,7 +71,7 @@ const CAT_COLORS = [
   'חום',
   'ג׳ינג׳י לבן',
   'אפור לבן',
-  'תלת-גוני',
+  'טריקולור',
   'שחור-לבן',
   'אחר',
 ];
@@ -296,7 +296,7 @@ const CAT_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't 
   - "קרם" (cream) is a very pale, warm ivory/beige tone - distinctly warmer than אפור (which has no warm undertone at all) and much paler/softer than כתום/ג'ינג'י (a vivid, saturated orange). This is a common Persian/longhair color - don't default to אפור or אחר just because the coat looks pale or washed out; check for a warm undertone first.
   - "חום" (brown) is a warm but muted brown/chocolate tone - warmer than gray, less vivid/red than כתום/ג'ינג'י.
   - "ג'ינג'י לבן" and "אפור לבן" are for a coat with clearly separate patches of white plus (respectively) orange or gray - not a single blended pale color.
-  - "תלת-גוני" is for a coat with three distinct colors patched together (typically white, black, and orange/ginger) - a striped/mottled texture on top of this is captured separately by "pattern" (see below), not by color.`;
+  - "טריקולור" is for a coat with three distinct colors patched together (typically white, black, and orange/ginger) - a striped/mottled texture on top of this is captured separately by "pattern" (see below), not by color.`;
 const DOG_COLOR_ANCHORS = `  - "שחור" (black) is a solid black coat - don't undersell an obviously black dog by reaching for "אחר" or a patched option just because of a few tiny white hairs or a small chin/chest fleck; use "שחור-לבן" only once the white patching is clearly substantial (a real chest patch, socks, a bib), not a minor fleck.
   - "לבן" (white) is a solid white coat, the same way - reserve "חום-לבן"/"שחור-לבן" for a coat that's clearly two-toned, not a mostly-white coat with a tiny colored fleck.
   - "חום" (brown) is a warm but muted brown/chocolate tone.
@@ -326,7 +326,7 @@ const DOG_FUR_BULLET = `- "furType" is your best classification of the coat itse
 
 const COLLAR_BULLET = `- "collarColor" is the color of the collar/harness itself (only meaningful if hasCollar is true) - one of the given options, or null if there's no visible collar or its color can't be told. "collarHasBell" is whether a bell is visibly hanging from the collar - true/false only when the collar is clearly visible enough to tell, null otherwise (same reasoning as hasCollar).`;
 
-const PATTERN_BULLET = `- "pattern" is the cat's coat pattern, classified separately from its base color ("color" above), into exactly one of the given options. Most cats are simply "אחיד" (solid/no distinct pattern) - the correct default whenever the coat is just one blended color, or a color+white combination, with no further pattern on top. Use "טאבי (מנומר)" for a striped/mottled coat. Use "קליקו" for a classic patched coat with distinct black and orange/ginger patches together with white (a cat can be color="תלת-גוני" and pattern="קליקו" at the same time - that's expected, not a conflict). Use "טורטי" for a mottled mix of black and orange/cream patches with little or no white - a subtler, less distinctly patched cousin of calico. Use "טוקסידו" for a mostly-solid coat (usually black) with a distinct, roughly symmetric white bib/chest/paws/belly, resembling formal wear. Use "פוינט (קצוות כהות)" for a pale/cream body with clearly darker color concentrated at the face, ears, legs, and tail (the classic Siamese look). Use "אחר" only if the coat shows a real, distinct pattern that doesn't fit any of these.`;
+const PATTERN_BULLET = `- "pattern" is the cat's coat pattern, classified separately from its base color ("color" above), into exactly one of the given options. Most cats are simply "אחיד" (solid/no distinct pattern) - the correct default whenever the coat is just one blended color, or a color+white combination, with no further pattern on top. Use "טאבי (מנומר)" for a striped/mottled coat. Use "קליקו" for a classic patched coat with distinct black and orange/ginger patches together with white (a cat can be color="טריקולור" and pattern="קליקו" at the same time - that's expected, not a conflict). Use "טורטי" for a mottled mix of black and orange/cream patches with little or no white - a subtler, less distinctly patched cousin of calico. Use "טוקסידו" for a mostly-solid coat (usually black) with a distinct, roughly symmetric white bib/chest/paws/belly, resembling formal wear. Use "פוינט (קצוות כהות)" for a pale/cream body with clearly darker color concentrated at the face, ears, legs, and tail (the classic Siamese look). Use "אחר" only if the coat shows a real, distinct pattern that doesn't fit any of these.`;
 
 const REST_OF_PROMPT = `- "markings" lists distinct identifying marks, one per line (use \\n between them) - do not write one flowing sentence combining them. E.g. two lines "נקודה שחורה ליד האף" and "אוזניים קצרות מהרגיל", not one sentence joining both. Each line should be a single specific, visually-checkable feature: a spot, a scar, an asymmetry, a missing limb, or a color patch at a specific location (e.g. "כתמים בגוון קרם באוזניים ובזנב"). A generic, whole-coat description ("white cat", "mostly gray with some white") belongs only in colorDescription, not here - but if colorDescription itself calls out where on the body a patch or pattern appears, restate that as its own line in markings too, since a located patch is just as identifying as a scar or notch and markings is what actually gets compared during matching (colorDescription is for display only). Leave "" if nothing distinctive beyond generic coloring is visible or mentioned.
 - "city" and "neighborhood" split out of the post's location text where possible (e.g. "רמת גן, ליד הפארק" -> city "רמת גן", neighborhood/area "" or a more specific area if named). Leave neighborhood "" if the post only names a city, or if you can't confidently separate the two.

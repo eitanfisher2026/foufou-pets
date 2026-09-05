@@ -22,9 +22,9 @@ export const SPECIES_LABELS = {
 // what forms actually show; see shared/colorOptionsApi.js. This constant is
 // what a fresh project starts with before anyone has customized it. "אחר"
 // (other) is a fixed catch-all, always last, never part of the editable list.
-// Base color only, not pattern - "תלת-גוני" (tricolor) stays here since it's
+// Base color only, not pattern - "טריקולור" (tricolor) stays here since it's
 // still a base coloring fact, but the striped/mottled "tabby" pattern moved
-// out entirely to CAT_PATTERNS below (a cat can be color="תלת-גוני" AND
+// out entirely to CAT_PATTERNS below (a cat can be color="טריקולור" AND
 // pattern="קליקו" at once - that's expected, not a conflict). Bicolor
 // combos with white (ג׳ינג׳י לבן/אפור לבן/שחור-לבן) stay as their own
 // named colors rather than decomposing into color+pattern too - those
@@ -40,7 +40,7 @@ export const CAT_COLORS = [
   'חום',
   'ג׳ינג׳י לבן',
   'אפור לבן',
-  'תלת-גוני',
+  'טריקולור',
   'שחור-לבן',
   'אחר',
 ];
