@@ -17,6 +17,7 @@ import {
   CAT_PATTERN_DESCRIPTIONS,
 } from '../shared/collections.js';
 import Field from '../shared/Field.jsx';
+import MainPhoto from '../shared/MainPhoto.jsx';
 import { useColorOptions } from '../shared/useColorOptions.js';
 import { useBreedOptions } from '../shared/useBreedOptions.js';
 import { usePatternOptions } from '../shared/usePatternOptions.js';
@@ -1057,9 +1058,14 @@ function MatchCard({
       </div>
 
       {report?.photos?.[0]?.url && (
+        // The thumbnail (already tiny, see uploadPhotos.js), not the full
+        // photo - a match list can pile up dozens of cards (especially the
+        // collapsed "ללא התאמה" section), and none of them need full
+        // resolution until someone actually taps to enlarge one. onViewPhoto
+        // still opens the real, full-size photo.
         <button type="button" onClick={() => onViewPhoto(report.photos[0].url)} className="mb-2 block w-full">
           <img
-            src={report.photos[0].url}
+            src={report.photos[0].thumbUrl || report.photos[0].url}
             alt=""
             className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
           />
@@ -1150,23 +1156,5 @@ function MatchCard({
       )}
       {confirmDialog}
     </li>
-  );
-}
-
-// View mode shows only the main photo - the rest (extra angles, raw
-// screenshots) are still there, just tucked behind "עריכה" and "פרטים
-// מלאים" instead of stretching the summary view. Width always fills its
-// container (never wider), so a wide/landscape source image can't overflow
-// the page the way a fixed-height/auto-width image could.
-function MainPhoto({ photo, onView }) {
-  if (!photo) return null;
-  return (
-    <button type="button" onClick={() => onView(photo.url)} className="mb-4 block w-full">
-      <img
-        src={photo.url}
-        alt=""
-        className="h-64 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400 sm:h-80"
-      />
-    </button>
   );
 }

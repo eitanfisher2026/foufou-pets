@@ -39,6 +39,7 @@ import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
 import FormSection from '../shared/FormSection.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import Field from '../shared/Field.jsx';
+import MainPhoto from '../shared/MainPhoto.jsx';
 import ExtractionApproval from '../shared/ExtractionApproval.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
@@ -1004,9 +1005,11 @@ function ReverseMatchCard({
       </div>
 
       {lostCase.photos?.[0]?.url && (
+        // Same reasoning as LostCaseDetail.jsx's MatchCard - the thumbnail
+        // for the list, full resolution only once someone taps to enlarge.
         <button type="button" onClick={() => onViewPhoto(lostCase.photos[0].url)} className="mb-2 block w-full">
           <img
-            src={lostCase.photos[0].url}
+            src={lostCase.photos[0].thumbUrl || lostCase.photos[0].url}
             alt=""
             className="h-48 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400"
           />
@@ -1093,20 +1096,3 @@ function ReverseMatchCard({
   );
 }
 
-// View mode shows only the main photo - the rest (extra angles, raw
-// screenshots) are still there, just tucked behind "עריכה" and "פרטים
-// מלאים" instead of stretching the summary view. Width always fills its
-// container (never wider), so a wide/landscape source image can't overflow
-// the page the way a fixed-height/auto-width image could.
-function MainPhoto({ photo, onView }) {
-  if (!photo) return null;
-  return (
-    <button type="button" onClick={() => onView(photo.url)} className="mb-4 block w-full">
-      <img
-        src={photo.url}
-        alt=""
-        className="h-64 w-full rounded-lg bg-slate-50 object-contain ring-4 ring-amber-400 sm:h-80"
-      />
-    </button>
-  );
-}
