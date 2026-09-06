@@ -23,6 +23,24 @@ export const MATCH_STATUS_LABELS = {
   [REPORT_STATUS.CLOSED]: 'נסגר',
 };
 
+// Display order for the collapsible per-status sections below the pending-
+// review list (see LostCaseDetail.jsx/FoundReportDetail.jsx) - every status
+// except NEW, which gets its own always-open "ממתינות לבדיקה" section
+// instead. The two automatic no-match outcomes are deliberately last: a
+// person actually decided every status ahead of them, so those two -
+// nobody chose them, the algorithm just ruled the pair out - read as the
+// least interesting group to open first.
+export const MATCH_STATUS_DISPLAY_ORDER = [
+  REPORT_STATUS.REVIEWING,
+  REPORT_STATUS.NEEDS_FOLLOWUP,
+  REPORT_STATUS.NOT_RELEVANT,
+  REPORT_STATUS.LIKELY_MATCH,
+  REPORT_STATUS.CONTACTED,
+  REPORT_STATUS.CLOSED,
+  REPORT_STATUS.NO_MATCH,
+  REPORT_STATUS.NO_MATCH_PHOTO,
+];
+
 export const MATCH_STATUS_COLORS = {
   [REPORT_STATUS.NEW]: 'bg-amber-100 text-amber-800',
   [REPORT_STATUS.NO_MATCH]: 'bg-slate-100 text-slate-600',

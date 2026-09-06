@@ -58,7 +58,7 @@ import {
 } from '../matching/matchingApi.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
-import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from '../matching/matchStatusLabels.js';
+import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, MATCH_STATUS_DISPLAY_ORDER } from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
@@ -123,8 +123,18 @@ export default function FoundReportDetail() {
   // would see), the button just reset with no explanation.
   const [checkError, setCheckError] = useState('');
   const [recheckingId, setRecheckingId] = useState(null);
-  const [showProcessedMatches, setShowProcessedMatches] = useState(false);
-  const [showNoMatch, setShowNoMatch] = useState(false);
+  // Which of the per-status sections below "ממתינות לבדיקה" are expanded
+  // (see MATCH_STATUS_DISPLAY_ORDER) - a set of REPORT_STATUS values, each
+  // collapsed by default, independent of the others.
+  const [openStatusSections, setOpenStatusSections] = useState(() => new Set());
+  function toggleStatusSection(status) {
+    setOpenStatusSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(status)) next.delete(status);
+      else next.add(status);
+      return next;
+    });
+  }
   // How many active lost cases have never been compared against this
   // report at all - distinct from matches.length, which counts pairings
   // that already have a scored record (whether awaiting review, no-match,
@@ -401,15 +411,17 @@ export default function FoundReportDetail() {
   const canManage = isEditorOrAdmin || report.reportedByUid === user.uid;
   const showEditForm = editing && canManage;
 
-  // Three groups the algorithm itself produces, plus a fourth (below) for
-  // whatever a person has explicitly triaged by hand. "New" (candidates
-  // never scored at all) isn't one of these - it has no card to show yet,
-  // so it only ever appears as a count on the check button itself.
+  // "New" (candidates never scored at all) isn't a real status here - it
+  // has no card to show yet, so it only ever appears as a count on the
+  // check button itself. Everything scored but not yet triaged by a person
+  // (status NEW) goes in the always-open "ממתינות לבדיקה" list; every other
+  // status gets its own collapsible section below, one per status actually
+  // present, in MATCH_STATUS_DISPLAY_ORDER's order.
   const pendingReview = matches.filter((m) => m.status === REPORT_STATUS.NEW);
-  const noMatch = matches.filter((m) => m.status === REPORT_STATUS.NO_MATCH || m.status === REPORT_STATUS.NO_MATCH_PHOTO);
-  const processedMatches = matches.filter(
-    (m) => m.status !== REPORT_STATUS.NEW && m.status !== REPORT_STATUS.NO_MATCH && m.status !== REPORT_STATUS.NO_MATCH_PHOTO
-  );
+  const statusGroups = MATCH_STATUS_DISPLAY_ORDER.map((status) => ({
+    status,
+    items: matches.filter((m) => m.status === status),
+  })).filter((g) => g.items.length > 0);
 
   return (
     <div className="p-4">
@@ -863,59 +875,36 @@ export default function FoundReportDetail() {
                 <p className="mb-6 text-sm text-slate-400">אין התאמות ממתינות לבדיקה כרגע.</p>
               )}
 
-              {noMatch.length > 0 && (
-                <div className="mb-6">
-                  <button onClick={() => setShowNoMatch((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
-                    {showNoMatch ? 'הסתרת' : 'הצגת'} {noMatch.length} ללא התאמה
-                  </button>
-                  {showNoMatch && (
-                    <ul className="space-y-3">
-                      {noMatch.map((m) => (
-                        <ReverseMatchCard
-                          key={m.lostCase.id}
-                          match={m}
-                          report={report}
-                          onStatusChange={handleMatchStatusChange}
-                          onViewPhoto={setLightboxUrl}
-                          confidenceColors={confidenceColors}
-                          onRecheck={handleRecheckSingleMatch}
-                          rechecking={recheckingId === m.lostCase.id}
-                          onResolved={handleMatchResolved}
-                          onDeleted={handleLostCaseDeleted}
-                          user={user}
-                          isEditorOrAdmin={isEditorOrAdmin}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-
-              {processedMatches.length > 0 && (
-                <div>
-                  <button onClick={() => setShowProcessedMatches((v) => !v)} className="mb-3 text-sm text-slate-500 underline">
-                    {showProcessedMatches ? 'הסתרת' : 'הצגת'} {processedMatches.length} התאמות שכבר טופלו
-                  </button>
-                  {showProcessedMatches && (
-                    <ul className="space-y-3">
-                      {processedMatches.map((m) => (
-                        <ReverseMatchCard
-                          key={m.lostCase.id}
-                          match={m}
-                          report={report}
-                          onStatusChange={handleMatchStatusChange}
-                          onViewPhoto={setLightboxUrl}
-                          confidenceColors={confidenceColors}
-                          onResolved={handleMatchResolved}
-                          onDeleted={handleLostCaseDeleted}
-                          user={user}
-                          isEditorOrAdmin={isEditorOrAdmin}
-                        />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+              {statusGroups.map(({ status, items }) => {
+                const isOpen = openStatusSections.has(status);
+                return (
+                  <div key={status} className="mb-6">
+                    <button onClick={() => toggleStatusSection(status)} className="mb-3 text-sm text-slate-500 underline">
+                      {isOpen ? 'הסתרת' : 'הצגת'} {items.length} {MATCH_STATUS_LABELS[status]}
+                    </button>
+                    {isOpen && (
+                      <ul className="space-y-3">
+                        {items.map((m) => (
+                          <ReverseMatchCard
+                            key={m.lostCase.id}
+                            match={m}
+                            report={report}
+                            onStatusChange={handleMatchStatusChange}
+                            onViewPhoto={setLightboxUrl}
+                            confidenceColors={confidenceColors}
+                            onRecheck={handleRecheckSingleMatch}
+                            rechecking={recheckingId === m.lostCase.id}
+                            onResolved={handleMatchResolved}
+                            onDeleted={handleLostCaseDeleted}
+                            user={user}
+                            isEditorOrAdmin={isEditorOrAdmin}
+                          />
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
             </>
           )}
         </>
