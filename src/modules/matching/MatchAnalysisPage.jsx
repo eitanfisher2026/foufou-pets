@@ -115,9 +115,10 @@ export default function MatchAnalysisPage() {
   // navigating back to the match card. Same DropdownBadge/status labels as
   // the cards (see LostCaseDetail.jsx/FoundReportDetail.jsx), plus a
   // one-click shortcut for the single most common action after reading a
-  // full analysis: ruling the pair out. Landing on "אין התאמה" specifically
-  // (whether via that shortcut or picked from the dropdown) also moves on
-  // automatically - to the next still-pending candidate on whichever side
+  // full analysis: ruling the pair out. Setting a status here - by that
+  // shortcut, or by picking anything at all from the dropdown - always
+  // means the reviewer is done deciding on this one, so it moves on
+  // automatically to the next still-pending candidate on whichever side
   // (dir) this review is walking through. Once there isn't one, this goes
   // all the way back to that side's own main list (not just one case/
   // report's own page), focused on the pet the whole review was actually
@@ -125,15 +126,13 @@ export default function MatchAnalysisPage() {
   async function handleStatusChange(status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatch((prev) => ({ ...prev, status }));
-    if (status === REPORT_STATUS.NOT_RELEVANT) {
-      if (nextMatch) {
-        if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
-        else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
-      } else if (dir === 'report') {
-        navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
-      } else {
-        navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
-      }
+    if (nextMatch) {
+      if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
+      else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
+    } else if (dir === 'report') {
+      navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
+    } else {
+      navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
     }
   }
 
