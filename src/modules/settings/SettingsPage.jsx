@@ -2,16 +2,11 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
-import {
-  rescanAllLostCases,
-  backfillPhotoSimilarityForExistingMatches,
-  migrateLegacyMatchStatusesAndCounters,
-} from '../matching/matchingApi.js';
+import { rescanAllLostCases, backfillPhotoSimilarityForExistingMatches } from '../matching/matchingApi.js';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
-import { backfillNormalizedPhones } from '../shared/duplicateCheckApi.js';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
@@ -35,12 +30,6 @@ export default function SettingsPage() {
   const [photoBackfilling, setPhotoBackfilling] = useState(false);
   const [photoBackfillProgress, setPhotoBackfillProgress] = useState(null);
   const [photoBackfillResult, setPhotoBackfillResult] = useState(null);
-  const [counterBackfilling, setCounterBackfilling] = useState(false);
-  const [counterBackfillProgress, setCounterBackfillProgress] = useState(null);
-  const [counterBackfillResult, setCounterBackfillResult] = useState(null);
-  const [phoneBackfilling, setPhoneBackfilling] = useState(false);
-  const [phoneBackfillProgress, setPhoneBackfillProgress] = useState(null);
-  const [phoneBackfillResult, setPhoneBackfillResult] = useState(null);
   // Both actions below silently do nothing if the threshold set in
   // "פרמטרים להתאמה" was never actually saved there (it's a separate page,
   // with its own save button at the bottom of a long form) - showing the
@@ -94,30 +83,6 @@ export default function SettingsPage() {
       notifyVisualMatch(result.visualMatches);
     } finally {
       setPhotoBackfilling(false);
-    }
-  }
-
-  async function handleCounterBackfill() {
-    setCounterBackfilling(true);
-    setCounterBackfillResult(null);
-    setCounterBackfillProgress({ done: 0, total: 0 });
-    try {
-      const result = await migrateLegacyMatchStatusesAndCounters((done, total) => setCounterBackfillProgress({ done, total }));
-      setCounterBackfillResult(result);
-    } finally {
-      setCounterBackfilling(false);
-    }
-  }
-
-  async function handlePhoneBackfill() {
-    setPhoneBackfilling(true);
-    setPhoneBackfillResult(null);
-    setPhoneBackfillProgress({ done: 0, total: 0 });
-    try {
-      const result = await backfillNormalizedPhones((done, total) => setPhoneBackfillProgress({ done, total }));
-      setPhoneBackfillResult(result);
-    } finally {
-      setPhoneBackfilling(false);
     }
   }
 
@@ -228,53 +193,6 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm text-emerald-700">
             נסרקו מחדש {rescanResult.casesProcessed} תיקי חיפוש, נמצאו {rescanResult.matchesScored} התאמות בסך הכל.
           </p>
-        )}
-      </section>
-
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">עדכון סטטוסים ומונים לכל התיקים</h2>
-        <p className="mb-3 text-sm text-slate-500">
-          פעולה חד-פעמית: מעדכנת כל התאמה שעדיין מסומנת בסטטוס הישן "בעל סבירות גבוהה" (שהוסר) ל"דורש מעקב", ואז
-          מחשבת מחדש את מוני ההתאמות שמוצגים ליד כל תיק ברשימה הראשית (סה"כ, ממתינות, ודורשות תשומת לב) מתוך ההתאמות
-          הקיימות - בלי לסרוק, לבדוק תמונות, או לשנות שום דבר אחר בהתאמה עצמה, אז זה מהיר וללא עלות.
-        </p>
-        <button
-          type="button"
-          onClick={handleCounterBackfill}
-          disabled={counterBackfilling}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
-        >
-          {counterBackfilling ? 'מעדכן...' : 'הרצה'}
-        </button>
-        {counterBackfilling && <ProgressBar current={counterBackfillProgress.done} total={counterBackfillProgress.total} label="מעדכן..." />}
-        {counterBackfillResult && (
-          <p className="mt-2 text-sm text-emerald-700">
-            {counterBackfillResult.legacyStatusesFixed > 0 && (
-              <>תוקנו {counterBackfillResult.legacyStatusesFixed} התאמות עם סטטוס ישן. </>
-            )}
-            עודכנו המונים של {counterBackfillResult.casesProcessed} תיקי חיפוש.
-          </p>
-        )}
-      </section>
-
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">עדכון מספרי טלפון לזיהוי כפילויות</h2>
-        <p className="mb-3 text-sm text-slate-500">
-          פעולה חד-פעמית: בדיקת הכפילויות לפי טלפון עברה משליפת כל הרשומות בכל פעם שמדווחים תיק חדש, לחיפוש ישיר וזול
-          יותר - אבל זה דורש שדה טלפון מנורמל שמורות ברשומות ישנות. הרצה זו משלימה את השדה הזה על כל רשומה קיימת עם
-          מספר טלפון שעדיין חסר לה.
-        </p>
-        <button
-          type="button"
-          onClick={handlePhoneBackfill}
-          disabled={phoneBackfilling}
-          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
-        >
-          {phoneBackfilling ? 'מעדכן...' : 'הרצה'}
-        </button>
-        {phoneBackfilling && <ProgressBar current={phoneBackfillProgress.done} total={phoneBackfillProgress.total} label="מעדכן..." />}
-        {phoneBackfillResult && (
-          <p className="mt-2 text-sm text-emerald-700">עודכנו {phoneBackfillResult.recordsUpdated} רשומות.</p>
         )}
       </section>
 

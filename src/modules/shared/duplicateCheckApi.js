@@ -1,4 +1,4 @@
-import { collection, getDocs, query, setDoc, where, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from './collections.js';
 
@@ -47,8 +47,7 @@ const MIN_PHONE_DIGITS = 7;
  * side - this used to read the ENTIRE collection on every single report
  * submission (the app's most frequent write), which only gets more
  * expensive as the collection grows. A record saved before normalizedPhone
- * existed won't match here until it's next edited/re-saved, or until the
- * one-off backfillNormalizedPhones migration below runs.
+ * existed won't match here until it's next edited/re-saved.
  */
 async function findDuplicatesByContactPhone(recordType, contactPhone) {
   const digits = normalizePhone(contactPhone);
@@ -94,31 +93,4 @@ export async function findDuplicatesBySourceUrlAnyType(sourceUrl) {
     ...lost.map((m) => ({ ...m, recordType: 'lost', matchedOn: ['sourceUrl'] })),
     ...found.map((m) => ({ ...m, recordType: 'found', matchedOn: ['sourceUrl'] })),
   ];
-}
-
-/**
- * One-off admin migration: sets normalizedPhone on every existing lost case
- * and found report that has a contactPhone but no normalizedPhone yet (a
- * record saved before findDuplicatesByContactPhone switched from a full-
- * collection scan to querying this field directly). Reads both collections
- * in full exactly once - a real cost, but a one-time one, versus the
- * per-submission full scan it replaces running forever otherwise.
- */
-export async function backfillNormalizedPhones(onProgress) {
-  const [lostSnap, foundSnap] = await Promise.all([
-    getDocs(collection(db, COLLECTIONS.LOST_CASES)),
-    getDocs(collection(db, COLLECTIONS.FOUND_REPORTS)),
-  ]);
-  const targets = [
-    ...lostSnap.docs.map((d) => ({ collectionName: COLLECTIONS.LOST_CASES, id: d.id, data: d.data() })),
-    ...foundSnap.docs.map((d) => ({ collectionName: COLLECTIONS.FOUND_REPORTS, id: d.id, data: d.data() })),
-  ].filter((t) => t.data.contactPhone && !t.data.normalizedPhone);
-
-  onProgress?.(0, targets.length);
-  for (let i = 0; i < targets.length; i++) {
-    const t = targets[i];
-    await setDoc(doc(db, t.collectionName, t.id), { normalizedPhone: normalizePhone(t.data.contactPhone) }, { merge: true });
-    onProgress?.(i + 1, targets.length);
-  }
-  return { recordsUpdated: targets.length };
 }
