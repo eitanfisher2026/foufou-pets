@@ -8,7 +8,10 @@ export default function AppFooter() {
     <div className="mt-8 border-t border-slate-200 pt-3 text-center">
       <p className="mb-1 text-xs font-medium text-slate-500">🐾 איתור חיות מחמד</p>
       <p className="mb-1 text-xs text-slate-300">© FouFou-Pets</p>
-      <p className="text-xs text-slate-300">2026 {APP_VERSION}</p>
+      <p className="mb-1 text-xs text-slate-300">2026 {APP_VERSION}</p>
+      <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-xs text-slate-400 underline">
+        מדיניות פרטיות
+      </a>
     </div>
   );
 }
