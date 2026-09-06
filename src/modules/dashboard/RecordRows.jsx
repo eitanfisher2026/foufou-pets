@@ -41,17 +41,28 @@ function typeBadgeFromRecordNumber(recordNumber, fallbackLabel) {
 
 // The total candidate count (matchCount) belongs in the section header, not
 // repeated on every row. Reviewed/new counts are plain text - only the
-// confidence level itself is a color-coded badge, kept visually separate.
-export function MatchSummaryRow({ matchCount, newMatchCount, topMatchScore, confidenceColors }) {
+// confidence level and the important-matches call-out are color-coded
+// badges, kept visually separate. "X נבדקו" alone used to be the only
+// signal a reviewed match ever showed here - it hides whether any of those
+// reviewed matches are actually worth a look (a follow-up flag, contact
+// already made, a likely match), so importantMatchCount (see
+// isImportantMatchStatus in matchStatusLabels.js, kept in sync in
+// matchingApi.js) gets its own badge whenever it's nonzero.
+export function MatchSummaryRow({ matchCount, newMatchCount, importantMatchCount, topMatchScore, confidenceColors }) {
   const hasNew = newMatchCount > 0;
   const reviewedCount = matchCount - newMatchCount;
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="whitespace-nowrap text-xs text-black">
         {hasNew && `${newMatchCount} לבדיקה, `}
         {reviewedCount} נבדקו
       </span>
       <ConfidenceBadge score={topMatchScore} confidenceColors={confidenceColors} />
+      {importantMatchCount > 0 && (
+        <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+          ⚠️ {importantMatchCount} דורשות תשומת לב
+        </span>
+      )}
     </div>
   );
 }
@@ -135,6 +146,7 @@ export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showT
             <MatchSummaryRow
               matchCount={c.matchCount}
               newMatchCount={c.newMatchCount}
+              importantMatchCount={c.importantMatchCount}
               topMatchScore={c.topMatchScore}
               confidenceColors={confidenceColors}
             />

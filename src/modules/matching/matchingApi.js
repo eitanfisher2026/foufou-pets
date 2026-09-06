@@ -12,7 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
+import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS, CLOSURE_REASON } from '../shared/collections.js';
 import {
   rankMatches,
   scoreMatch,
@@ -22,8 +22,11 @@ import {
 } from './matchingEngine.js';
 import { getMatchConfig } from './matchConfigApi.js';
 import { comparePhotoSimilarity } from './photoSimilarityApi.js';
+import { isImportantMatchStatus } from './matchStatusLabels.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
+import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
+import { archiveFoundReport } from '../found-report/foundReportApi.js';
 
 // Must match PHOTO_SIMILARITY_MODEL in functions/index.js - the functions
 // package doesn't share modules with the client, so this is kept in sync by
@@ -193,6 +196,7 @@ async function recomputeLostCaseCounts(lostCaseId) {
     {
       matchCount: all.length,
       newMatchCount: all.filter((m) => m.status === REPORT_STATUS.NEW).length,
+      importantMatchCount: all.filter((m) => isImportantMatchStatus(m.status)).length,
       topMatchScore: all.reduce((max, m) => Math.max(max, m.score || 0), 0),
       // Denormalized so this can be a search filter (see recordSearch.js)
       // without every search needing to read every lost case's matches
@@ -397,7 +401,11 @@ export async function clearMatches(lostCaseId) {
   existingSnap.docs.forEach((d) => batch.delete(d.ref));
   await batch.commit();
 
-  await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { matchCount: 0, newMatchCount: 0, topMatchScore: 0 }, { merge: true });
+  await setDoc(
+    doc(db, COLLECTIONS.LOST_CASES, lostCaseId),
+    { matchCount: 0, newMatchCount: 0, importantMatchCount: 0, topMatchScore: 0 },
+    { merge: true }
+  );
 }
 
 export async function getMatches(lostCaseId) {
@@ -734,21 +742,35 @@ export async function getMatch(lostCaseId, foundReportId) {
 
 /**
  * Updates one match's review status and keeps the lost case's denormalized
- * newMatchCount (used for the dashboard summary badge) in sync.
+ * newMatchCount/importantMatchCount (used for the dashboard summary badge -
+ * see MatchSummaryRow in RecordRows.jsx) in sync. Setting status to CLOSED
+ * specifically also archives both sides of the match (the lost case and the
+ * found report) - once a pairing is closed there's nothing left to keep
+ * either record active for.
  */
 export async function updateMatchStatus(lostCaseId, foundReportId, status) {
   const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
   const prevSnap = await getDoc(matchRef);
-  const wasNew = prevSnap.exists() && prevSnap.data().status === REPORT_STATUS.NEW;
+  const prevStatus = prevSnap.exists() ? prevSnap.data().status : null;
+  const wasNew = prevStatus === REPORT_STATUS.NEW;
   const isNew = status === REPORT_STATUS.NEW;
+  const wasImportant = isImportantMatchStatus(prevStatus);
+  const isImportant = isImportantMatchStatus(status);
 
   await setDoc(matchRef, { status }, { merge: true });
 
-  if (wasNew !== isNew) {
-    await setDoc(
-      doc(db, COLLECTIONS.LOST_CASES, lostCaseId),
-      { newMatchCount: increment(isNew ? 1 : -1) },
-      { merge: true }
-    );
+  const counterUpdates = {};
+  if (wasNew !== isNew) counterUpdates.newMatchCount = increment(isNew ? 1 : -1);
+  if (wasImportant !== isImportant) counterUpdates.importantMatchCount = increment(isImportant ? 1 : -1);
+  if (Object.keys(counterUpdates).length > 0) {
+    await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), counterUpdates, { merge: true });
+  }
+
+  if (status === REPORT_STATUS.CLOSED) {
+    const closure = { closureDate: new Date().toISOString().slice(0, 10), closureReason: CLOSURE_REASON.SYSTEM_MATCH_CLOSED };
+    await Promise.all([
+      updateLostCaseClosure(lostCaseId, RECORD_STATUS.ARCHIVED, closure),
+      archiveFoundReport(foundReportId, closure),
+    ]);
   }
 }

@@ -249,6 +249,14 @@ export const CLOSURE_REASON = {
   // was determined either way - the record just aged out of the working
   // list on its own.
   SYSTEM_ARCHIVED_OLD: 'system_archived_old',
+  // Set automatically (never by a person) when a match's own status is set
+  // to "נסגר" (REPORT_STATUS.CLOSED) - see updateMatchStatus in
+  // matchingApi.js. Applied to both sides of that match (the lost case and
+  // the found report), same reasoning as SYSTEM_ARCHIVED_OLD above: kept
+  // distinct from RETURNED_TO_OWNER since closing a match doesn't
+  // necessarily mean that's how the story ended, just that a person is
+  // done reviewing this particular pairing.
+  SYSTEM_MATCH_CLOSED: 'system_match_closed',
 };
 
 export const CLOSURE_REASON_LABELS = {
@@ -257,6 +265,7 @@ export const CLOSURE_REASON_LABELS = {
   [CLOSURE_REASON.DIED]: 'נפטר/ה',
   [CLOSURE_REASON.OTHER]: 'אחר',
   [CLOSURE_REASON.SYSTEM_ARCHIVED_OLD]: 'ארכוב אוטומטי - מעל חודש במערכת',
+  [CLOSURE_REASON.SYSTEM_MATCH_CLOSED]: 'ארכוב אוטומטי - ההתאמה סומנה כנסגרה',
 };
 
 export const REPORT_STATUS = {

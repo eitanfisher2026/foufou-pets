@@ -23,23 +23,44 @@ export const MATCH_STATUS_LABELS = {
   [REPORT_STATUS.CLOSED]: 'נסגר',
 };
 
+// How much a status actually matters once a person has looked at it -
+// higher means more important/more likely to need real attention, not just
+// chronological order. Everything else here (display order for the
+// collapsible sections, and which statuses count as "important" enough to
+// call out on a case's own row in the main list) derives from this one
+// ranking instead of being ordered by hand in more than one place. NEW
+// isn't ranked - it's not a decided status at all, and always gets its own
+// always-open "ממתינות לבדיקה" section instead of one of these.
+export const MATCH_STATUS_PRIORITY = {
+  [REPORT_STATUS.NO_MATCH]: 1, // automatic, fully settled, never needs a second look
+  [REPORT_STATUS.NO_MATCH_PHOTO]: 2, // automatic, fully settled
+  [REPORT_STATUS.NOT_RELEVANT]: 3, // a person already ruled it out
+  [REPORT_STATUS.CLOSED]: 4, // the pairing's story is over, whatever it was
+  [REPORT_STATUS.REVIEWING]: 5, // actively being looked at
+  [REPORT_STATUS.NEEDS_FOLLOWUP]: 6, // explicitly flagged as needing action
+  [REPORT_STATUS.CONTACTED]: 7, // real progress - the reporter's been reached
+  [REPORT_STATUS.LIKELY_MATCH]: 8, // probably the actual answer - most urgent
+};
+
 // Display order for the collapsible per-status sections below the pending-
-// review list (see LostCaseDetail.jsx/FoundReportDetail.jsx) - every status
-// except NEW, which gets its own always-open "ממתינות לבדיקה" section
-// instead. The two automatic no-match outcomes are deliberately last: a
-// person actually decided every status ahead of them, so those two -
-// nobody chose them, the algorithm just ruled the pair out - read as the
-// least interesting group to open first.
-export const MATCH_STATUS_DISPLAY_ORDER = [
-  REPORT_STATUS.REVIEWING,
-  REPORT_STATUS.NEEDS_FOLLOWUP,
-  REPORT_STATUS.NOT_RELEVANT,
-  REPORT_STATUS.LIKELY_MATCH,
-  REPORT_STATUS.CONTACTED,
-  REPORT_STATUS.CLOSED,
-  REPORT_STATUS.NO_MATCH,
-  REPORT_STATUS.NO_MATCH_PHOTO,
-];
+// review list (see LostCaseDetail.jsx/FoundReportDetail.jsx) - most
+// important first, so the statuses actually worth a reviewer's attention
+// are the easiest to find, not buried under the two automatic no-match
+// outcomes nobody ever chose.
+export const MATCH_STATUS_DISPLAY_ORDER = Object.keys(MATCH_STATUS_PRIORITY).sort(
+  (a, b) => MATCH_STATUS_PRIORITY[b] - MATCH_STATUS_PRIORITY[a]
+);
+
+// The statuses worth calling out on a case's own row in the main list (see
+// MatchSummaryRow in RecordRows.jsx) - a plain "64 נבדקו" count hides
+// whether any of those 64 are actually significant. Threshold is
+// NEEDS_FOLLOWUP's own priority, so "important" reads as "at least as
+// worth a look as an explicit follow-up flag" - currently NEEDS_FOLLOWUP,
+// CONTACTED, and LIKELY_MATCH.
+const IMPORTANT_THRESHOLD = MATCH_STATUS_PRIORITY[REPORT_STATUS.NEEDS_FOLLOWUP];
+export function isImportantMatchStatus(status) {
+  return (MATCH_STATUS_PRIORITY[status] || 0) >= IMPORTANT_THRESHOLD;
+}
 
 export const MATCH_STATUS_COLORS = {
   [REPORT_STATUS.NEW]: 'bg-amber-100 text-amber-800',

@@ -122,11 +122,15 @@ export default function MatchAnalysisPage() {
   // (dir) this review is walking through. Once there isn't one, this goes
   // all the way back to that side's own main list (not just one case/
   // report's own page), focused on the pet the whole review was actually
-  // about - see Dashboard.jsx/FoundReportsListPage.jsx.
+  // about - see Dashboard.jsx/FoundReportsListPage.jsx. CLOSED is the one
+  // exception: updateMatchStatus archives both the lost case and the found
+  // report when it's set, so there's no other candidate left worth
+  // reviewing for either side - this always goes straight to the fallback,
+  // even if some other still-NEW candidate technically exists.
   async function handleStatusChange(status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatch((prev) => ({ ...prev, status }));
-    if (nextMatch) {
+    if (nextMatch && status !== REPORT_STATUS.CLOSED) {
       if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
       else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
     } else if (dir === 'report') {
