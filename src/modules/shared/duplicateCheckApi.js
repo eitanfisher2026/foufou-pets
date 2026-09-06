@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, setDoc, where, doc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from './collections.js';
 
@@ -24,7 +24,10 @@ export async function findDuplicatesBySourceUrl(recordType, sourceUrl) {
 // Digits-only comparison so "054-485-3364", "0544853364" and "+972-54-485-3364"
 // all match each other - contactPhone is free text, never format-enforced,
 // so a raw string match would miss the large majority of real duplicates.
-function normalizePhone(phone) {
+// Exported so lostReportApi.js/foundReportApi.js can compute the same
+// normalizedPhone value they save alongside contactPhone (see
+// findDuplicatesByContactPhone below for why that field exists).
+export function normalizePhone(phone) {
   let digits = (phone || '').replace(/\D/g, '');
   if (digits.startsWith('972')) digits = '0' + digits.slice(3);
   return digits;
@@ -37,20 +40,22 @@ const MIN_PHONE_DIGITS = 7;
 
 /**
  * Second duplicate signal, alongside source URL: a contact phone number
- * that already appears on another record of the same type. There's no
- * indexed normalized-phone field to query directly (contactPhone is plain
- * free text), so this fetches every record with a non-empty phone and
- * compares client-side - fine at this app's scale, and works retroactively
- * on every existing record with no migration needed.
+ * that already appears on another record of the same type. Queries the
+ * denormalized `normalizedPhone` field (set alongside contactPhone by
+ * createLostCase/updateLostCase/createFoundReport/updateFoundReport) rather
+ * than fetching every record with a non-empty phone and comparing client-
+ * side - this used to read the ENTIRE collection on every single report
+ * submission (the app's most frequent write), which only gets more
+ * expensive as the collection grows. A record saved before normalizedPhone
+ * existed won't match here until it's next edited/re-saved, or until the
+ * one-off backfillNormalizedPhones migration below runs.
  */
 export async function findDuplicatesByContactPhone(recordType, contactPhone) {
   const digits = normalizePhone(contactPhone);
   if (digits.length < MIN_PHONE_DIGITS) return [];
   const collectionName = recordType === 'lost' ? COLLECTIONS.LOST_CASES : COLLECTIONS.FOUND_REPORTS;
-  const snap = await getDocs(query(collection(db, collectionName), where('contactPhone', '!=', '')));
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter((r) => normalizePhone(r.contactPhone) === digits);
+  const snap = await getDocs(query(collection(db, collectionName), where('normalizedPhone', '==', digits)));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 /**
@@ -89,4 +94,31 @@ export async function findDuplicatesBySourceUrlAnyType(sourceUrl) {
     ...lost.map((m) => ({ ...m, recordType: 'lost', matchedOn: ['sourceUrl'] })),
     ...found.map((m) => ({ ...m, recordType: 'found', matchedOn: ['sourceUrl'] })),
   ];
+}
+
+/**
+ * One-off admin migration: sets normalizedPhone on every existing lost case
+ * and found report that has a contactPhone but no normalizedPhone yet (a
+ * record saved before findDuplicatesByContactPhone switched from a full-
+ * collection scan to querying this field directly). Reads both collections
+ * in full exactly once - a real cost, but a one-time one, versus the
+ * per-submission full scan it replaces running forever otherwise.
+ */
+export async function backfillNormalizedPhones(onProgress) {
+  const [lostSnap, foundSnap] = await Promise.all([
+    getDocs(collection(db, COLLECTIONS.LOST_CASES)),
+    getDocs(collection(db, COLLECTIONS.FOUND_REPORTS)),
+  ]);
+  const targets = [
+    ...lostSnap.docs.map((d) => ({ collectionName: COLLECTIONS.LOST_CASES, id: d.id, data: d.data() })),
+    ...foundSnap.docs.map((d) => ({ collectionName: COLLECTIONS.FOUND_REPORTS, id: d.id, data: d.data() })),
+  ].filter((t) => t.data.contactPhone && !t.data.normalizedPhone);
+
+  onProgress?.(0, targets.length);
+  for (let i = 0; i < targets.length; i++) {
+    const t = targets[i];
+    await setDoc(doc(db, t.collectionName, t.id), { normalizedPhone: normalizePhone(t.data.contactPhone) }, { merge: true });
+    onProgress?.(i + 1, targets.length);
+  }
+  return { recordsUpdated: targets.length };
 }

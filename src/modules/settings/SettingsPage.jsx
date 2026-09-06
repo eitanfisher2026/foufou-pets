@@ -11,8 +11,10 @@ import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
+import { backfillNormalizedPhones } from '../shared/duplicateCheckApi.js';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
+import ProgressBar from '../shared/ProgressBar.jsx';
 
 function photoThresholdLabel(key) {
   if (key === 'never') return 'כבוי';
@@ -23,23 +25,6 @@ function defaultArchiveCutoffDate() {
   const d = new Date();
   d.setDate(d.getDate() - 30);
   return d.toISOString().slice(0, 10);
-}
-
-function ProgressBar({ progress }) {
-  if (!progress) return null;
-  return (
-    <div className="mt-3">
-      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-        <div
-          className="h-full rounded-full bg-slate-800 transition-all duration-300"
-          style={{ width: progress.total > 0 ? `${(progress.done / progress.total) * 100}%` : '0%' }}
-        />
-      </div>
-      <p className="mt-1 text-xs text-slate-500">
-        {progress.done} מתוך {progress.total} תיקים
-      </p>
-    </div>
-  );
 }
 
 export default function SettingsPage() {
@@ -53,6 +38,9 @@ export default function SettingsPage() {
   const [counterBackfilling, setCounterBackfilling] = useState(false);
   const [counterBackfillProgress, setCounterBackfillProgress] = useState(null);
   const [counterBackfillResult, setCounterBackfillResult] = useState(null);
+  const [phoneBackfilling, setPhoneBackfilling] = useState(false);
+  const [phoneBackfillProgress, setPhoneBackfillProgress] = useState(null);
+  const [phoneBackfillResult, setPhoneBackfillResult] = useState(null);
   // Both actions below silently do nothing if the threshold set in
   // "פרמטרים להתאמה" was never actually saved there (it's a separate page,
   // with its own save button at the bottom of a long form) - showing the
@@ -118,6 +106,18 @@ export default function SettingsPage() {
       setCounterBackfillResult(result);
     } finally {
       setCounterBackfilling(false);
+    }
+  }
+
+  async function handlePhoneBackfill() {
+    setPhoneBackfilling(true);
+    setPhoneBackfillResult(null);
+    setPhoneBackfillProgress({ done: 0, total: 0 });
+    try {
+      const result = await backfillNormalizedPhones((done, total) => setPhoneBackfillProgress({ done, total }));
+      setPhoneBackfillResult(result);
+    } finally {
+      setPhoneBackfilling(false);
     }
   }
 
@@ -223,7 +223,7 @@ export default function SettingsPage() {
         >
           {rescanning ? 'סורק מחדש...' : 'הרצה'}
         </button>
-        {rescanning && <ProgressBar progress={rescanProgress} />}
+        {rescanning && <ProgressBar current={rescanProgress.done} total={rescanProgress.total} label="סורק מחדש..." />}
         {rescanResult && (
           <p className="mt-2 text-sm text-emerald-700">
             נסרקו מחדש {rescanResult.casesProcessed} תיקי חיפוש, נמצאו {rescanResult.matchesScored} התאמות בסך הכל.
@@ -246,7 +246,7 @@ export default function SettingsPage() {
         >
           {counterBackfilling ? 'מעדכן...' : 'הרצה'}
         </button>
-        {counterBackfilling && <ProgressBar progress={counterBackfillProgress} />}
+        {counterBackfilling && <ProgressBar current={counterBackfillProgress.done} total={counterBackfillProgress.total} label="מעדכן..." />}
         {counterBackfillResult && (
           <p className="mt-2 text-sm text-emerald-700">
             {counterBackfillResult.legacyStatusesFixed > 0 && (
@@ -254,6 +254,27 @@ export default function SettingsPage() {
             )}
             עודכנו המונים של {counterBackfillResult.casesProcessed} תיקי חיפוש.
           </p>
+        )}
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <h2 className="mb-1 font-medium text-slate-700">עדכון מספרי טלפון לזיהוי כפילויות</h2>
+        <p className="mb-3 text-sm text-slate-500">
+          פעולה חד-פעמית: בדיקת הכפילויות לפי טלפון עברה משליפת כל הרשומות בכל פעם שמדווחים תיק חדש, לחיפוש ישיר וזול
+          יותר - אבל זה דורש שדה טלפון מנורמל שמורות ברשומות ישנות. הרצה זו משלימה את השדה הזה על כל רשומה קיימת עם
+          מספר טלפון שעדיין חסר לה.
+        </p>
+        <button
+          type="button"
+          onClick={handlePhoneBackfill}
+          disabled={phoneBackfilling}
+          className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+        >
+          {phoneBackfilling ? 'מעדכן...' : 'הרצה'}
+        </button>
+        {phoneBackfilling && <ProgressBar current={phoneBackfillProgress.done} total={phoneBackfillProgress.total} label="מעדכן..." />}
+        {phoneBackfillResult && (
+          <p className="mt-2 text-sm text-emerald-700">עודכנו {phoneBackfillResult.recordsUpdated} רשומות.</p>
         )}
       </section>
 
@@ -281,7 +302,7 @@ export default function SettingsPage() {
         >
           {photoBackfilling ? 'משווה תמונות...' : 'הרצה'}
         </button>
-        {photoBackfilling && <ProgressBar progress={photoBackfillProgress} />}
+        {photoBackfilling && <ProgressBar current={photoBackfillProgress.done} total={photoBackfillProgress.total} label="משווה תמונות..." />}
         {photoBackfillResult && (
           <p className="mt-2 text-sm text-emerald-700">
             נסרקו {photoBackfillResult.casesScanned} תיקי חיפוש, הושוו תמונות ב-{photoBackfillResult.pairsChecked}{' '}
@@ -363,7 +384,7 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {archiving && <ProgressBar progress={archiveProgress} />}
+        {archiving && <ProgressBar current={archiveProgress.done} total={archiveProgress.total} label="מעביר לארכיון..." />}
         {archiveResult && (
           <p className="mt-2 text-sm text-emerald-700">
             הועברו לארכיון {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.

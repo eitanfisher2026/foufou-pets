@@ -7,8 +7,8 @@ const PAGE_SIZE = 20;
 // listLostCasesPage/listFoundReportsPage in dashboardApi.js). Resets back
 // to the first page whenever `deps` changes (e.g. switching species)
 // instead of appending onto a list that no longer matches. `enabled=false`
-// holds off fetching entirely, same convention as useLoadWithProgress -
-// for a fetch that depends on a value which itself loads asynchronously.
+// holds off fetching entirely - for a fetch that depends on a value which
+// itself loads asynchronously.
 export function usePaginatedList(fetchPage, deps = [], enabled = true) {
   const [items, setItems] = useState([]);
   const [cursor, setCursor] = useState(null);

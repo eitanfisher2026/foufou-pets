@@ -1,8 +1,8 @@
 /**
- * Small counting progress bar for a list load (see useLoadWithProgress.js) -
+ * Small counting progress bar for a long-running scan/backfill action -
  * "טוען... 7/30" with a matching fill bar underneath. `label` defaults to
- * "טוען..." for those existing callers; other long-running actions (e.g.
- * a per-record match scan) pass their own, like "סורק התאמות...".
+ * "טוען..."; other long-running actions (e.g. a per-record match scan)
+ * pass their own, like "סורק התאמות...".
  */
 export default function ProgressBar({ current, total, label = 'טוען...' }) {
   const pct = total > 0 ? Math.round((current / total) * 100) : 0;

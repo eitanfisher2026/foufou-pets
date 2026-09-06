@@ -170,22 +170,29 @@ function isAutoStatus(status) {
 // "New" a real, meaningful count (candidates never yet compared) instead
 // of a status that silently got reused for "compared but unreviewed".
 
+// Filters by species server-side when one is given (every hot-path caller -
+// countNewCandidatesFor*/checkMatchesFor* - always has one, since they're
+// always working within one specific case/report's own species) instead of
+// reading the WHOLE collection and discarding half of it client-side. Every
+// record gets a real species at creation (species is a required form field,
+// and a wrong one is corrected via fixLostCaseSpecies/fixFoundReportSpecies
+// rather than ever being cleared back to empty), so this is safe - unlike
+// status below, there's no legacy-record case where species is genuinely
+// absent. Status itself stays a client-side filter, since a record from
+// before that field existed could still be missing it entirely (a Firestore
+// equality query would silently exclude such a record, not just leave it
+// unfiltered) - `species: null` (the "every species" case, used only by
+// rare admin bulk actions) still reads the whole collection, same as before.
 async function activeFoundReportsForSpecies(species) {
-  const snap = await getDocs(collection(db, COLLECTIONS.FOUND_REPORTS));
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter(
-      (r) => (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE && (!species || !r.species || r.species === species)
-    );
+  const base = collection(db, COLLECTIONS.FOUND_REPORTS);
+  const snap = await getDocs(species ? query(base, where('species', '==', species)) : base);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => (r.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE);
 }
 
 async function activeLostCasesForSpecies(species) {
-  const snap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
-  return snap.docs
-    .map((d) => ({ id: d.id, ...d.data() }))
-    .filter(
-      (c) => (c.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE && (!species || !c.species || c.species === species)
-    );
+  const base = collection(db, COLLECTIONS.LOST_CASES);
+  const snap = await getDocs(species ? query(base, where('species', '==', species)) : base);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((c) => (c.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE);
 }
 
 async function recomputeLostCaseCounts(lostCaseId) {

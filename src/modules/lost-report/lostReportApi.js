@@ -5,6 +5,7 @@ import { COLLECTIONS, RECORD_STATUS, SPECIES, DEFAULT_DOG_BREED } from '../share
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
 import { generatePhotoThumbnail } from '../shared/photoThumbnailApi.js';
+import { normalizePhone } from '../shared/duplicateCheckApi.js';
 
 // A dog record saved with a truly blank breed (not even the "מעורב (לא
 // ידוע)" default) can't be usefully compared on breed at all - the
@@ -51,6 +52,7 @@ export async function createLostCase(fields, photoFiles, owner) {
     lastSeenDateApprox: fields.lastSeenDateApprox || false,
     contactName: fields.contactName || '',
     contactPhone: fields.contactPhone || '',
+    normalizedPhone: normalizePhone(fields.contactPhone),
     notes: fields.notes || '',
     sourceGroupName: fields.sourceGroupName || '',
     originalPosterName: fields.originalPosterName || '',
@@ -110,6 +112,7 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       lastSeenDateApprox: fields.lastSeenDateApprox || false,
       contactName: fields.contactName || '',
       contactPhone: fields.contactPhone || '',
+      normalizedPhone: normalizePhone(fields.contactPhone),
       notes: fields.notes || '',
       closureDate: fields.closureDate || '',
       closedBy: fields.closedBy || '',
