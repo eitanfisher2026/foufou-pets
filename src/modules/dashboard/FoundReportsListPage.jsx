@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RECORD_STATUS, FOUND_REPORT_STATUS_LABELS } from '../shared/collections.js';
 import { petLabels } from '../shared/petLabels.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
@@ -18,7 +19,15 @@ import { usePaginatedList } from '../shared/usePaginatedList.js';
  * needs to see records beyond what's currently on screen.
  */
 export default function FoundReportsListPage() {
-  const { preferredSpecies, roleLoading } = useAuth();
+  const { preferredSpecies, setPreferredSpecies, roleLoading } = useAuth();
+  const [searchParams] = useSearchParams();
+  // Set when arriving here from the match-analysis page after running out
+  // of pending candidates to auto-advance through in the "report" direction
+  // (see MatchAnalysisPage.jsx) - names the found report whose row to
+  // scroll to and highlight below, and the species to switch to first if
+  // that report isn't the one currently shown.
+  const focusReportId = searchParams.get('focus');
+  const focusSpecies = searchParams.get('focusSpecies');
   // Same server-side species filter and roleLoading gate as the dashboard's
   // lost-case list (see Dashboard.jsx/dashboardApi.js) - only the current
   // species is ever fetched, re-fetched on toggle switch.
@@ -36,6 +45,29 @@ export default function FoundReportsListPage() {
     setTotalCount(null);
     countFoundReports(preferredSpecies).then(setTotalCount);
   }, [preferredSpecies, roleLoading]);
+
+  // Rare in practice (matches are always same-species, so this only fires
+  // if the review that sent someone back here started from the other
+  // species' tab) - same reasoning as Dashboard.jsx's equivalent effect.
+  useEffect(() => {
+    if (roleLoading || !focusSpecies || focusSpecies === preferredSpecies) return;
+    setPreferredSpecies(focusSpecies);
+  }, [roleLoading, focusSpecies, preferredSpecies]);
+
+  // The report to scroll to and highlight might not be on the first loaded
+  // page yet (see usePaginatedList) - keep paging in further batches until
+  // it turns up or the list genuinely runs out.
+  useEffect(() => {
+    if (!focusReportId || loading || loadingMore || !hasMore) return;
+    if (reports.some((r) => r.id === focusReportId)) return;
+    loadMore();
+  }, [focusReportId, reports, loading, loadingMore, hasMore]);
+
+  useEffect(() => {
+    if (!focusReportId) return;
+    const el = document.getElementById(`report-${focusReportId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusReportId, reports]);
 
   const visibleReports = reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED);
 
@@ -59,7 +91,7 @@ export default function FoundReportsListPage() {
 
       <ul className="space-y-2">
         {visibleReports.map((r) => (
-          <FoundReportRow key={r.id} report={r} statusLabels={FOUND_REPORT_STATUS_LABELS} />
+          <FoundReportRow key={r.id} report={r} statusLabels={FOUND_REPORT_STATUS_LABELS} highlighted={r.id === focusReportId} />
         ))}
       </ul>
 

@@ -878,7 +878,14 @@ export default function LostCaseDetail() {
         </p>
       ) : (
         <>
-          <h3 className="mb-2 text-sm font-semibold text-slate-600">ממתינות לבדיקה ({pendingReview.length})</h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-slate-600">ממתינות לבדיקה ({pendingReview.length})</h3>
+            {pendingReview.length > 0 && (
+              <Link to={`/lost/${caseId}/analysis/${pendingReview[0].foundReportId}`} className="text-xs text-slate-500 underline">
+                בדיקה מסודרת אחת אחרי השנייה
+              </Link>
+            )}
+          </div>
           {pendingReview.length > 0 ? (
             <ul className="mb-6 space-y-3">
               {pendingReview.map((m) => (

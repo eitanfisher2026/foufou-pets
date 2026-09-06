@@ -146,11 +146,16 @@ export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showT
   );
 }
 
-export function FoundReportRow({ report: r, statusLabels, showTypeBadge }) {
+export function FoundReportRow({ report: r, statusLabels, showTypeBadge, highlighted }) {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const typeBadge = showTypeBadge ? typeBadgeFromRecordNumber(r.recordNumber, 'נמצא') : null;
   return (
-    <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
+    <li
+      id={`report-${r.id}`}
+      className={`flex items-start gap-3 rounded-xl border bg-white p-3 hover:bg-slate-50 ${
+        highlighted ? 'border-blue-400 ring-2 ring-blue-400 ring-offset-2' : 'border-slate-200'
+      }`}
+    >
       <RowThumbnail photo={r.photos?.[0]} onOpen={setLightboxUrl} />
       <Link to={`/found/${r.id}`} className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

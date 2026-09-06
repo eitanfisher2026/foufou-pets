@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getMatch, getMatches, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { getMatch, getMatches, getMatchesForFoundReport, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
@@ -45,17 +45,25 @@ function formatFieldValue(v) {
 export default function MatchAnalysisPage() {
   const { caseId, foundReportId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Which side this review session is actually working through: 'case'
+  // (default) walks this lost case's other found-report candidates, set by
+  // every entry point that starts from a lost case's own page. 'report'
+  // walks this found report's other lost-case candidates instead, set by
+  // FoundReportDetail.jsx's links - the URL alone (a caseId+foundReportId
+  // pair either way) can't tell these apart, so the link that got you here
+  // has to say which list it's stepping through.
+  const dir = searchParams.get('dir') === 'report' ? 'report' : 'case';
   const [match, setMatch] = useState(null);
   const [lostCase, setLostCase] = useState(null);
   const [foundReport, setFoundReport] = useState(null);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [rechecking, setRechecking] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
-  // The case's full match list, sorted by score (see getMatches) - lets
-  // marking "אין התאמה" below jump straight to the next candidate instead
-  // of leaving the reviewer stranded on the one they just closed out. Only
-  // depends on caseId, not foundReportId, since it's the same list
-  // regardless of which candidate in it is currently open.
+  // The full candidate list for whichever side dir names, sorted by score
+  // (see getMatches/getMatchesForFoundReport) - lets marking "אין התאמה"
+  // below jump straight to the next candidate instead of leaving the
+  // reviewer stranded on the one they just closed out.
   const [allMatches, setAllMatches] = useState([]);
 
   useEffect(() => {
@@ -70,8 +78,9 @@ export default function MatchAnalysisPage() {
   }, [caseId, foundReportId]);
 
   useEffect(() => {
-    getMatches(caseId).then(setAllMatches);
-  }, [caseId]);
+    if (dir === 'report') getMatchesForFoundReport(foundReportId).then(setAllMatches);
+    else getMatches(caseId).then(setAllMatches);
+  }, [dir, caseId, foundReportId]);
 
   // The next candidate still awaiting a first decision (status NEW, same
   // "pendingReview" definition LostCaseDetail.jsx's cards use) after this
@@ -80,7 +89,10 @@ export default function MatchAnalysisPage() {
   // triaged. Recomputed from allMatches/match rather than stored, so it
   // stays correct as statuses change (e.g. right after marking this one
   // "אין התאמה").
-  const currentIndex = allMatches.findIndex((m) => m.foundReportId === foundReportId);
+  const currentIndex =
+    dir === 'report'
+      ? allMatches.findIndex((m) => m.lostCase.id === caseId)
+      : allMatches.findIndex((m) => m.foundReportId === foundReportId);
   const nextMatch =
     currentIndex >= 0 ? allMatches.slice(currentIndex + 1).find((m) => m.status === REPORT_STATUS.NEW) : null;
 
@@ -105,16 +117,20 @@ export default function MatchAnalysisPage() {
   // one-click shortcut for the single most common action after reading a
   // full analysis: ruling the pair out. Landing on "אין התאמה" specifically
   // (whether via that shortcut or picked from the dropdown) also moves on
-  // automatically - to the next still-pending candidate for this case if
-  // there is one. Once there isn't, this goes all the way back to the main
-  // list (not just the case's own page) focused on the lost pet the whole
-  // review was actually about - see Dashboard.jsx.
+  // automatically - to the next still-pending candidate on whichever side
+  // (dir) this review is walking through. Once there isn't one, this goes
+  // all the way back to that side's own main list (not just one case/
+  // report's own page), focused on the pet the whole review was actually
+  // about - see Dashboard.jsx/FoundReportsListPage.jsx.
   async function handleStatusChange(status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatch((prev) => ({ ...prev, status }));
     if (status === REPORT_STATUS.NOT_RELEVANT) {
       if (nextMatch) {
-        navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
+        if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
+        else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
+      } else if (dir === 'report') {
+        navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
       } else {
         navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
       }

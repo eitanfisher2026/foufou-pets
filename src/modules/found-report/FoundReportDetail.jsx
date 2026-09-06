@@ -829,7 +829,17 @@ export default function FoundReportDetail() {
             </p>
           ) : (
             <>
-              <h3 className="mb-2 text-sm font-semibold text-slate-600">ממתינות לבדיקה ({pendingReview.length})</h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-slate-600">ממתינות לבדיקה ({pendingReview.length})</h3>
+                {pendingReview.length > 0 && (
+                  <Link
+                    to={`/lost/${pendingReview[0].lostCase.id}/analysis/${report.id}?dir=report`}
+                    className="text-xs text-slate-500 underline"
+                  >
+                    בדיקה מסודרת אחת אחרי השנייה
+                  </Link>
+                )}
+              </div>
               {pendingReview.length > 0 ? (
                 <ul className="mb-6 space-y-3">
                   {pendingReview.map((m) => (
@@ -1053,7 +1063,7 @@ function ReverseMatchCard({
           עריכה
         </Link>
         <Link
-          to={`/lost/${lostCase.id}/analysis/${report.id}`}
+          to={`/lost/${lostCase.id}/analysis/${report.id}?dir=report`}
           className="flex-1 rounded-lg border border-slate-300 py-2 text-center text-sm font-medium text-slate-600"
         >
           ניתוח מלא
