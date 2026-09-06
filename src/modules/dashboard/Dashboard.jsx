@@ -92,8 +92,20 @@ export default function Dashboard() {
   // fetched only when actually needed (including once, on mount, if
   // restoring a 'found'/'both' search from the URL).
   const [searchParams, setSearchParams] = useSearchParams();
+  // Set when arriving here from the match-analysis page after running out
+  // of pending candidates to auto-advance through (see
+  // MatchAnalysisPage.jsx) - names the lost case whose row to scroll to
+  // and highlight below, and the species to switch to first if that case
+  // isn't the one currently shown. Excluded from the searchCriteria
+  // restore below - it isn't a search filter, and search's own field-based
+  // matching would treat these two keys as (nonsensical) criteria to match
+  // records against otherwise.
+  const focusCaseId = searchParams.get('focus');
+  const focusSpecies = searchParams.get('focusSpecies');
   const [searchCriteria, setSearchCriteriaState] = useState(() => {
     const fromUrl = Object.fromEntries(searchParams.entries());
+    delete fromUrl.focus;
+    delete fromUrl.focusSpecies;
     return Object.keys(fromUrl).length > 0 ? fromUrl : null;
   });
   const [foundReportsForSearch, setFoundReportsForSearch] = useState([]);
@@ -121,6 +133,33 @@ export default function Dashboard() {
   useEffect(() => {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
+
+  // In practice this only ever matters if the review that sent someone back
+  // here (see MatchAnalysisPage.jsx) happened to start from the other
+  // species' tab than the one currently selected - matches are always
+  // same-species, so this is rare, but switching (and saving, same as
+  // using the toggle by hand) avoids silently landing on a case that isn't
+  // even in the list this page is about to render.
+  useEffect(() => {
+    if (roleLoading || !focusSpecies || focusSpecies === preferredSpecies) return;
+    setPreferredSpecies(focusSpecies);
+  }, [roleLoading, focusSpecies, preferredSpecies]);
+
+  // The case to scroll to and highlight might not be on the first loaded
+  // page yet (see usePaginatedList) - keep paging in further batches until
+  // it turns up or the list genuinely runs out. Skipped during an active
+  // search, where this list isn't even what's rendered.
+  useEffect(() => {
+    if (!focusCaseId || hasActiveSearch || loading || loadingMore || !hasMore) return;
+    if (lostCases.some((c) => c.id === focusCaseId)) return;
+    loadMore();
+  }, [focusCaseId, hasActiveSearch, lostCases, loading, loadingMore, hasMore]);
+
+  useEffect(() => {
+    if (!focusCaseId || hasActiveSearch) return;
+    const el = document.getElementById(`case-${focusCaseId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusCaseId, hasActiveSearch, lostCases]);
 
   // Some search fields are species-specific (e.g. "תבנית פרווה" only
   // applies to cats) - clearing on toggle switch avoids a stale filter
@@ -321,6 +360,7 @@ export default function Dashboard() {
               statusLabels={LOST_CASE_STATUS_LABELS}
               confidenceColors={confidenceColors}
               showTypeBadge={activeRecordType === 'both'}
+              highlighted={c.id === focusCaseId}
             />
           ))}
           {foundResults.map((r) => (

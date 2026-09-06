@@ -103,11 +103,16 @@ function RowThumbnail({ photo, onOpen }) {
   );
 }
 
-export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showTypeBadge }) {
+export function LostCaseRow({ lostCase: c, statusLabels, confidenceColors, showTypeBadge, highlighted }) {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const typeBadge = showTypeBadge ? typeBadgeFromRecordNumber(c.recordNumber, 'אבד') : null;
   return (
-    <li className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 hover:bg-slate-50">
+    <li
+      id={`case-${c.id}`}
+      className={`flex items-start gap-3 rounded-xl border bg-white p-3 hover:bg-slate-50 ${
+        highlighted ? 'border-blue-400 ring-2 ring-blue-400 ring-offset-2' : 'border-slate-200'
+      }`}
+    >
       <RowThumbnail photo={c.photos?.[0]} onOpen={setLightboxUrl} />
       <Link to={`/lost/${c.id}`} className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

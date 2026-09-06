@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getMatch, getMatches, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
@@ -57,14 +57,6 @@ export default function MatchAnalysisPage() {
   // depends on caseId, not foundReportId, since it's the same list
   // regardless of which candidate in it is currently open.
   const [allMatches, setAllMatches] = useState([]);
-  // The very first candidate this page opened on, captured once on mount
-  // (a plain ref, not state - re-navigating to another candidate via
-  // handleStatusChange below keeps this component mounted, so the ref
-  // survives across it, but a genuinely fresh page load starts a new one).
-  // Once there's no next candidate left to jump to, this is where "back to
-  // the case" should land the reviewer - the pet they actually came here
-  // to check on, not whichever candidate they last happened to be viewing.
-  const startFoundReportIdRef = useRef(foundReportId);
 
   useEffect(() => {
     Promise.all([getMatch(caseId, foundReportId), getLostCase(caseId), getFoundReport(foundReportId)]).then(
@@ -114,8 +106,9 @@ export default function MatchAnalysisPage() {
   // full analysis: ruling the pair out. Landing on "אין התאמה" specifically
   // (whether via that shortcut or picked from the dropdown) also moves on
   // automatically - to the next still-pending candidate for this case if
-  // there is one, otherwise back to the case itself, focused on the
-  // candidate this review session actually started from.
+  // there is one. Once there isn't, this goes all the way back to the main
+  // list (not just the case's own page) focused on the lost pet the whole
+  // review was actually about - see Dashboard.jsx.
   async function handleStatusChange(status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatch((prev) => ({ ...prev, status }));
@@ -123,7 +116,7 @@ export default function MatchAnalysisPage() {
       if (nextMatch) {
         navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
       } else {
-        navigate(`/lost/${caseId}?focus=${startFoundReportIdRef.current}`);
+        navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
       }
     }
   }
