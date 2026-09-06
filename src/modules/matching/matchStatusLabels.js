@@ -28,12 +28,11 @@ export const MATCH_STATUS_LABELS = {
 
 // How much a status actually matters once a person has looked at it -
 // higher means more important/more likely to need real attention, not just
-// chronological order. Everything else here (both dropdown/section display
-// order, and which statuses count as "important" enough to call out on a
-// case's own row in the main list) derives from this one ranking instead
-// of being ordered by hand in more than one place. NEW isn't ranked - it's
-// not a decided status at all, and always gets its own always-open
-// "ממתינות לבדיקה" section/first dropdown entry instead of one of these.
+// chronological order. Used for isImportantMatchStatus below (which
+// statuses count as "important" enough to call out on a case's own row in
+// the main list). NEW isn't ranked - it's not a decided status at all, and
+// always gets its own always-open "ממתינות לבדיקה" section/first dropdown
+// entry instead of one of these.
 export const MATCH_STATUS_PRIORITY = {
   [REPORT_STATUS.NO_MATCH]: 1, // automatic, fully settled, never needs a second look
   [REPORT_STATUS.NO_MATCH_PHOTO]: 2, // automatic, fully settled
@@ -44,13 +43,24 @@ export const MATCH_STATUS_PRIORITY = {
   [REPORT_STATUS.CONTACTED]: 7, // real progress - the reporter's been reached, most urgent
 };
 
-// Least-important-first, matching the ranking above - the collapsible
-// sections below the pending-review list (see LostCaseDetail.jsx/
-// FoundReportDetail.jsx) and the status dropdown (see ORDERED_MATCH_STATUSES
-// below) both use this order.
-export const MATCH_STATUS_DISPLAY_ORDER = Object.keys(MATCH_STATUS_PRIORITY).sort(
-  (a, b) => MATCH_STATUS_PRIORITY[a] - MATCH_STATUS_PRIORITY[b]
-);
+// Display order for the collapsible sections below the pending-review list
+// (see LostCaseDetail.jsx/FoundReportDetail.jsx) and the status dropdown
+// (see ORDERED_MATCH_STATUSES below) - deliberately NOT just a sort by the
+// priority ranking above, since scanning order and importance ranking turn
+// out to want different shapes: the two statuses actually worth acting on
+// go first so they're never buried under 62 settled ones, and everything
+// else keeps its previous least-important-first order after that (so e.g.
+// NOT_RELEVANT still reads as grouped with the two automatic no-match
+// outcomes right after it, not off on its own).
+export const MATCH_STATUS_DISPLAY_ORDER = [
+  REPORT_STATUS.NEEDS_FOLLOWUP,
+  REPORT_STATUS.CONTACTED,
+  REPORT_STATUS.NO_MATCH,
+  REPORT_STATUS.NO_MATCH_PHOTO,
+  REPORT_STATUS.NOT_RELEVANT,
+  REPORT_STATUS.CLOSED,
+  REPORT_STATUS.REVIEWING,
+];
 
 // Every status a person can actually pick, in display order, NEW first -
 // what the status-change dropdown (see DropdownBadge's `order` prop) renders
