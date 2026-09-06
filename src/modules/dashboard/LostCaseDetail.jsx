@@ -68,7 +68,12 @@ import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import ClosureDialog from '../shared/ClosureDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
-import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, MATCH_STATUS_DISPLAY_ORDER } from '../matching/matchStatusLabels.js';
+import {
+  MATCH_STATUS_LABELS,
+  MATCH_STATUS_COLORS,
+  MATCH_STATUS_DISPLAY_ORDER,
+  ORDERED_MATCH_STATUSES,
+} from '../matching/matchStatusLabels.js';
 
 const EXTRACTION_FIELD_DEFS = [
   { targetKey: 'name', extractedKey: 'petName', label: 'שם החיה' },
@@ -1055,6 +1060,7 @@ function MatchCard({
         <DropdownBadge
           value={match.status}
           labels={MATCH_STATUS_LABELS}
+          order={ORDERED_MATCH_STATUSES}
           onChange={(status) => onStatusChange(match.foundReportId, status)}
           colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
         />

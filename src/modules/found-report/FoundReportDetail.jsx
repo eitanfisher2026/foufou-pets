@@ -58,7 +58,12 @@ import {
 } from '../matching/matchingApi.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
-import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, MATCH_STATUS_DISPLAY_ORDER } from '../matching/matchStatusLabels.js';
+import {
+  MATCH_STATUS_LABELS,
+  MATCH_STATUS_COLORS,
+  MATCH_STATUS_DISPLAY_ORDER,
+  ORDERED_MATCH_STATUSES,
+} from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
@@ -1007,6 +1012,7 @@ function ReverseMatchCard({
         <DropdownBadge
           value={match.status}
           labels={MATCH_STATUS_LABELS}
+          order={ORDERED_MATCH_STATUSES}
           onChange={(status) => onStatusChange(lostCase.id, status)}
           colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
         />

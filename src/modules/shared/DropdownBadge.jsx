@@ -9,8 +9,15 @@ import { useEffect, useRef, useState } from 'react';
  * matter what CSS was applied, making them render oversized regardless of
  * padding/height. A fully custom dropdown has no native form-control
  * chrome to fight, so its size is exactly what this CSS says.
+ *
+ * `order` is an optional array of keys controlling the menu's option
+ * order - falls back to `labels`' own object key order when omitted,
+ * which for a plain object literal is exactly its declared order (fine
+ * for a genuinely arbitrary set of options, fragile for one where the
+ * order itself is meaningful - see ORDERED_MATCH_STATUSES in
+ * matchStatusLabels.js for a real one).
  */
-export default function DropdownBadge({ value, labels, onChange, colorClass = 'bg-slate-100 text-slate-600' }) {
+export default function DropdownBadge({ value, labels, order, onChange, colorClass = 'bg-slate-100 text-slate-600' }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -44,7 +51,7 @@ export default function DropdownBadge({ value, labels, onChange, colorClass = 'b
           className="absolute z-20 mt-1 min-w-max overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
           style={{ insetInlineEnd: 0 }}
         >
-          {Object.entries(labels).map(([v, label]) => (
+          {(order || Object.keys(labels)).map((v) => (
             <button
               key={v}
               type="button"
@@ -56,7 +63,7 @@ export default function DropdownBadge({ value, labels, onChange, colorClass = 'b
                 v === value ? 'font-semibold text-slate-800' : 'text-slate-600'
               }`}
             >
-              {label}
+              {labels[v]}
             </button>
           ))}
         </div>

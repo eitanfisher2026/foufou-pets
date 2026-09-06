@@ -11,7 +11,7 @@ import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
-import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from './matchStatusLabels.js';
+import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, ORDERED_MATCH_STATUSES } from './matchStatusLabels.js';
 import { getMatchConfig } from './matchConfigApi.js';
 
 const VERDICT_STYLES = {
@@ -187,6 +187,7 @@ export default function MatchAnalysisPage() {
           <DropdownBadge
             value={match.status}
             labels={MATCH_STATUS_LABELS}
+            order={ORDERED_MATCH_STATUSES}
             onChange={handleStatusChange}
             colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
           />

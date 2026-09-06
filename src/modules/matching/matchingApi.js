@@ -362,7 +362,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   const visual = reusableVisual || (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
   const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
 
-  // Only a real triage status (REVIEWING, NOT_RELEVANT, LIKELY_MATCH,
+  // Only a real triage status (REVIEWING, NOT_RELEVANT, NEEDS_FOLLOWUP,
   // CONTACTED, CLOSED, ...) means a person actually looked at this pairing,
   // and only that should survive a re-score untouched. Otherwise the
   // auto-verdict needs to track whatever the current score/photo check
@@ -446,6 +446,47 @@ export async function rescanAllLostCases(onProgress) {
   }
 
   return { casesProcessed: lostCases.length, matchesScored, visualMatches };
+}
+
+// 'likely_match' isn't a real REPORT_STATUS value any more (see the
+// migration below and the comment on REPORT_STATUS.NEEDS_FOLLOWUP in
+// collections.js) - a bare string, not an enum reference, since there's
+// nothing left to reference once it's removed. Only exists to find and fix
+// whatever matches were already saved with it before this change.
+const LEGACY_LIKELY_MATCH_STATUS = 'likely_match';
+
+/**
+ * One-off admin migration, meant to be run once after the REPORT_STATUS
+ * changes above: any match still carrying the old 'likely_match' status
+ * gets moved to NEEDS_FOLLOWUP (its closest surviving equivalent - see the
+ * comment on that status in collections.js), then every lost case's
+ * denormalized matchCount/newMatchCount/importantMatchCount/topMatchScore/
+ * hasVisualMatch (see recomputeLostCaseCounts above) gets recomputed from
+ * whatever's actually stored now. No rescoring, no AI - nowhere near the
+ * cost of rescanAllLostCases. The recompute step alone is also what a case
+ * whose matches haven't changed since importantMatchCount was introduced
+ * needs, to show a current count on its row in the main list (see
+ * MatchSummaryRow in RecordRows.jsx) without waiting for something else to
+ * trigger it. Every lost case is included, not just active ones, so the
+ * counters stay honest even for an archived/resolved case someone
+ * navigates back to directly.
+ */
+export async function migrateLegacyMatchStatusesAndCounters(onProgress) {
+  const legacySnap = await getDocs(query(collectionGroup(db, 'matches'), where('status', '==', LEGACY_LIKELY_MATCH_STATUS)));
+  if (legacySnap.docs.length > 0) {
+    const batch = writeBatch(db);
+    legacySnap.docs.forEach((d) => batch.update(d.ref, { status: REPORT_STATUS.NEEDS_FOLLOWUP }));
+    await batch.commit();
+  }
+
+  const snap = await getDocs(collection(db, COLLECTIONS.LOST_CASES));
+  const ids = snap.docs.map((d) => d.id);
+  onProgress?.(0, ids.length);
+  for (let i = 0; i < ids.length; i++) {
+    await recomputeLostCaseCounts(ids[i]);
+    onProgress?.(i + 1, ids.length);
+  }
+  return { legacyStatusesFixed: legacySnap.docs.length, casesProcessed: ids.length };
 }
 
 /**

@@ -288,9 +288,13 @@ export const REPORT_STATUS = {
   // field - see applyVisualVerdict in matchingApi.js.
   NO_MATCH_PHOTO: 'no_match_photo',
   REVIEWING: 'reviewing',
+  // Covers what used to be a separate LIKELY_MATCH status too - "this looks
+  // like the real one" is itself a reason it needs a follow-up action, not
+  // a meaningfully different state from "needs follow-up" for some other
+  // reason (see matchStatusLabels.js/matchingApi.js for the migration that
+  // folded existing likely_match matches into this one).
   NEEDS_FOLLOWUP: 'needs_followup',
   NOT_RELEVANT: 'not_relevant',
-  LIKELY_MATCH: 'likely_match',
   CONTACTED: 'contacted',
   CLOSED: 'closed',
 };
