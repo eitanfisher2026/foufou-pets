@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMatch, checkSingleMatch } from './matchingApi.js';
+import { getMatch, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
@@ -10,6 +10,8 @@ import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import BackLink from '../shared/BackLink.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
+import DropdownBadge from '../shared/DropdownBadge.jsx';
+import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS } from './matchStatusLabels.js';
 import { getMatchConfig } from './matchConfigApi.js';
 
 const VERDICT_STYLES = {
@@ -76,6 +78,16 @@ export default function MatchAnalysisPage() {
     }
   }
 
+  // This page used to be read-only for status too - changing it meant
+  // navigating back to the match card. Same DropdownBadge/status labels as
+  // the cards (see LostCaseDetail.jsx/FoundReportDetail.jsx), plus a
+  // one-click shortcut for the single most common action after reading a
+  // full analysis: ruling the pair out.
+  async function handleStatusChange(status) {
+    await updateMatchStatus(caseId, foundReportId, status);
+    setMatch((prev) => ({ ...prev, status }));
+  }
+
   if (!match || !lostCase || !foundReport) return <p className="p-4 text-slate-500">טוען...</p>;
 
   return (
@@ -106,6 +118,27 @@ export default function MatchAnalysisPage() {
         >
           {rechecking ? 'סורק מחדש...' : 'בדיקה חוזרת'}
         </button>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-slate-600">סטטוס בדיקה:</span>
+        <div className="flex items-center gap-2">
+          {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+            <button
+              type="button"
+              onClick={() => handleStatusChange(REPORT_STATUS.NOT_RELEVANT)}
+              className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500"
+            >
+              ✕ אין התאמה
+            </button>
+          )}
+          <DropdownBadge
+            value={match.status}
+            labels={MATCH_STATUS_LABELS}
+            onChange={handleStatusChange}
+            colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+          />
+        </div>
       </div>
 
       {(lostCase.photos?.[0]?.url || foundReport.photos?.[0]?.url) && (

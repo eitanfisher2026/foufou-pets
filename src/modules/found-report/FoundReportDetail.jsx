@@ -995,7 +995,16 @@ function ReverseMatchCard({
           </button>
         )}
       </div>
-      <div className="mb-2 flex justify-end">
+      <div className="mb-2 flex items-center justify-end gap-2">
+        {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+          <button
+            type="button"
+            onClick={() => onStatusChange(lostCase.id, REPORT_STATUS.NOT_RELEVANT)}
+            className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500"
+          >
+            ✕ אין התאמה
+          </button>
+        )}
         <DropdownBadge
           value={match.status}
           labels={MATCH_STATUS_LABELS}
