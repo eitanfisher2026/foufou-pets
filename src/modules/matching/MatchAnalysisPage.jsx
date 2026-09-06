@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getMatch, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
+import { getMatch, getMatches, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
 import { getFoundReport } from '../found-report/foundReportApi.js';
@@ -51,6 +51,20 @@ export default function MatchAnalysisPage() {
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [rechecking, setRechecking] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  // The case's full match list, sorted by score (see getMatches) - lets
+  // marking "אין התאמה" below jump straight to the next candidate instead
+  // of leaving the reviewer stranded on the one they just closed out. Only
+  // depends on caseId, not foundReportId, since it's the same list
+  // regardless of which candidate in it is currently open.
+  const [allMatches, setAllMatches] = useState([]);
+  // The very first candidate this page opened on, captured once on mount
+  // (a plain ref, not state - re-navigating to another candidate via
+  // handleStatusChange below keeps this component mounted, so the ref
+  // survives across it, but a genuinely fresh page load starts a new one).
+  // Once there's no next candidate left to jump to, this is where "back to
+  // the case" should land the reviewer - the pet they actually came here
+  // to check on, not whichever candidate they last happened to be viewing.
+  const startFoundReportIdRef = useRef(foundReportId);
 
   useEffect(() => {
     Promise.all([getMatch(caseId, foundReportId), getLostCase(caseId), getFoundReport(foundReportId)]).then(
@@ -62,6 +76,21 @@ export default function MatchAnalysisPage() {
     );
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, [caseId, foundReportId]);
+
+  useEffect(() => {
+    getMatches(caseId).then(setAllMatches);
+  }, [caseId]);
+
+  // The next candidate still awaiting a first decision (status NEW, same
+  // "pendingReview" definition LostCaseDetail.jsx's cards use) after this
+  // one's position in the score-sorted list - not just the literal next
+  // array entry, so clicking through doesn't wander back over ones already
+  // triaged. Recomputed from allMatches/match rather than stored, so it
+  // stays correct as statuses change (e.g. right after marking this one
+  // "אין התאמה").
+  const currentIndex = allMatches.findIndex((m) => m.foundReportId === foundReportId);
+  const nextMatch =
+    currentIndex >= 0 ? allMatches.slice(currentIndex + 1).find((m) => m.status === REPORT_STATUS.NEW) : null;
 
   // This page used to be pure read-only - seeing a stale or missing photo
   // comparison here (e.g. a match scored before the photo threshold cleared
@@ -82,10 +111,21 @@ export default function MatchAnalysisPage() {
   // navigating back to the match card. Same DropdownBadge/status labels as
   // the cards (see LostCaseDetail.jsx/FoundReportDetail.jsx), plus a
   // one-click shortcut for the single most common action after reading a
-  // full analysis: ruling the pair out.
+  // full analysis: ruling the pair out. Landing on "אין התאמה" specifically
+  // (whether via that shortcut or picked from the dropdown) also moves on
+  // automatically - to the next still-pending candidate for this case if
+  // there is one, otherwise back to the case itself, focused on the
+  // candidate this review session actually started from.
   async function handleStatusChange(status) {
     await updateMatchStatus(caseId, foundReportId, status);
     setMatch((prev) => ({ ...prev, status }));
+    if (status === REPORT_STATUS.NOT_RELEVANT) {
+      if (nextMatch) {
+        navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
+      } else {
+        navigate(`/lost/${caseId}?focus=${startFoundReportIdRef.current}`);
+      }
+    }
   }
 
   if (!match || !lostCase || !foundReport) return <p className="p-4 text-slate-500">טוען...</p>;

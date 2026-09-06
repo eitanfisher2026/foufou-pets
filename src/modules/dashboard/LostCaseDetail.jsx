@@ -100,6 +100,12 @@ export default function LostCaseDetail() {
   const navigate = useNavigate();
   const { user, isEditorOrAdmin } = useAuth();
   const [searchParams] = useSearchParams();
+  // Set when arriving back here from the match-analysis page after running
+  // out of pending candidates to auto-advance through (see
+  // MatchAnalysisPage.jsx) - names the exact match card to scroll to and
+  // highlight below, so the reviewer lands back on the pet they actually
+  // came here to check on rather than a plain, unfocused list.
+  const focusReportId = searchParams.get('focus');
   const [lostCase, setLostCase] = useState(null);
   const [matches, setMatches] = useState([]);
   const [reportsById, setReportsById] = useState({});
@@ -167,6 +173,24 @@ export default function LostCaseDetail() {
   useEffect(() => {
     getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
   }, []);
+
+  // The focused card might be sitting in a collapsed "ללא התאמה"/"טופלו"
+  // section (both start closed) - expand whichever one actually holds it
+  // before trying to scroll to it, or the element just won't be in the DOM
+  // yet.
+  useEffect(() => {
+    if (!focusReportId) return;
+    const m = matches.find((m) => m.foundReportId === focusReportId);
+    if (!m) return;
+    if (m.status === REPORT_STATUS.NO_MATCH || m.status === REPORT_STATUS.NO_MATCH_PHOTO) setShowNoMatch(true);
+    else if (m.status !== REPORT_STATUS.NEW) setShowProcessed(true);
+  }, [focusReportId, matches]);
+
+  useEffect(() => {
+    if (!focusReportId) return;
+    const el = document.getElementById(`match-${focusReportId}`);
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [focusReportId, matches, showNoMatch, showProcessed]);
 
   // Compares against the last-loaded/last-saved case, not just whether
   // edit mode is open - entering edit mode without touching anything
@@ -897,6 +921,7 @@ export default function LostCaseDetail() {
                   onDeleted={handleFoundReportDeleted}
                   user={user}
                   isEditorOrAdmin={isEditorOrAdmin}
+                  highlighted={m.foundReportId === focusReportId}
                 />
               ))}
             </ul>
@@ -927,6 +952,7 @@ export default function LostCaseDetail() {
                       onDeleted={handleFoundReportDeleted}
                       user={user}
                       isEditorOrAdmin={isEditorOrAdmin}
+                      highlighted={m.foundReportId === focusReportId}
                     />
                   ))}
                 </ul>
@@ -955,6 +981,7 @@ export default function LostCaseDetail() {
                       onDeleted={handleFoundReportDeleted}
                       user={user}
                       isEditorOrAdmin={isEditorOrAdmin}
+                      highlighted={m.foundReportId === focusReportId}
                     />
                   ))}
                 </ul>
@@ -1007,6 +1034,7 @@ function MatchCard({
   onDeleted,
   user,
   isEditorOrAdmin,
+  highlighted,
 }) {
   const [showCatDetails, setShowCatDetails] = useState(false);
   const [showNotify, setShowNotify] = useState(false);
@@ -1034,7 +1062,12 @@ function MatchCard({
   }
 
   return (
-    <li className="rounded-xl border border-slate-200 bg-white p-4">
+    <li
+      id={`match-${match.foundReportId}`}
+      className={`rounded-xl border bg-white p-4 ${
+        highlighted ? 'border-blue-400 ring-2 ring-blue-400 ring-offset-2' : 'border-slate-200'
+      }`}
+    >
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="flex shrink-0 items-center gap-2 font-medium text-slate-800">
           רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
