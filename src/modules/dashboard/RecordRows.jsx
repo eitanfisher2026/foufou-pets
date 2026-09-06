@@ -16,7 +16,7 @@ const STATUS_BADGE_COLORS = {
   [RECORD_STATUS.RESOLVED]: 'bg-blue-100 text-blue-800',
 };
 
-export function StatusBadge({ status, labels }) {
+function StatusBadge({ status, labels }) {
   if (!status || status === RECORD_STATUS.ACTIVE) return null;
   return (
     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_BADGE_COLORS[status] || 'bg-slate-100 text-slate-600'}`}>

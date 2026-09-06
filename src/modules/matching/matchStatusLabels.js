@@ -33,7 +33,7 @@ export const MATCH_STATUS_LABELS = {
 // the main list). NEW isn't ranked - it's not a decided status at all, and
 // always gets its own always-open "ממתינות לבדיקה" section/first dropdown
 // entry instead of one of these.
-export const MATCH_STATUS_PRIORITY = {
+const MATCH_STATUS_PRIORITY = {
   [REPORT_STATUS.NO_MATCH]: 1, // automatic, fully settled, never needs a second look
   [REPORT_STATUS.NO_MATCH_PHOTO]: 2, // automatic, fully settled
   [REPORT_STATUS.NOT_RELEVANT]: 3, // a person already ruled it out - no follow-up needed, same as the two above

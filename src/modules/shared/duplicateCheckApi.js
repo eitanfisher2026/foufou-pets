@@ -50,7 +50,7 @@ const MIN_PHONE_DIGITS = 7;
  * existed won't match here until it's next edited/re-saved, or until the
  * one-off backfillNormalizedPhones migration below runs.
  */
-export async function findDuplicatesByContactPhone(recordType, contactPhone) {
+async function findDuplicatesByContactPhone(recordType, contactPhone) {
   const digits = normalizePhone(contactPhone);
   if (digits.length < MIN_PHONE_DIGITS) return [];
   const collectionName = recordType === 'lost' ? COLLECTIONS.LOST_CASES : COLLECTIONS.FOUND_REPORTS;

@@ -71,7 +71,7 @@ export function buildNotifyFinderMessage(report, lostCase) {
 // "0" - e.g. "054-123-4567" -> "972541234567". Same normalization
 // direction as duplicateCheckApi.js's phone matching, just inverted (that
 // one strips 972 back to a leading 0 for comparison; this one adds it).
-export function toWhatsAppNumber(phone) {
+function toWhatsAppNumber(phone) {
   let digits = (phone || '').replace(/\D/g, '');
   if (digits.startsWith('0')) digits = '972' + digits.slice(1);
   return digits;
