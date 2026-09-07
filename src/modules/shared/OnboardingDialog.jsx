@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { usePwaInstall } from './usePwaInstall.js';
-import { getHelpContent } from './helpContentApi.js';
+import HelpCard from './HelpCard.jsx';
+import { GETTING_STARTED_CARDS } from './helpContent.js';
 
 /**
  * Shown automatically, once, the first time someone ever signs in (see
@@ -9,24 +10,19 @@ import { getHelpContent } from './helpContentApi.js';
  * just hides it without marking anything as seen.
  *
  * Two explicit steps, not one long scrollable page - step 1 (welcome +
- * install) used to sit directly above the exact same "how it works" text
+ * install) used to sit directly above the exact same "how it works" content
  * HelpDialog shows, so the whole thing read as "the ordinary help screen,
  * just appeared instantly" rather than an actual welcome moment. Now step 2
  * only shows once someone deliberately presses "המשך", not the instant the
- * dialog opens. Reuses the exact same admin-editable "how does this work"
- * text as HelpDialog.jsx (fetched eagerly, in the background, so it's
- * already there by the time step 2 is reached) - read-only here, so
- * there's only ever one copy of that explanation to keep current.
+ * dialog opens. Reuses the exact same GETTING_STARTED_CARDS as HelpDialog.jsx
+ * (see helpContent.js) - just that one list, not the "יכולות נוספות" tab,
+ * since a brand-new user needs the walkthrough first, not the full
+ * reference - so there's only ever one copy of that content to keep current.
  */
 export default function OnboardingDialog({ onClose }) {
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [step, setStep] = useState(1);
   const [showIosGuide, setShowIosGuide] = useState(false);
-  const [helpText, setHelpText] = useState(null);
-
-  useEffect(() => {
-    getHelpContent().then(setHelpText);
-  }, []);
 
   async function handleInstallClick() {
     if (canPrompt) {
@@ -84,12 +80,10 @@ export default function OnboardingDialog({ onClose }) {
             )}
           </div>
         ) : (
-          <div className="p-4">
-            {helpText === null ? (
-              <p className="text-sm text-slate-400">טוען...</p>
-            ) : (
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{helpText}</p>
-            )}
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto p-4">
+            {GETTING_STARTED_CARDS.map((card) => (
+              <HelpCard key={card.title} {...card} />
+            ))}
           </div>
         )}
 

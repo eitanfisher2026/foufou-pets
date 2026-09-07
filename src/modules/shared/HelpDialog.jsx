@@ -1,47 +1,26 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '../auth/AuthProvider.jsx';
-import { getHelpContent, saveHelpContent } from './helpContentApi.js';
+import { useState } from 'react';
+import HelpCard from './HelpCard.jsx';
+import { GETTING_STARTED_CARDS, ADDITIONAL_CARDS } from './helpContent.js';
 
 /**
  * "How does this work" explainer, reached via the ℹ️ button next to the
- * dashboard header. Admin-editable (Firestore-backed, config/helpContent),
- * same edit/save/cancel pattern as AboutDialog.jsx - a regular user just
- * reads it.
+ * dashboard header - two tabs (a sequential getting-started walkthrough,
+ * and a reference list of features that don't have a natural order), same
+ * shape as SuperZola's own help screen. Used to be one long admin-editable
+ * paragraph; this content is hardcoded now (see helpContent.js) since a
+ * structured walkthrough like this is worth reviewing like any other code
+ * change, not something that holds up as a wall of text in a textarea.
  */
 export default function HelpDialog({ onClose }) {
-  const { isAdmin } = useAuth();
-  const [text, setText] = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    getHelpContent().then(setText);
-  }, []);
-
-  function startEditing() {
-    setDraft(text || '');
-    setEditing(true);
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await saveHelpContent(draft);
-      setText(draft);
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  }
+  const [tab, setTab] = useState('start');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div
-        className="max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-lg"
+        className="flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between rounded-t-2xl bg-gradient-to-l from-blue-500 to-indigo-500 px-4 py-3 text-white">
+        <div className="flex items-center justify-between bg-gradient-to-l from-blue-500 to-indigo-500 px-4 py-3 text-white">
           <h2 className="flex items-center gap-2 text-base font-bold">
             <span>ℹ️</span> איך זה עובד?
           </h2>
@@ -50,47 +29,33 @@ export default function HelpDialog({ onClose }) {
           </button>
         </div>
 
-        <div className="p-4">
-          {text === null ? (
-            <p className="text-sm text-slate-400">טוען...</p>
-          ) : editing ? (
-            <>
-              <textarea
-                className="input w-full"
-                rows={16}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="כתבו כאן את תוכן העזרה..."
-              />
-              <div className="mt-3 flex gap-2">
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex-1 rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-                >
-                  {saving ? 'שומר...' : '💾 שמירה'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(false)}
-                  disabled={saving}
-                  className="flex-1 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
-                >
-                  ביטול
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{text}</p>
-              {isAdmin && (
-                <button type="button" onClick={startEditing} className="mt-3 text-xs text-blue-600 underline">
-                  ✏️ עריכה
-                </button>
-              )}
-            </>
-          )}
+        <div className="flex justify-center border-b border-slate-100 px-4 pt-3">
+          <div className="flex gap-1 rounded-full bg-slate-100 p-1">
+            <button
+              type="button"
+              onClick={() => setTab('start')}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                tab === 'start' ? 'bg-slate-800 text-white' : 'text-slate-500'
+              }`}
+            >
+              התחלת עבודה
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('more')}
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
+                tab === 'more' ? 'bg-slate-800 text-white' : 'text-slate-500'
+              }`}
+            >
+              יכולות נוספות
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2 overflow-y-auto p-4">
+          {(tab === 'start' ? GETTING_STARTED_CARDS : ADDITIONAL_CARDS).map((card) => (
+            <HelpCard key={card.title} {...card} />
+          ))}
         </div>
 
         <div className="border-t border-slate-100 px-4 py-3 text-center">
