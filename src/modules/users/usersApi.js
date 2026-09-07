@@ -1,6 +1,6 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { SPECIES } from '../shared/collections.js';
+import { SPECIES, COLLECTIONS } from '../shared/collections.js';
 
 export const COLLECTION = 'users';
 
@@ -95,6 +95,44 @@ export async function updateUserRole(uid, role) {
 // someone back to the default, it never locks them out.
 export async function deleteUser(uid) {
   await deleteDoc(doc(db, COLLECTION, uid));
+}
+
+// Fulfills the privacy policy's "request deletion of your personal data"
+// (see public/privacy.html) - unlike deleteUser above, which only ever
+// touched their own profile doc, this clears the personal-contact fields
+// (name/email/phone) off every lost case and found report they created,
+// plus their name/email on every feedback thread they sent. Deliberately
+// leaves the records themselves (photos, pet details, matches, message
+// text) in place - those aren't this person's personal data, and other
+// people still rely on that content (an active match, a support history)
+// even once this person's own identifying info is gone from it. A single
+// batch is safe at this app's scale (well under Firestore's 500-write
+// limit for any one person's own records); would need chunking if that
+// ever stopped being true.
+export async function clearUserReference(uid) {
+  const [lostCasesSnap, foundReportsSnap, feedbackSnap] = await Promise.all([
+    getDocs(query(collection(db, COLLECTIONS.LOST_CASES), where('ownerId', '==', uid))),
+    getDocs(query(collection(db, COLLECTIONS.FOUND_REPORTS), where('reportedByUid', '==', uid))),
+    getDocs(query(collection(db, 'feedbackThreads'), where('userId', '==', uid))),
+  ]);
+
+  const batch = writeBatch(db);
+  lostCasesSnap.docs.forEach((d) => {
+    batch.update(d.ref, { ownerName: '', ownerEmail: '', contactName: '', contactPhone: '', normalizedPhone: '' });
+  });
+  foundReportsSnap.docs.forEach((d) => {
+    batch.update(d.ref, { reporterName: '', reporterEmail: '', contactName: '', contactPhone: '', normalizedPhone: '' });
+  });
+  feedbackSnap.docs.forEach((d) => {
+    batch.update(d.ref, { senderName: '', senderEmail: '' });
+  });
+  await batch.commit();
+
+  return {
+    lostCasesCleared: lostCasesSnap.docs.length,
+    foundReportsCleared: foundReportsSnap.docs.length,
+    feedbackThreadsCleared: feedbackSnap.docs.length,
+  };
 }
 
 /** Self-service: marks the first-login onboarding dialog as seen, for good. */

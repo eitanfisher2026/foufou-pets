@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import BackLink from '../shared/BackLink.jsx';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listUsers, updateUserRole, deleteUser, ROLES, ROLE_LABELS } from '../users/usersApi.js';
+import { listUsers, updateUserRole, deleteUser, clearUserReference, ROLES, ROLE_LABELS } from '../users/usersApi.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import SelectField from '../shared/SelectField.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
@@ -19,6 +19,11 @@ export default function UsersSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [savingUid, setSavingUid] = useState(null);
   const [disconnectingUid, setDisconnectingUid] = useState(null);
+  const [clearingUid, setClearingUid] = useState(null);
+  // Keyed by uid, so the "done, N cleared" confirmation stays attached to
+  // whichever row it's actually about, even after clearing several people
+  // in a row.
+  const [clearedResults, setClearedResults] = useState({});
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
@@ -40,6 +45,29 @@ export default function UsersSettingsPage() {
       setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role } : u)));
     } finally {
       setSavingUid(null);
+    }
+  }
+
+  // Fulfills the actual deletion right described in the privacy policy
+  // (public/privacy.html, section 5) - unlike "ניתוק" below, this doesn't
+  // touch their account/login at all; it clears their name/email/phone off
+  // every lost case and found report they created, and their name/email on
+  // every feedback thread they sent, leaving the records themselves (and
+  // their ability to keep using the app) untouched. The two actions answer
+  // different questions ("delete my personal info" vs. "remove my access")
+  // and either one alone doesn't do the other.
+  async function handleClearReference(u) {
+    const ok = await confirm(
+      `לנקות את פרטי הקשר של ${u.displayName || u.email} מהמערכת? השם, האימייל והטלפון שלהם יימחקו מכל תיק חיפוש, דיווח ופנייה שיצרו - אבל התיקים והדיווחים עצמם (תמונות, פרטי החיה, התאמות) יישארו. זה לא מנתק אותם ולא חוסם אותם מהאפליקציה - רק פעולת "ניתוק" למטה עושה את זה.`,
+      { confirmLabel: 'ניקוי פרטים אישיים', danger: true }
+    );
+    if (!ok) return;
+    setClearingUid(u.id);
+    try {
+      const result = await clearUserReference(u.id);
+      setClearedResults((prev) => ({ ...prev, [u.id]: result }));
+    } finally {
+      setClearingUid(null);
     }
   }
 
@@ -104,14 +132,30 @@ export default function UsersSettingsPage() {
             {u.id === currentUser.uid ? (
               <p className="mt-1 text-xs text-slate-400">זה אתה - לא ניתן לשנות או לנתק את עצמך</p>
             ) : (
-              <button
-                type="button"
-                onClick={() => handleDisconnect(u)}
-                disabled={disconnectingUid === u.id}
-                className="mt-2 text-xs text-red-600 underline disabled:opacity-50"
-              >
-                {disconnectingUid === u.id ? 'מנתק...' : 'ניתוק'}
-              </button>
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleClearReference(u)}
+                  disabled={clearingUid === u.id}
+                  className="text-xs text-red-600 underline disabled:opacity-50"
+                >
+                  {clearingUid === u.id ? 'מנקה...' : 'ניקוי התייחסות'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDisconnect(u)}
+                  disabled={disconnectingUid === u.id}
+                  className="text-xs text-red-600 underline disabled:opacity-50"
+                >
+                  {disconnectingUid === u.id ? 'מנתק...' : 'ניתוק'}
+                </button>
+              </div>
+            )}
+            {clearedResults[u.id] && (
+              <p className="mt-1 text-xs text-emerald-700">
+                נוקו {clearedResults[u.id].lostCasesCleared} תיקי חיפוש, {clearedResults[u.id].foundReportsCleared} דיווחים
+                {clearedResults[u.id].feedbackThreadsCleared > 0 && `, ${clearedResults[u.id].feedbackThreadsCleared} פניות משוב`}.
+              </p>
             )}
           </li>
         ))}
