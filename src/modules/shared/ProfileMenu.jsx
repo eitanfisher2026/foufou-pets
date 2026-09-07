@@ -175,6 +175,14 @@ export default function ProfileMenu() {
             </>
           )}
 
+          <a
+            href="/privacy.html"
+            onClick={() => setOpen(false)}
+            className="block px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            🔒 מדיניות פרטיות
+          </a>
+
           <button
             type="button"
             onClick={signOut}
