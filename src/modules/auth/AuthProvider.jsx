@@ -13,6 +13,31 @@ import { SPECIES } from '../shared/collections.js';
 
 const AuthContext = createContext(null);
 
+// Lets an admin preview the app the way a regular user actually sees it
+// (no settings access, no admin-only controls) without touching their
+// real role in Firestore - a per-device UI toggle, not a permission
+// change, so it's stored in localStorage rather than the profile doc.
+// Own key, unrelated to any other app.
+const VIEW_AS_REGULAR_STORAGE_KEY = 'foufouPets:viewAsRegular';
+
+function readViewingAsRegular() {
+  try {
+    return localStorage.getItem(VIEW_AS_REGULAR_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeViewingAsRegular(value) {
+  try {
+    if (value) localStorage.setItem(VIEW_AS_REGULAR_STORAGE_KEY, '1');
+    else localStorage.removeItem(VIEW_AS_REGULAR_STORAGE_KEY);
+  } catch {
+    // Private browsing / storage blocked - the toggle just won't survive
+    // a reload, not worth failing anything else over.
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +49,7 @@ export function AuthProvider({ children }) {
   // even flashes the onboarding dialog open. Only a genuinely brand-new
   // profile doc has this explicitly false (see upsertUserOnLogin).
   const [hasSeenOnboarding, setHasSeenOnboardingState] = useState(true);
+  const [viewingAsRegular, setViewingAsRegular] = useState(readViewingAsRegular);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
@@ -60,8 +86,23 @@ export function AuthProvider({ children }) {
 
   const signInWithGoogle = () => signInWithPopup(auth, googleProvider);
   const signOut = () => firebaseSignOut(auth);
-  const isAdmin = role === ROLES.ADMIN;
-  const isEditorOrAdmin = role === ROLES.ADMIN || role === ROLES.EDITOR;
+  // isRealAdmin is the actual Firestore role, never affected by the toggle -
+  // it's what decides whether the toggle itself is even offered. isAdmin/
+  // isEditorOrAdmin are what the rest of the app already checks everywhere
+  // (RequireAdmin, ProfileMenu, the various admin-only buttons throughout)
+  // - folding the simulation in here means every one of those existing
+  // checks respects it automatically, with nothing else needing to change.
+  const isRealAdmin = role === ROLES.ADMIN;
+  const isAdmin = isRealAdmin && !viewingAsRegular;
+  const isEditorOrAdmin = (role === ROLES.ADMIN || role === ROLES.EDITOR) && !viewingAsRegular;
+
+  function toggleViewAsRegular() {
+    setViewingAsRegular((prev) => {
+      const next = !prev;
+      writeViewingAsRegular(next);
+      return next;
+    });
+  }
   // Optimistic local update (the live subscription above will confirm it
   // moments later) so switching species feels instant instead of waiting on
   // a round trip - saved to the profile, not just this device, so it's
@@ -90,6 +131,9 @@ export function AuthProvider({ children }) {
         roleLoading,
         isAdmin,
         isEditorOrAdmin,
+        isRealAdmin,
+        viewingAsRegular,
+        toggleViewAsRegular,
         preferredSpecies,
         setPreferredSpecies,
         hasSeenOnboarding,

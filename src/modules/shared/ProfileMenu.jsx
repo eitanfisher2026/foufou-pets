@@ -17,7 +17,7 @@ import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
  * at the top in that case.
  */
 export default function ProfileMenu() {
-  const { user, signOut, isAdmin, roleLoading } = useAuth();
+  const { user, signOut, isAdmin, isRealAdmin, viewingAsRegular, toggleViewAsRegular, roleLoading } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
@@ -182,6 +182,19 @@ export default function ProfileMenu() {
           >
             🔒 מדיניות פרטיות
           </a>
+
+          {isRealAdmin && (
+            <button
+              type="button"
+              onClick={() => {
+                toggleViewAsRegular();
+                setOpen(false);
+              }}
+              className="block w-full px-4 py-2.5 text-right text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              👁️ {viewingAsRegular ? 'חזרה לתצוגת מנהל' : 'תצוגה כמשתמש רגיל'}
+            </button>
+          )}
 
           <button
             type="button"

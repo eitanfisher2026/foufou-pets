@@ -39,7 +39,7 @@ function RequireAdmin({ children }) {
 }
 
 function AppRoutes() {
-  const { user, loading } = useAuth();
+  const { user, loading, viewingAsRegular, toggleViewAsRegular } = useAuth();
   useHomeHistoryGuard();
 
   if (loading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
@@ -51,6 +51,19 @@ function AppRoutes() {
   // space on tablet/laptop screens instead of sitting in a narrow strip.
   return (
     <div className="mx-auto max-w-md sm:max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl">
+      {/* Rendered here, above every route, rather than inside Dashboard's
+          own header - the whole point is previewing what a regular user
+          sees everywhere, not just on the home screen, and an admin
+          navigating around while simulating still needs an obvious,
+          always-visible way out of it. */}
+      {viewingAsRegular && (
+        <div className="m-4 mb-0 flex items-center justify-between gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2">
+          <span className="text-xs text-amber-800">👁️ מוצג כמשתמש רגיל</span>
+          <button type="button" onClick={toggleViewAsRegular} className="shrink-0 text-xs font-semibold text-slate-700 underline">
+            חזרה למנהל
+          </button>
+        </div>
+      )}
       <Suspense fallback={<p className="p-8 text-center text-slate-500">טוען...</p>}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
