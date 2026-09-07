@@ -7,18 +7,16 @@ import PrivacyDialog from './PrivacyDialog.jsx';
 import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 
 /**
- * The single account entry point on the dashboard header. For a regular
- * user/editor, the trigger is their own profile photo with a small chevron
- * badge (so it reads as "tap for a menu" rather than "here's my photo" -
- * the menu contents were never really the discoverability problem, the
- * invisible trigger was). For an admin, the trigger is a plain ⚙️ icon
- * instead of their photo - one icon covers both "app settings" and "my
- * account", rather than two separate header controls competing for the
- * same limited row on mobile; the menu itself just gains a "הגדרות" link
- * at the top in that case.
+ * The single account entry point on the dashboard header - a plain ⚙️ icon
+ * for every role, not just admins (it used to be the person's own profile
+ * photo for a regular user/editor, with a small chevron badge so it still
+ * read as "tap for a menu" rather than "here's my photo" - one consistent
+ * icon for everyone is simpler and needs no such badge). The menu
+ * contents still differ by role: an admin sees a "הגדרות" link at the top
+ * that nobody else does.
  */
 export default function ProfileMenu() {
-  const { user, signOut, isAdmin, isRealAdmin, viewingAsRegular, toggleViewAsRegular, roleLoading } = useAuth();
+  const { user, signOut, isAdmin, isRealAdmin, viewingAsRegular, toggleViewAsRegular } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
@@ -78,35 +76,11 @@ export default function ProfileMenu() {
   return (
     <div ref={rootRef} className="relative shrink-0">
       <button type="button" onClick={() => setOpen((v) => !v)} className="relative block shrink-0" aria-label="תפריט חשבון">
-        {roleLoading ? (
-          // isAdmin is false (its own default) until the role check
-          // actually resolves - rendering straight off it here briefly
-          // showed the photo, then swapped to the gear icon a moment
-          // later for an admin. A neutral placeholder while roleLoading is
-          // true means committing to the real icon only once, correctly.
-          <span className="block h-9 w-9 animate-pulse rounded-full bg-slate-200 shadow" />
-        ) : isAdmin ? (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow">⚙️</span>
-        ) : user?.photoURL ? (
-          <img
-            src={user.photoURL}
-            alt=""
-            className="h-9 w-9 rounded-full ring-2 ring-white shadow"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-200 text-sm font-medium text-slate-600 shadow">
-            {(user?.displayName || user?.email || '?')[0]}
-          </span>
-        )}
-        {!roleLoading && !isAdmin && (
-          <span
-            aria-hidden="true"
-            className="absolute -bottom-0.5 -left-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-700 text-[9px] leading-none text-white ring-2 ring-white"
-          >
-            ▾
-          </span>
-        )}
+        {/* Same gear icon for everyone now, not just admins - it never
+            depended on the role resolving (unlike the old avatar/gear
+            switch, which needed a loading placeholder to avoid a flash),
+            so there's nothing left here to wait on. */}
+        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow">⚙️</span>
       </button>
 
       {open && (
