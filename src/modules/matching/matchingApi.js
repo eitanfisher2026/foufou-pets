@@ -209,7 +209,12 @@ async function recomputeLostCaseCounts(lostCaseId) {
       // without every search needing to read every lost case's matches
       // subcollection - kept in sync here, same as the other counts above,
       // so it's always current whenever matches change for any reason.
-      hasVisualMatch: all.some((m) => isNotableVisualVerdict(m.visualSimilarity?.verdict)),
+      // Only a still-NEW match counts - once a person has actually looked
+      // at a match (ruled it out, flagged it, closed it, anything), the
+      // "AI noticed something" alert has done its job; leaving it on
+      // forever regardless of review status made the badge permanent and
+      // meaningless on any case with review history.
+      hasVisualMatch: all.some((m) => m.status === REPORT_STATUS.NEW && isNotableVisualVerdict(m.visualSimilarity?.verdict)),
       lastCheckedAt: serverTimestamp(),
     },
     { merge: true }
@@ -227,7 +232,8 @@ async function recomputeFoundReportVisualFlag(foundReportId) {
   const matches = await getMatchesForFoundReport(foundReportId);
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId),
-    { hasVisualMatch: matches.some((m) => isNotableVisualVerdict(m.visualSimilarity?.verdict)) },
+    // Same "still NEW" restriction as recomputeLostCaseCounts above.
+    { hasVisualMatch: matches.some((m) => m.status === REPORT_STATUS.NEW && isNotableVisualVerdict(m.visualSimilarity?.verdict)) },
     { merge: true }
   );
 }
@@ -758,19 +764,31 @@ export async function getMatch(lostCaseId, foundReportId) {
 export async function updateMatchStatus(lostCaseId, foundReportId, status) {
   const matchRef = doc(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches', foundReportId);
   const prevSnap = await getDoc(matchRef);
-  const prevStatus = prevSnap.exists() ? prevSnap.data().status : null;
+  const prevData = prevSnap.exists() ? prevSnap.data() : null;
+  const prevStatus = prevData?.status || null;
   const wasNew = prevStatus === REPORT_STATUS.NEW;
   const isNew = status === REPORT_STATUS.NEW;
   const wasImportant = isImportantMatchStatus(prevStatus);
   const isImportant = isImportantMatchStatus(status);
+  // hasVisualMatch (see recomputeLostCaseCounts/recomputeFoundReportVisualFlag
+  // above) only counts a still-NEW match's notable AI verdict - a match that
+  // carries one and is leaving/entering NEW can flip that flag, but it's a
+  // boolean OR across every match on the case, not a simple count, so it
+  // needs a real recompute rather than an increment. Only worth paying for
+  // when this specific match could actually be the one flipping it.
+  const affectsVisualFlag = wasNew !== isNew && isNotableVisualVerdict(prevData?.visualSimilarity?.verdict);
 
   await setDoc(matchRef, { status }, { merge: true });
 
-  const counterUpdates = {};
-  if (wasNew !== isNew) counterUpdates.newMatchCount = increment(isNew ? 1 : -1);
-  if (wasImportant !== isImportant) counterUpdates.importantMatchCount = increment(isImportant ? 1 : -1);
-  if (Object.keys(counterUpdates).length > 0) {
-    await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), counterUpdates, { merge: true });
+  if (affectsVisualFlag) {
+    await Promise.all([recomputeLostCaseCounts(lostCaseId), recomputeFoundReportVisualFlag(foundReportId)]);
+  } else {
+    const counterUpdates = {};
+    if (wasNew !== isNew) counterUpdates.newMatchCount = increment(isNew ? 1 : -1);
+    if (wasImportant !== isImportant) counterUpdates.importantMatchCount = increment(isImportant ? 1 : -1);
+    if (Object.keys(counterUpdates).length > 0) {
+      await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), counterUpdates, { merge: true });
+    }
   }
 
   if (status === REPORT_STATUS.CLOSED) {
