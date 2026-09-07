@@ -1,11 +1,54 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { initializeApp } from 'firebase-admin/app';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { randomUUID } from 'node:crypto';
 import sharp from 'sharp';
 import Anthropic from '@anthropic-ai/sdk';
 
 initializeApp();
+const db = getFirestore();
+
+// A signed-in caller only means "has a Google account" - anyone, not just
+// people actually using this app - and every function below that calls
+// Claude bills real money per call regardless of whether it's reached
+// through the app's own UI or a direct request with a stolen/copied auth
+// token. This caps worst-case exposure per account rather than trying to
+// distinguish real usage from abuse: generous enough that a regular user
+// submitting several reports (or running a normal "check matches" scan,
+// which can fire comparePhotoSimilarity several times in one click) in an
+// hour never comes close, low enough that a script hammering one of these
+// endpoints hits a wall fast. Deliberately NOT applied to
+// fetchFacebookLinkPreview/generatePhotoThumbnail below - neither calls
+// Claude, so neither carries the same per-call cost risk. Admins/editors
+// are exempt entirely: they're trusted, known individuals (not the
+// anonymous-signed-in-stranger case this guards against), and the
+// legitimate bulk admin actions in Settings (rescan everything, photo-
+// similarity backfill) can genuinely call these dozens of times in one
+// deliberate action.
+const RATE_LIMIT_MAX_CALLS = 60;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+async function enforceAiRateLimit(uid) {
+  const userSnap = await db.collection('users').doc(uid).get();
+  const role = userSnap.exists ? userSnap.data().role : 'regular';
+  if (role === 'admin' || role === 'editor') return;
+
+  const ref = db.collection('aiRateLimits').doc(uid);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const data = snap.exists ? snap.data() : null;
+    const now = Date.now();
+    if (!data || now - data.windowStart > RATE_LIMIT_WINDOW_MS) {
+      tx.set(ref, { windowStart: now, count: 1 });
+      return;
+    }
+    if (data.count >= RATE_LIMIT_MAX_CALLS) {
+      throw new HttpsError('resource-exhausted', 'יותר מדי בקשות בזמן קצר. נסו שוב בעוד כמה דקות.');
+    }
+    tx.update(ref, { count: FieldValue.increment(1) });
+  });
+}
 
 // Sonnet, not Opus: this is a bounded structured-extraction task (read a
 // screenshot, fill a form), not open-ended reasoning - Sonnet's accuracy on
@@ -392,6 +435,7 @@ export const detectPetSpecies = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await enforceAiRateLimit(request.auth.uid);
 
     const image = request.data?.image;
     if (!image?.base64) {
@@ -447,6 +491,7 @@ export const extractReportFromImages = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await enforceAiRateLimit(request.auth.uid);
 
     const images = request.data?.images;
     if (!Array.isArray(images) || images.length === 0) {
@@ -817,6 +862,7 @@ export const comparePhotoSimilarity = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await enforceAiRateLimit(request.auth.uid);
 
     const { lostPhotoUrl, foundPhotoUrl } = request.data || {};
     if (typeof lostPhotoUrl !== 'string' || typeof foundPhotoUrl !== 'string') {

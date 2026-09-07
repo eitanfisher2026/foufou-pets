@@ -2,8 +2,52 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Mirrors firestore.rules' own role()/isEditorOrAdmin() - a Storage
+    // rule can read Firestore via firestore.get() for exactly this kind of
+    // cross-service check.
+    function role() {
+      return firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        ? firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role
+        : 'regular';
+    }
+
+    function isEditorOrAdmin() {
+      return signedIn() && (role() == 'admin' || role() == 'editor');
+    }
+
+    // Photos are readable by any signed-in user - same as the Firestore
+    // records they belong to, since browsing/matching needs to see them.
+    // Writes (upload, replace, delete) are scoped to whoever actually owns
+    // the lost case a file lives under, mirroring the same ownership check
+    // firestore.rules applies to the record itself (see uploadPhotos.js for
+    // the lost-cases/{caseId}/... path shape). Previously any signed-in
+    // user could write to ANY path in the whole bucket, including
+    // someone else's already-uploaded photos.
+    match /lost-cases/{caseId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && (
+        isEditorOrAdmin() ||
+        firestore.get(/databases/(default)/documents/lostCases/$(caseId)).data.ownerId == request.auth.uid
+      );
+    }
+
+    // Same idea, found-reports side.
+    match /found-reports/{reportId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() && (
+        isEditorOrAdmin() ||
+        firestore.get(/databases/(default)/documents/foundReports/$(reportId)).data.reportedByUid == request.auth.uid
+      );
+    }
+
+    // Nothing else is ever stored in this bucket - deny by default rather
+    // than falling through to a wider rule.
     match /{allPaths=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if false;
     }
   }
 }
