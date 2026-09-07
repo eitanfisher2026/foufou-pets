@@ -511,7 +511,14 @@ export const extractReportFromImages = onCall(
     // full text/URL but never a photo) or pasted in by hand. A screenshot
     // alone often cuts off long captions ("...עוד"); this fills that gap
     // without replacing the image-based extraction, which is still required.
-    const postText = typeof request.data?.postText === 'string' ? request.data.postText.slice(0, 4000) : '';
+    // The cap here used to be 4000 chars - low enough that a genuinely long
+    // post (backstory + appeal + hashtags + contact info as the very last
+    // line) got cut before ever reaching the model, silently dropping
+    // whatever came after - including, worst case, the phone number this
+    // whole field exists to rescue in the first place. 20000 covers any
+    // real post with room to spare; still bounded so a pasted full webpage
+    // or similar degenerate input doesn't balloon token cost unbounded.
+    const postText = typeof request.data?.postText === 'string' ? request.data.postText.slice(0, 20000) : '';
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
