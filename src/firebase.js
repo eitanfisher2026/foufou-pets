@@ -34,4 +34,10 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app, 'europe-west1');
+// me-west1 (Tel Aviv) - must match the region every function in
+// functions/index.js is deployed to. Moved from europe-west1 for the real
+// (if modest) latency win, since virtually every user is in Israel - the
+// AI calls themselves still dominate actual wait time either way, since
+// those still have to reach Anthropic's API regardless of which region
+// this runs in.
+export const functions = getFunctions(app, 'me-west1');

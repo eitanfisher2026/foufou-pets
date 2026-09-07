@@ -430,7 +430,7 @@ const SPECIES_DETECT_PROMPT = `Look at this photo from a lost/found pet post and
  * skips this call entirely - no added cost or latency there.
  */
 export const detectPetSpecies = onCall(
-  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 30 },
+  { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 30 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -486,7 +486,7 @@ export const extractReportFromImages = onCall(
   // reasoning + a 4096 max_tokens budget pushed real-world latency past it -
   // Cloud Run kills the request before the handler can return an error, which
   // the browser sees as a bare CORS failure instead of a real error message.
-  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 120 },
+  { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 120 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
@@ -663,7 +663,7 @@ function extractOgTag(html, property) {
  * best-effort supplement to the screenshot-based reading, never a
  * replacement for it.
  */
-export const fetchFacebookLinkPreview = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 30 }, async (request) => {
+export const fetchFacebookLinkPreview = onCall({ region: 'me-west1', cors: true, timeoutSeconds: 30 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.');
   }
@@ -781,7 +781,7 @@ async function generateThumbnailFor(bucket, photo) {
  * policy, which only allows same-origin <img> loads, not cross-origin
  * fetch/canvas reads.
  */
-export const generatePhotoThumbnail = onCall({ region: 'europe-west1', cors: true, timeoutSeconds: 60 }, async (request) => {
+export const generatePhotoThumbnail = onCall({ region: 'me-west1', cors: true, timeoutSeconds: 60 }, async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.');
   }
@@ -864,7 +864,7 @@ async function fetchImageAsBase64(url) {
  * found-report pair in the whole pool.
  */
 export const comparePhotoSimilarity = onCall(
-  { region: 'europe-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 60 },
+  { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 60 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
