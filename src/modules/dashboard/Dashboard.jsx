@@ -9,7 +9,6 @@ import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { LostCaseRow, FoundReportRow } from './RecordRows.jsx';
 import ProfileMenu from '../shared/ProfileMenu.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
-import HelpDialog from '../shared/HelpDialog.jsx';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import SearchDialog from './SearchDialog.jsx';
 import { matchesSearch } from './recordSearch.js';
@@ -50,7 +49,6 @@ export default function Dashboard() {
   // progress ("20/64" etc.) next to the load-more button - a cheap
   // count-only query, same idea as foundCount below.
   const [totalLostCount, setTotalLostCount] = useState(null);
-  const [showHelp, setShowHelp] = useState(false);
   // A dialog left open when the app is backgrounded (switching apps,
   // locking the phone) can resurface as a brief stale frame the instant
   // the OS resumes the tab, before React's real current state repaints
@@ -270,14 +268,6 @@ export default function Dashboard() {
       <header className="mb-6 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h1 className="whitespace-nowrap text-xl font-bold text-slate-800">איתור חיות מחמד</h1>
-          <button
-            type="button"
-            onClick={() => setShowHelp(true)}
-            aria-label="עזרה"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-500"
-          >
-            ℹ️
-          </button>
         </div>
         <ProfileMenu />
       </header>
@@ -381,7 +371,6 @@ export default function Dashboard() {
 
       <AppFooter />
 
-      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {showOnboarding && (
         <OnboardingDialog
           onClose={() => {

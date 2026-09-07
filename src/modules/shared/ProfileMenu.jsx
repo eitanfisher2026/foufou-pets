@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from './usePwaInstall.js';
-import AboutDialog from './AboutDialog.jsx';
+import HelpDialog from './HelpDialog.jsx';
 import PrivacyDialog from './PrivacyDialog.jsx';
 import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 
@@ -21,7 +21,7 @@ export default function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
-  const [showAbout, setShowAbout] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const rootRef = useRef(null);
@@ -118,11 +118,11 @@ export default function ProfileMenu() {
             type="button"
             onClick={() => {
               setOpen(false);
-              setShowAbout(true);
+              setShowHelp(true);
             }}
             className="block w-full px-4 py-2.5 text-right text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            ℹ️ אודות
+            ℹ️ עזרה
           </button>
 
           <button
@@ -186,7 +186,7 @@ export default function ProfileMenu() {
       )}
 
       {showFeedback && <FeedbackDialog onClose={() => setShowFeedback(false)} />}
-      {showAbout && <AboutDialog onClose={() => setShowAbout(false)} />}
+      {showHelp && <HelpDialog onClose={() => setShowHelp(false)} />}
       {showPrivacy && <PrivacyDialog onClose={() => setShowPrivacy(false)} />}
     </div>
   );
