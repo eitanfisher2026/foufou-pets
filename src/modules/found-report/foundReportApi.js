@@ -162,6 +162,9 @@ export async function archiveFoundReport(reportId, closure) {
       closureReason: closure.closureReason || '',
       closedBy: closure.closedBy || '',
       closingComment: closure.closingComment || '',
+      // Same reasoning as lostCases' closedViaFoundReportId (see
+      // updateLostCaseClosure) mirrored for the other direction.
+      ...(closure.closedViaLostCaseId ? { closedViaLostCaseId: closure.closedViaLostCaseId } : {}),
       updatedAt: serverTimestamp(),
     },
     { merge: true }

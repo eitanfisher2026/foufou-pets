@@ -801,6 +801,63 @@ export const generatePhotoThumbnail = onCall({ region: 'me-west1', cors: true, t
   }
 });
 
+const UPLOAD_FOLDER_BY_RECORD_TYPE = { lost: 'lost-cases', found: 'found-reports' };
+const COLLECTION_BY_RECORD_TYPE = { lost: 'lostCases', found: 'foundReports' };
+const OWNER_FIELD_BY_RECORD_TYPE = { lost: 'ownerId', found: 'reportedByUid' };
+
+/**
+ * Writes a compressed photo (and optionally its thumbnail) into Storage on
+ * the client's behalf, after checking ownership with a direct Admin SDK
+ * read - not storage.rules' own firestore.get() cross-service check, which
+ * in practice lagged behind a record's own creation write far more than a
+ * short client-side retry could reliably outrun (a brand-new record's
+ * first photo upload happens the instant after that record is created,
+ * which is exactly when that lag bites hardest). This read has no such
+ * lag: it's the same Admin SDK read the rest of this file already uses.
+ * Compression itself still happens client-side (see uploadPhotos.js) -
+ * only the authorization-sensitive write moved here.
+ */
+export const uploadReportPhoto = onCall({ region: 'me-west1', cors: true, timeoutSeconds: 60 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+
+  const { recordType, recordId, path, base64, thumbPath, thumbBase64 } = request.data || {};
+  const folder = UPLOAD_FOLDER_BY_RECORD_TYPE[recordType];
+  if (!folder || typeof recordId !== 'string' || typeof path !== 'string' || typeof base64 !== 'string') {
+    throw new HttpsError('invalid-argument', 'recordType, recordId, path and base64 are required.');
+  }
+  // The client picks the exact filenames (see uploadPhotos.js), but they
+  // must actually live under this record's own folder - proving ownership
+  // of the record above says nothing about an arbitrary path elsewhere in
+  // the bucket.
+  const expectedPrefix = `${folder}/${recordId}/`;
+  if (!path.startsWith(expectedPrefix) || (thumbPath && !thumbPath.startsWith(expectedPrefix))) {
+    throw new HttpsError('invalid-argument', 'path does not belong to this record.');
+  }
+
+  const recordSnap = await db.collection(COLLECTION_BY_RECORD_TYPE[recordType]).doc(recordId).get();
+  if (!recordSnap.exists) {
+    throw new HttpsError('not-found', 'הרשומה לא נמצאה.');
+  }
+  if (recordSnap.data()[OWNER_FIELD_BY_RECORD_TYPE[recordType]] !== request.auth.uid) {
+    const userSnap = await db.collection('users').doc(request.auth.uid).get();
+    const role = userSnap.exists ? userSnap.data().role : 'regular';
+    if (role !== 'admin' && role !== 'editor') {
+      throw new HttpsError('permission-denied', 'אין לך הרשאה להעלות תמונות לרשומה הזו.');
+    }
+  }
+
+  const bucket = getStorage().bucket();
+  const url = await uploadThumbnail(bucket, path, Buffer.from(base64, 'base64'));
+  const result = { path, url };
+  if (thumbBase64 && thumbPath) {
+    result.thumbPath = thumbPath;
+    result.thumbUrl = await uploadThumbnail(bucket, thumbPath, Buffer.from(thumbBase64, 'base64'));
+  }
+  return result;
+});
+
 // Haiku, not Sonnet: this is a single visual-similarity judgment between two
 // already-known photos, not open-ended extraction - the same reasoning as
 // Upgraded from claude-haiku-4-5 after two confirmed cases of confidently

@@ -299,8 +299,13 @@ export default function LostCaseDetail() {
   }
 
   async function handleStatusChange(foundReportId, status) {
-    await updateMatchStatus(caseId, foundReportId, status);
-    setMatches((prev) => prev.map((m) => (m.foundReportId === foundReportId ? { ...m, status } : m)));
+    setActionError('');
+    try {
+      await updateMatchStatus(caseId, foundReportId, status);
+      setMatches((prev) => prev.map((m) => (m.foundReportId === foundReportId ? { ...m, status } : m)));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // Re-scores just this one pairing - useful right after editing the found
@@ -309,10 +314,13 @@ export default function LostCaseDetail() {
   // report again.
   async function handleRecheckSingleMatch(foundReportId) {
     setRecheckingId(foundReportId);
+    setActionError('');
     try {
       const result = await checkSingleMatch(caseId, foundReportId);
       await load();
       notifyVisualMatch(result.visualMatch ? [result.visualMatch] : []);
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setRecheckingId(null);
     }

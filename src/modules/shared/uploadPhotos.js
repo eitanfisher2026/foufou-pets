@@ -1,30 +1,22 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../../firebase.js';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebase.js';
 import { compressImage, compressThumbnail } from './imageCompression.js';
+import { blobToBase64 } from './blobToBase64.js';
 
-// storage.rules checks photo-write ownership by reading the just-created
-// Firestore record (firestore.get(...).data.ownerId/reportedByUid) - a
-// cross-service read that Firebase's own docs note can briefly lag behind a
-// write that only just happened, since Storage rules evaluation and
-// Firestore's write path are different backends. Uploading a brand-new
-// record's own photos immediately after creating it (every create flow
-// does exactly this) sits right in that gap, which showed up as a reliably
-// reproducible storage/unauthorized on the very first upload. Only retried
-// for that specific code - a real ownership rejection (wrong user) would
-// keep failing the same way regardless of how long it waits, and this
-// still throws after retrying, so that case surfaces exactly as before.
-const UNAUTHORIZED_RETRY_DELAYS_MS = [500, 1000, 2000];
+const uploadReportPhoto = httpsCallable(functions, 'uploadReportPhoto');
 
-async function uploadBytesWithRetry(storageRef, data, metadata) {
-  for (let attempt = 0; ; attempt++) {
-    try {
-      return await uploadBytes(storageRef, data, metadata);
-    } catch (err) {
-      if (err.code !== 'storage/unauthorized' || attempt >= UNAUTHORIZED_RETRY_DELAYS_MS.length) throw err;
-      await new Promise((resolve) => setTimeout(resolve, UNAUTHORIZED_RETRY_DELAYS_MS[attempt]));
-    }
-  }
-}
+// storage.rules' own ownership check (firestore.get() on the record this
+// photo belongs to) turned out to race a record's own creation write far
+// more than a short retry could reliably outrun in practice (see
+// uploadReportPhoto in functions/index.js for the real fix) - every fresh
+// record's very first photo upload happens the instant after that record's
+// Firestore doc is created, which is exactly the case where a Storage
+// rule's cross-service read is least likely to have caught up yet. Routing
+// the actual write through a Cloud Function sidesteps this entirely: the
+// function checks ownership with a direct Admin SDK read (no cross-service
+// rule lag to race) before writing with elevated privileges. Compression
+// stays client-side (free, and unrelated to the permissions problem).
+const folderToRecordType = { 'lost-cases': 'lost', 'found-reports': 'found' };
 
 /**
  * Compresses and uploads a batch of photo files under `folder/<reportId>/`.
@@ -39,24 +31,22 @@ async function uploadBytesWithRetry(storageRef, data, metadata) {
  * input files.
  */
 export async function uploadPhotos(files, folder, reportId, { thumbnailIndex = null } = {}) {
+  const recordType = folderToRecordType[folder];
   const uploads = files.map(async (file, index) => {
     const compressed = await compressImage(file);
     const base = `${folder}/${reportId}/${Date.now()}_${index}`;
     const path = `${base}.jpg`;
+    const base64 = await blobToBase64(compressed);
 
-    const storageRef = ref(storage, path);
-    await uploadBytesWithRetry(storageRef, compressed, { contentType: 'image/jpeg' });
-    const url = await getDownloadURL(storageRef);
+    let thumbPath;
+    let thumbBase64;
+    if (index === thumbnailIndex) {
+      thumbPath = `${base}_thumb.jpg`;
+      thumbBase64 = await blobToBase64(await compressThumbnail(compressed));
+    }
 
-    if (index !== thumbnailIndex) return { path, url };
-
-    const thumb = await compressThumbnail(compressed);
-    const thumbPath = `${base}_thumb.jpg`;
-    const thumbRef = ref(storage, thumbPath);
-    await uploadBytesWithRetry(thumbRef, thumb, { contentType: 'image/jpeg' });
-    const thumbUrl = await getDownloadURL(thumbRef);
-
-    return { path, url, thumbPath, thumbUrl };
+    const { data } = await uploadReportPhoto({ recordType, recordId: reportId, path, base64, thumbPath, thumbBase64 });
+    return data;
   });
 
   return Promise.all(uploads);

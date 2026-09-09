@@ -793,9 +793,15 @@ export async function updateMatchStatus(lostCaseId, foundReportId, status) {
 
   if (status === REPORT_STATUS.CLOSED) {
     const closure = { closureDate: new Date().toISOString().slice(0, 10), closureReason: CLOSURE_REASON.SYSTEM_MATCH_CLOSED };
+    // closedVia*Id lets firestore.rules verify this specific write: a real
+    // match naming that exact counterpart must exist under this case, and
+    // the requester must actually own that counterpart record - so someone
+    // who owns only one side of a pairing can still close the other side
+    // through this exact flow, without being handed general edit rights on
+    // a record they don't own.
     await Promise.all([
-      updateLostCaseClosure(lostCaseId, RECORD_STATUS.ARCHIVED, closure),
-      archiveFoundReport(foundReportId, closure),
+      updateLostCaseClosure(lostCaseId, RECORD_STATUS.ARCHIVED, { ...closure, closedViaFoundReportId: foundReportId }),
+      archiveFoundReport(foundReportId, { ...closure, closedViaLostCaseId: lostCaseId }),
     ]);
   }
 }

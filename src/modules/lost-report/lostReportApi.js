@@ -179,6 +179,12 @@ export async function updateLostCaseClosure(caseId, status, closure) {
       closureReason: closure.closureReason || '',
       closedBy: closure.closedBy || '',
       closingComment: closure.closingComment || '',
+      // Only ever set when a match's own status closes this case (see
+      // updateMatchStatus in matchingApi.js) - firestore.rules checks this
+      // against a real match under this case to let that found report's
+      // own owner close this side too, without a blank field here for an
+      // ordinary manual archive.
+      ...(closure.closedViaFoundReportId ? { closedViaFoundReportId: closure.closedViaFoundReportId } : {}),
       updatedAt: serverTimestamp(),
     },
     { merge: true }

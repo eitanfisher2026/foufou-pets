@@ -1,15 +1,7 @@
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../../firebase.js';
 import { compressImage } from '../shared/imageCompression.js';
-
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
+import { blobToBase64 } from '../shared/blobToBase64.js';
 
 /**
  * Sends 1+ screenshot files to the shared extraction function and returns
