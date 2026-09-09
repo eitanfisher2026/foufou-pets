@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.jsx';
 import { getMatch, getMatches, getMatchesForFoundReport, checkSingleMatch, updateMatchStatus } from './matchingApi.js';
 import { REPORT_STATUS } from '../shared/collections.js';
 import { getLostCase } from '../lost-report/lostReportApi.js';
@@ -13,6 +14,7 @@ import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, ORDERED_MATCH_STATUSES } from './matchStatusLabels.js';
 import { getMatchConfig } from './matchConfigApi.js';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 const VERDICT_STYLES = {
   match: { label: 'תואם', badge: 'bg-emerald-100 text-emerald-800' },
@@ -45,6 +47,7 @@ function formatFieldValue(v) {
 export default function MatchAnalysisPage() {
   const { caseId, foundReportId } = useParams();
   const navigate = useNavigate();
+  const { user, isEditorOrAdmin } = useAuth();
   const [searchParams] = useSearchParams();
   // Which side this review session is actually working through: 'case'
   // (default) walks this lost case's other found-report candidates, set by
@@ -60,6 +63,7 @@ export default function MatchAnalysisPage() {
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [rechecking, setRechecking] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [actionError, setActionError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState(null);
   // The full candidate list for whichever side dir names, sorted by score
   // (see getMatches/getMatchesForFoundReport) - lets marking "אין התאמה"
@@ -104,9 +108,12 @@ export default function MatchAnalysisPage() {
   // available from wherever "why does this look wrong" actually comes up.
   async function handleRecheck() {
     setRechecking(true);
+    setActionError('');
     try {
       await checkSingleMatch(caseId, foundReportId);
       setMatch(await getMatch(caseId, foundReportId));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setRechecking(false);
     }
@@ -130,6 +137,7 @@ export default function MatchAnalysisPage() {
   // even if some other still-NEW candidate technically exists.
   async function handleStatusChange(status) {
     setChangingStatus(true);
+    setActionError('');
     try {
       await updateMatchStatus(caseId, foundReportId, status);
       setMatch((prev) => ({ ...prev, status }));
@@ -141,12 +149,20 @@ export default function MatchAnalysisPage() {
       } else {
         navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
       }
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setChangingStatus(false);
     }
   }
 
   if (!match || !lostCase || !foundReport) return <p className="p-4 text-slate-500">טוען...</p>;
+
+  // Match-level actions need owning EITHER side of this specific pairing -
+  // matches firestore.rules' own lostCases/{caseId}/matches/{foundReportId}
+  // write rule. This page is reachable by a direct link/URL regardless of
+  // who's viewing, unlike the match cards it's linked from.
+  const canManageMatch = isEditorOrAdmin || lostCase.ownerId === user.uid || foundReport.reportedByUid === user.uid;
 
   return (
     <div className="p-4">
@@ -168,21 +184,25 @@ export default function MatchAnalysisPage() {
           <span className="text-sm font-medium text-slate-600">רמת התאמה כוללת:</span>
           <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
         </div>
-        <button
-          type="button"
-          onClick={handleRecheck}
-          disabled={rechecking}
-          className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
-        >
-          {rechecking ? 'סורק מחדש...' : 'בדיקה חוזרת'}
-        </button>
+        {canManageMatch && (
+          <button
+            type="button"
+            onClick={handleRecheck}
+            disabled={rechecking}
+            className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
+          >
+            {rechecking ? 'סורק מחדש...' : 'בדיקה חוזרת'}
+          </button>
+        )}
       </div>
+
+      {actionError && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{actionError}</p>}
 
       <div className="mb-4">
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-slate-600">סטטוס בדיקה:</span>
           <div className="flex items-center gap-2">
-            {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+            {canManageMatch && match.status !== REPORT_STATUS.NOT_RELEVANT && (
               <button
                 type="button"
                 onClick={() => handleStatusChange(REPORT_STATUS.NOT_RELEVANT)}
@@ -198,7 +218,7 @@ export default function MatchAnalysisPage() {
               order={ORDERED_MATCH_STATUSES}
               onChange={handleStatusChange}
               colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
-              disabled={changingStatus}
+              disabled={changingStatus || !canManageMatch}
             />
           </div>
         </div>

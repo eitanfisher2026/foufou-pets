@@ -263,18 +263,26 @@ export default function FoundReportDetail() {
   // again.
   async function handleRecheckSingleMatch(lostCaseId) {
     setRecheckingId(lostCaseId);
+    setActionError('');
     try {
       const result = await checkSingleMatch(lostCaseId, reportId);
       setMatches(await getMatchesForFoundReport(reportId));
       notifyVisualMatch(result.visualMatch ? [result.visualMatch] : []);
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setRecheckingId(null);
     }
   }
 
   async function handleMatchStatusChange(lostCaseId, status) {
-    await updateMatchStatus(lostCaseId, reportId, status);
-    setMatches((prev) => prev.map((m) => (m.lostCase.id === lostCaseId ? { ...m, status } : m)));
+    setActionError('');
+    try {
+      await updateMatchStatus(lostCaseId, reportId, status);
+      setMatches((prev) => prev.map((m) => (m.lostCase.id === lostCaseId ? { ...m, status } : m)));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // Same reasoning as the lost-case page's handleMatchResolved - once a
@@ -840,34 +848,36 @@ export default function FoundReportDetail() {
 
       {!showEditForm && (
         <>
-          {checking && checkProgress?.total > 0 && (
+          {canManage && checking && checkProgress?.total > 0 && (
             <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
           )}
-          <button
-            onClick={handleCheckMatches}
-            disabled={checking || newCandidateCount === 0}
-            className={
-              !checking && newCandidateCount === 0
-                ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
-                : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
-            }
-          >
-            {checking
-              ? 'סורקים התאמות...'
-              : newCandidateCount > 0
-                ? `סריקת ${newCandidateCount} חדשים`
-                : 'אין חדשים לסריקה'}
-          </button>
-          {!checking && checkResult && (
+          {canManage && (
+            <button
+              onClick={handleCheckMatches}
+              disabled={checking || newCandidateCount === 0}
+              className={
+                !checking && newCandidateCount === 0
+                  ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
+                  : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
+              }
+            >
+              {checking
+                ? 'סורקים התאמות...'
+                : newCandidateCount > 0
+                  ? `סריקת ${newCandidateCount} חדשים`
+                  : 'אין חדשים לסריקה'}
+            </button>
+          )}
+          {canManage && !checking && checkResult && (
             <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-center text-sm text-emerald-800">
               ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
               {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
             </p>
           )}
-          {!checking && checkError && (
+          {canManage && !checking && checkError && (
             <p className="mt-2 rounded-xl bg-red-50 p-3 text-center text-sm font-medium text-red-700">{checkError}</p>
           )}
-          {matches.length > 0 && (
+          {canManage && matches.length > 0 && (
             <button
               onClick={handleReset}
               disabled={checking}
@@ -876,7 +886,7 @@ export default function FoundReportDetail() {
               איפוס כל ההתאמות (כולל סטטוסים) וסריקה מחדש
             </button>
           )}
-          {matches.length === 0 && <div className="mb-6" />}
+          {(!canManage || matches.length === 0) && <div className="mb-6" />}
 
           <h2 className="mb-3 text-lg font-semibold text-slate-700">תיקי חיפוש תואמים אפשריים ({matches.length})</h2>
           {matches.length > 0 && (
@@ -1011,6 +1021,11 @@ function ReverseMatchCard({
   // editors/admins can delete any of them - same rule LostCaseDetail.jsx
   // applies when deleting a case from its own page.
   const canManageLostCase = isEditorOrAdmin || lostCase.ownerId === user.uid;
+  // Match-level actions need owning EITHER side of this specific pairing -
+  // matches firestore.rules' lostCases/{caseId}/matches/{foundReportId}
+  // write rule. report is this page's own found report (canManage's own
+  // computation, one level up), so ownership of it also satisfies this.
+  const canManageMatch = canManageLostCase || report?.reportedByUid === user.uid;
 
   async function handleDelete() {
     const ok = await confirm(
@@ -1033,7 +1048,7 @@ function ReverseMatchCard({
         <span className="flex shrink-0 items-center gap-2 font-medium text-slate-800">
           רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
         </span>
-        {onRecheck && (
+        {onRecheck && canManageMatch && (
           <button
             type="button"
             onClick={() => onRecheck(lostCase.id)}
@@ -1045,7 +1060,7 @@ function ReverseMatchCard({
         )}
       </div>
       <div className="mb-2 flex items-center justify-end gap-2">
-        {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+        {canManageMatch && match.status !== REPORT_STATUS.NOT_RELEVANT && (
           <button
             type="button"
             onClick={() => onStatusChange(lostCase.id, REPORT_STATUS.NOT_RELEVANT)}
@@ -1060,6 +1075,7 @@ function ReverseMatchCard({
           order={ORDERED_MATCH_STATUSES}
           onChange={(status) => onStatusChange(lostCase.id, status)}
           colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+          disabled={!canManageMatch}
         />
       </div>
 

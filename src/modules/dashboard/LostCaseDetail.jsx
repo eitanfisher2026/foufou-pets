@@ -909,33 +909,37 @@ export default function LostCaseDetail() {
         </div>
       )}
 
-      {checking && checkProgress?.total > 0 && <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />}
+      {canManage && checking && checkProgress?.total > 0 && (
+        <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+      )}
 
-      <button
-        onClick={handleCheckMatches}
-        disabled={checking || newCandidateCount === 0}
-        className={
-          !checking && newCandidateCount === 0
-            ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
-            : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
-        }
-      >
-        {checking
-          ? 'סורקים התאמות...'
-          : newCandidateCount > 0
-            ? `סריקת ${newCandidateCount} חדשות`
-            : 'אין חדשות לסריקה'}
-      </button>
-      {!checking && checkResult && (
+      {canManage && (
+        <button
+          onClick={handleCheckMatches}
+          disabled={checking || newCandidateCount === 0}
+          className={
+            !checking && newCandidateCount === 0
+              ? 'w-full rounded-xl bg-slate-100 px-4 py-3 font-medium text-slate-400'
+              : 'w-full rounded-xl bg-slate-800 px-4 py-3 font-medium text-white disabled:opacity-50'
+          }
+        >
+          {checking
+            ? 'סורקים התאמות...'
+            : newCandidateCount > 0
+              ? `סריקת ${newCandidateCount} חדשות`
+              : 'אין חדשות לסריקה'}
+        </button>
+      )}
+      {canManage && !checking && checkResult && (
         <p className="mt-2 rounded-xl bg-emerald-50 p-3 text-center text-sm text-emerald-800">
           ✓ הסריקה הושלמה - נבדקו {checkResult.newCount} התאמות חדשות
           {checkResult.visualMatches?.length > 0 && `, מתוכן ${checkResult.visualMatches.length} עם דמיון חזותי בולט`}
         </p>
       )}
-      {!checking && checkError && (
+      {canManage && !checking && checkError && (
         <p className="mt-2 rounded-xl bg-red-50 p-3 text-center text-sm font-medium text-red-700">{checkError}</p>
       )}
-      {matches.length > 0 && (
+      {canManage && matches.length > 0 && (
         <button
           onClick={handleReset}
           disabled={checking}
@@ -944,7 +948,7 @@ export default function LostCaseDetail() {
           איפוס כל ההתאמות (כולל סטטוסים) וסריקה מחדש
         </button>
       )}
-      {matches.length === 0 && <div className="mb-6" />}
+      {(!canManage || matches.length === 0) && <div className="mb-6" />}
 
       <h2 className="mb-3 text-lg font-semibold text-slate-700">התאמות אפשריות ({matches.length})</h2>
       {matches.length > 0 && (
@@ -1080,6 +1084,11 @@ function MatchCard({
   // themselves; editors/admins can delete any of them - same rule
   // FoundReportDetail.jsx applies when deleting a report from its own page.
   const canManageReport = report && (isEditorOrAdmin || report.reportedByUid === user.uid);
+  // Match-level actions (recheck, status, "no match") need owning EITHER
+  // side of this specific pairing - matches firestore.rules' own
+  // lostCases/{caseId}/matches/{foundReportId} write rule, tightened from
+  // "any signed-in user" to actual participants (or editor/admin).
+  const canManageMatch = isEditorOrAdmin || lostCase.ownerId === user.uid || canManageReport;
 
   async function handleDelete() {
     const ok = await confirm(
@@ -1102,17 +1111,19 @@ function MatchCard({
         <span className="flex shrink-0 items-center gap-2 font-medium text-slate-800">
           רמת התאמה: <ConfidenceBadge score={match.score} confidenceColors={confidenceColors} />
         </span>
-        <button
-          type="button"
-          onClick={() => onRecheck(match.foundReportId)}
-          disabled={rechecking}
-          className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
-        >
-          {rechecking ? 'סורק מחדש...' : 'סריקה חוזרת'}
-        </button>
+        {canManageMatch && (
+          <button
+            type="button"
+            onClick={() => onRecheck(match.foundReportId)}
+            disabled={rechecking}
+            className="shrink-0 whitespace-nowrap text-xs text-slate-500 underline disabled:opacity-50"
+          >
+            {rechecking ? 'סורק מחדש...' : 'סריקה חוזרת'}
+          </button>
+        )}
       </div>
       <div className="mb-2 flex items-center justify-end gap-2">
-        {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+        {canManageMatch && match.status !== REPORT_STATUS.NOT_RELEVANT && (
           <button
             type="button"
             onClick={() => onStatusChange(match.foundReportId, REPORT_STATUS.NOT_RELEVANT)}
@@ -1127,6 +1138,7 @@ function MatchCard({
           order={ORDERED_MATCH_STATUSES}
           onChange={(status) => onStatusChange(match.foundReportId, status)}
           colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+          disabled={!canManageMatch}
         />
       </div>
 
