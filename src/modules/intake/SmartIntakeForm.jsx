@@ -32,6 +32,7 @@ export default function SmartIntakeForm() {
     busy,
     reading,
     readError,
+    createError,
     analyze,
     createFromType,
     creating,
@@ -174,6 +175,7 @@ export default function SmartIntakeForm() {
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {creating && <AnalyzingIndicator />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
+        {createError && <p className="mt-2 text-sm text-red-600">{createError}</p>}
       </div>
 
       {extracted && !extracted.reportType && !creating && (

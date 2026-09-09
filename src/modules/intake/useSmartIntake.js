@@ -63,6 +63,12 @@ export function useSmartIntake() {
   // needs a color check, that runs right after the breed dialog resolves.
   const [breedCheck, setBreedCheck] = useState(null);
   const [colorCheck, setColorCheck] = useState(null);
+  // Set when extraction itself succeeds (so readError never fires) but the
+  // save that follows - the duplicate check, the photo upload, the Firestore
+  // write - throws. Without this, that failure used to vanish silently: no
+  // record got created and nothing told the person why, which read as
+  // "sharing just stopped working" with no way to tell what actually broke.
+  const [createError, setCreateError] = useState('');
 
   // `filesOverride`/`sourceUrlOverride` let a caller that just set that
   // state itself (e.g. the share-target screen, reacting to a fresh share
@@ -72,10 +78,12 @@ export function useSmartIntake() {
     const targetFiles = filesOverride ?? files;
     if (targetFiles.length === 0) return;
     setExtracted(null);
+    setCreateError('');
 
+    let result;
+    let resolvedSpecies = SPECIES.CAT;
     try {
       setDetectingSpecies(true);
-      let resolvedSpecies = SPECIES.CAT;
       let detectCostUsd = 0;
       try {
         const speciesResult = await detectSpecies(targetFiles[0]);
@@ -88,30 +96,42 @@ export function useSmartIntake() {
       }
       setDetectedSpecies(resolvedSpecies);
 
-      const result = await read(targetFiles, postText, resolvedSpecies);
+      result = await read(targetFiles, postText, resolvedSpecies);
       result._aiUsage = { ...result._aiUsage, estimatedCostUsd: (result._aiUsage?.estimatedCostUsd || 0) + detectCostUsd };
       setExtracted(result);
-      if (result.reportType === 'lost' || result.reportType === 'found') {
-        await createFromType(result, result.reportType, targetFiles, sourceUrlOverride, resolvedSpecies);
-      }
     } catch {
       // error already surfaced via readError
+      return;
+    }
+
+    if (result.reportType === 'lost' || result.reportType === 'found') {
+      try {
+        await createFromType(result, result.reportType, targetFiles, sourceUrlOverride, resolvedSpecies);
+      } catch {
+        setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      }
     }
   }
 
   async function createFromType(result, type, uploadedFiles, sourceUrlOverride, speciesOverride) {
-    const species = speciesOverride ?? detectedSpecies ?? preferredSpecies;
-    const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
-    if (finalSourceUrl?.trim() || result.contactPhone?.trim()) {
-      const matches = await findDuplicates(type, { sourceUrl: finalSourceUrl, contactPhone: result.contactPhone });
-      if (matches.length > 0) {
-        pendingCreateRef.current = { result, type, uploadedFiles, sourceUrlOverride, species };
-        setDuplicateRecordType(type);
-        setDuplicateMatches(matches);
-        return;
+    setCreateError('');
+    try {
+      const species = speciesOverride ?? detectedSpecies ?? preferredSpecies;
+      const finalSourceUrl = sourceUrlOverride ?? sourceUrl;
+      if (finalSourceUrl?.trim() || result.contactPhone?.trim()) {
+        const matches = await findDuplicates(type, { sourceUrl: finalSourceUrl, contactPhone: result.contactPhone });
+        if (matches.length > 0) {
+          pendingCreateRef.current = { result, type, uploadedFiles, sourceUrlOverride, species };
+          setDuplicateRecordType(type);
+          setDuplicateMatches(matches);
+          return;
+        }
       }
+      await doCreate(result, type, uploadedFiles, sourceUrlOverride, species);
+    } catch (err) {
+      setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      throw err;
     }
-    await doCreate(result, type, uploadedFiles, sourceUrlOverride, species);
   }
 
   async function doCreate(result, type, uploadedFiles, sourceUrlOverride, species) {
@@ -198,7 +218,12 @@ export function useSmartIntake() {
   function continueCreateAnyway() {
     const pending = pendingCreateRef.current;
     setDuplicateMatches(null);
-    if (pending) doCreate(pending.result, pending.type, pending.uploadedFiles, pending.sourceUrlOverride, pending.species);
+    setCreateError('');
+    if (pending) {
+      doCreate(pending.result, pending.type, pending.uploadedFiles, pending.sourceUrlOverride, pending.species).catch(() => {
+        setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      });
+    }
   }
 
   function cancelDuplicateCreate() {
@@ -215,6 +240,7 @@ export function useSmartIntake() {
     creating,
     busy: reading || creating || detectingSpecies,
     readError,
+    createError,
     analyze,
     createFromType,
     cancelReading,

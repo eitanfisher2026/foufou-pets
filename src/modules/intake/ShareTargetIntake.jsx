@@ -26,6 +26,7 @@ export default function ShareTargetIntake() {
     busy,
     reading,
     readError,
+    createError,
     analyze,
     createFromType,
     creating,
@@ -150,6 +151,7 @@ export default function ShareTargetIntake() {
       {reading && <AnalyzingIndicator onCancel={cancelReading} />}
       {creating && <AnalyzingIndicator />}
       {readError && <p className="text-sm text-red-600">{readError}</p>}
+      {createError && <p className="text-sm text-red-600">{createError}</p>}
 
       {status !== 'loading' && status !== 'fetching-link' && !creating && (
         <div>
