@@ -35,6 +35,7 @@ import {
 } from '../shared/collections.js';
 import { createFoundReport, updateFoundReport } from './foundReportApi.js';
 import { EMPTY_FOUND_FIELDS, mergeExtractedFoundFields } from './foundFieldMapping.js';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 export default function FoundReportForm() {
   const { user, preferredSpecies } = useAuth();
@@ -74,6 +75,10 @@ export default function FoundReportForm() {
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
   const [colorCheckReportId, setColorCheckReportId] = useState(null);
   const [breedCheckReportId, setBreedCheckReportId] = useState(null);
+  // A failed submit/save used to fail completely silently - the button just
+  // went back to normal with no explanation, indistinguishable from success
+  // unless you noticed nothing actually navigated.
+  const [submitError, setSubmitError] = useState('');
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -164,9 +169,12 @@ export default function FoundReportForm() {
 
   async function createReport() {
     setSubmitting(true);
+    setSubmitError('');
     try {
       const reportId = await createFoundReport({ ...fields, source }, photos, user);
       runPostCreateChecks(reportId);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -196,7 +204,12 @@ export default function FoundReportForm() {
   }
 
   async function handleBreedCheckSave(newBreed) {
-    await updateFoundReport(breedCheckReportId, { ...fields, breed: newBreed }, []);
+    try {
+      await updateFoundReport(breedCheckReportId, { ...fields, breed: newBreed }, []);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
+      return;
+    }
     setField('breed', newBreed);
     const id = breedCheckReportId;
     setBreedCheckReportId(null);
@@ -210,7 +223,12 @@ export default function FoundReportForm() {
   }
 
   async function handleColorCheckSave(newColor) {
-    await updateFoundReport(colorCheckReportId, { ...fields, color: newColor }, []);
+    try {
+      await updateFoundReport(colorCheckReportId, { ...fields, color: newColor }, []);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
+      return;
+    }
     navigate(`/found/${colorCheckReportId}`);
   }
 
@@ -225,9 +243,13 @@ export default function FoundReportForm() {
     e.preventDefault();
     if (fields.sourceUrl?.trim() || fields.contactPhone?.trim()) {
       setSubmitting(true);
+      setSubmitError('');
       let matches = [];
       try {
         matches = await findDuplicates('found', { sourceUrl: fields.sourceUrl, contactPhone: fields.contactPhone });
+      } catch (err) {
+        setSubmitError(getErrorMessage(err));
+        return;
       } finally {
         setSubmitting(false);
       }
@@ -556,6 +578,7 @@ export default function FoundReportForm() {
         </Field>
       </FormSection>
 
+      {submitError && <p className="text-sm text-red-600">{submitError}</p>}
       <button
         type="submit"
         disabled={submitting}

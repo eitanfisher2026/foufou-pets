@@ -8,6 +8,7 @@ import {
   markFeedbackThreadRead,
   sendFeedbackMessage,
 } from './feedbackApi.js';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 function messageTime(ms) {
   return new Date(ms).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' });
@@ -37,6 +38,8 @@ export default function FeedbackDialog({ onClose }) {
 
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [replyError, setReplyError] = useState('');
 
   useEffect(() => {
     loadThreads();
@@ -61,6 +64,7 @@ export default function FeedbackDialog({ onClose }) {
   async function handleCreate() {
     if (!text.trim()) return;
     setSubmitting(true);
+    setSubmitError('');
     try {
       await createFeedbackThread({
         userId: user.uid,
@@ -76,6 +80,8 @@ export default function FeedbackDialog({ onClose }) {
       setCategory('general');
       setView('list');
       await loadThreads();
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -84,12 +90,15 @@ export default function FeedbackDialog({ onClose }) {
   async function handleReply() {
     if (!replyText.trim() || !activeThread) return;
     setSending(true);
+    setReplyError('');
     try {
       const from = isAdmin ? 'admin' : 'user';
       await sendFeedbackMessage(activeThread.id, from, replyText.trim());
       const updatedMessages = [...activeThread.messages, { from, text: replyText.trim(), timestamp: Date.now() }];
       setActiveThread({ ...activeThread, messages: updatedMessages });
       setReplyText('');
+    } catch (err) {
+      setReplyError(getErrorMessage(err));
     } finally {
       setSending(false);
     }
@@ -189,6 +198,7 @@ export default function FeedbackDialog({ onClose }) {
               onChange={(e) => setText(e.target.value)}
               maxLength={3000}
             />
+            {submitError && <p className="text-sm text-red-600">{submitError}</p>}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -226,6 +236,7 @@ export default function FeedbackDialog({ onClose }) {
                 </div>
               ))}
             </div>
+            {replyError && <p className="px-3 pt-2 text-xs text-red-600">{replyError}</p>}
             <div className="flex gap-2 border-t border-slate-100 p-3">
               <input
                 className="input flex-1"

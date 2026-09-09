@@ -58,11 +58,12 @@ async function enforceAiRateLimit(uid) {
 // keep that exception cheap.
 const MODEL = 'claude-sonnet-5';
 
-// Claude Sonnet 5 list pricing, per million tokens. Intro pricing is in
-// effect through 2026-08-31 ($2/$10) - after that date these need updating
-// to the standard $3/$15 rate, or actual spend will read lower than real.
-const PRICE_PER_MTOK_INPUT = 2.0;
-const PRICE_PER_MTOK_OUTPUT = 10.0;
+// Claude Sonnet 5 list pricing, per million tokens - standard rate. Intro
+// pricing ($2/$10) applied through 2026-08-31; today is past that, so the
+// cost dashboard was quietly under-reporting the app's single highest-
+// volume AI call by a third until this was caught and updated.
+const PRICE_PER_MTOK_INPUT = 3.0;
+const PRICE_PER_MTOK_OUTPUT = 15.0;
 
 // Haiku, not Sonnet: the species pre-detect call (used only by the
 // smart-add/share-target flow, where species isn't known up front - see

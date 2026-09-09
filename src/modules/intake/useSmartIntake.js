@@ -192,10 +192,15 @@ export function useSmartIntake() {
   async function saveBreedCheck(newBreed) {
     const { type, id, fields } = breedCheck;
     const updatedFields = { ...fields, breed: newBreed };
-    if (type === 'lost') {
-      await updateLostCase(id, updatedFields, []);
-    } else {
-      await updateFoundReport(id, updatedFields, []);
+    try {
+      if (type === 'lost') {
+        await updateLostCase(id, updatedFields, []);
+      } else {
+        await updateFoundReport(id, updatedFields, []);
+      }
+    } catch (err) {
+      setCreateError(formatCreateError(err));
+      return;
     }
     setBreedCheck(null);
     await maybeColorCheck(type, id, updatedFields);
@@ -209,12 +214,17 @@ export function useSmartIntake() {
 
   async function saveColorCheck(newColor) {
     const { type, id, fields } = colorCheck;
-    if (type === 'lost') {
-      await updateLostCase(id, { ...fields, color: newColor }, []);
-      navigate(`/lost/${id}`);
-    } else {
-      await updateFoundReport(id, { ...fields, color: newColor }, []);
-      navigate(`/found/${id}`);
+    try {
+      if (type === 'lost') {
+        await updateLostCase(id, { ...fields, color: newColor }, []);
+        navigate(`/lost/${id}`);
+      } else {
+        await updateFoundReport(id, { ...fields, color: newColor }, []);
+        navigate(`/found/${id}`);
+      }
+    } catch (err) {
+      setCreateError(formatCreateError(err));
+      return;
     }
     setColorCheck(null);
   }

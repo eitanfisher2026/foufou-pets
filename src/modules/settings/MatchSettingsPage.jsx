@@ -396,19 +396,26 @@ export default function MatchSettingsPage() {
       { confirmLabel: 'איפוס' }
     );
     if (!ok) return;
+    setSaveError('');
     const catColorDefaults = CAT_COLORS.filter((c) => c !== OTHER);
     const dogColorDefaults = DOG_COLORS.filter((c) => c !== OTHER);
     const catBreedDefaults = CAT_BREEDS.filter((b) => b !== OTHER);
     const dogBreedDefaults = DOG_BREEDS.filter((b) => b !== OTHER);
     const patternDefaults = CAT_PATTERNS.filter((p) => p !== OTHER);
-    const [defaults] = await Promise.all([
-      resetMatchConfig(),
-      saveColorOptions(SPECIES.CAT, catColorDefaults),
-      saveColorOptions(SPECIES.DOG, dogColorDefaults),
-      saveBreedOptions(SPECIES.CAT, catBreedDefaults),
-      saveBreedOptions(SPECIES.DOG, dogBreedDefaults),
-      savePatternOptions(patternDefaults),
-    ]);
+    let defaults;
+    try {
+      [defaults] = await Promise.all([
+        resetMatchConfig(),
+        saveColorOptions(SPECIES.CAT, catColorDefaults),
+        saveColorOptions(SPECIES.DOG, dogColorDefaults),
+        saveBreedOptions(SPECIES.CAT, catBreedDefaults),
+        saveBreedOptions(SPECIES.DOG, dogBreedDefaults),
+        savePatternOptions(patternDefaults),
+      ]);
+    } catch (err) {
+      setSaveError(`האיפוס נכשל: ${err.message || 'שגיאה לא ידועה'}. ייתכן שחלק מההגדרות אופסו וחלק לא - כדאי לרענן ולבדוק.`);
+      return;
+    }
     setConfig(defaults);
     setCatColorOptions(catColorDefaults);
     setDogColorOptions(dogColorDefaults);

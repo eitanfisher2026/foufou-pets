@@ -5,6 +5,7 @@ import { listUsers, updateUserRole, deleteUser, clearUserReference, ROLES, ROLE_
 import { formatDateTime } from '../shared/formatDateTime.js';
 import SelectField from '../shared/SelectField.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({ value: role, label: ROLE_LABELS[role] }));
 
@@ -24,6 +25,9 @@ export default function UsersSettingsPage() {
   // whichever row it's actually about, even after clearing several people
   // in a row.
   const [clearedResults, setClearedResults] = useState({});
+  // Keyed by uid too, same reasoning as clearedResults - a failed action on
+  // one person's row shouldn't get lost or misread as being about another.
+  const [actionErrors, setActionErrors] = useState({});
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
@@ -40,9 +44,12 @@ export default function UsersSettingsPage() {
 
   async function handleRoleChange(uid, role) {
     setSavingUid(uid);
+    setActionErrors((prev) => ({ ...prev, [uid]: '' }));
     try {
       await updateUserRole(uid, role);
       setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role } : u)));
+    } catch (err) {
+      setActionErrors((prev) => ({ ...prev, [uid]: getErrorMessage(err) }));
     } finally {
       setSavingUid(null);
     }
@@ -63,9 +70,12 @@ export default function UsersSettingsPage() {
     );
     if (!ok) return;
     setClearingUid(u.id);
+    setActionErrors((prev) => ({ ...prev, [u.id]: '' }));
     try {
       const result = await clearUserReference(u.id);
       setClearedResults((prev) => ({ ...prev, [u.id]: result }));
+    } catch (err) {
+      setActionErrors((prev) => ({ ...prev, [u.id]: getErrorMessage(err) }));
     } finally {
       setClearingUid(null);
     }
@@ -84,9 +94,12 @@ export default function UsersSettingsPage() {
     );
     if (!ok) return;
     setDisconnectingUid(u.id);
+    setActionErrors((prev) => ({ ...prev, [u.id]: '' }));
     try {
       await deleteUser(u.id);
       setUsers((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (err) {
+      setActionErrors((prev) => ({ ...prev, [u.id]: getErrorMessage(err) }));
     } finally {
       setDisconnectingUid(null);
     }
@@ -157,6 +170,7 @@ export default function UsersSettingsPage() {
                 {clearedResults[u.id].feedbackThreadsCleared > 0 && `, ${clearedResults[u.id].feedbackThreadsCleared} פניות משוב`}.
               </p>
             )}
+            {actionErrors[u.id] && <p className="mt-1 text-xs font-medium text-red-600">{actionErrors[u.id]}</p>}
           </li>
         ))}
       </ul>

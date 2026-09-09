@@ -149,15 +149,17 @@ export async function updateFoundReportStatus(reportId, status) {
  * write - the found-report equivalent of updateLostCaseClosure in
  * lostReportApi.js. Found reports don't have their own archive-browsing
  * page or manual closure UI yet (see ArchivePage.jsx, currently lost-cases
- * only), but the fields are still worth recording consistently - right now
- * the only caller is the admin "archive records older than X days" bulk
- * action (see archiveOldRecordsApi.js).
+ * only), but the fields are still worth recording consistently. Status
+ * defaults to ARCHIVED (the admin "archive records older than X days" bulk
+ * action and updateMatchStatus's own CLOSED branch both want that), but
+ * NotifyOwnerDialog's "mark as resolved" checkbox needs RESOLVED instead -
+ * closure.status lets it override without a second, near-duplicate function.
  */
 export async function archiveFoundReport(reportId, closure) {
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
-      status: RECORD_STATUS.ARCHIVED,
+      status: closure.status || RECORD_STATUS.ARCHIVED,
       closureDate: closure.closureDate || '',
       closureReason: closure.closureReason || '',
       closedBy: closure.closedBy || '',

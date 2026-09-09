@@ -727,15 +727,19 @@ export async function countNewCandidatesForFoundReport(foundReportId) {
  * Uses a collection-group query on "matches" filtered by foundReportId,
  * not one getDoc per lost case - the original version fired one read PER
  * ACTIVE LOST CASE, in parallel, every single time this ran. That was fine
- * at this project's very first, tiny scale, but recomputeFoundReportVisualFlag
- * calls this once per notable visual match found during a single scan (see
- * checkMatchesForLostCase) - with the lost-case count grown into the
- * hundreds, a scan turning up even a handful of notable matches multiplied
- * out to hundreds of simultaneous reads, enough to trip Firestore's
- * client-side "too many outstanding requests" limit and silently kill the
- * whole scan partway through. This reads exactly the matches that actually
- * reference this found report - a handful at most, never one query per
- * lost case in the whole database.
+ * at this project's very first, tiny scale, but stopped scaling once the
+ * lost-case pool grew into the hundreds: a caller running this once per
+ * candidate (as recomputeFoundReportVisualFlag briefly did, before
+ * checkMatchesForLostCase/checkMatchesForFoundReport were changed to derive
+ * hasVisualMatch directly instead of requerying - see reportIdsToFlag/
+ * hasNewNotableMatch in each) could multiply out to hundreds of simultaneous
+ * reads, enough to trip Firestore's client-side "too many outstanding
+ * requests" limit and silently kill the whole scan partway through. Still
+ * used by checkSingleMatch, updateMatchStatus and
+ * backfillPhotoSimilarityForExistingMatches below - each calls this at most
+ * once per action, not once per candidate, so that risk doesn't apply there.
+ * This reads exactly the matches that actually reference this found report -
+ * a handful at most, never one query per lost case in the whole database.
  */
 export async function getMatchesForFoundReport(foundReportId) {
   const matchesSnap = await getDocs(query(collectionGroup(db, 'matches'), where('foundReportId', '==', foundReportId)));

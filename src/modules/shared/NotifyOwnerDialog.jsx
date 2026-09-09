@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { buildNotifyMessage, buildNotifyFinderMessage, buildWhatsAppUrl } from './notifyMessage.js';
 import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
-import { updateFoundReportStatus } from '../found-report/foundReportApi.js';
+import { archiveFoundReport } from '../found-report/foundReportApi.js';
 import { RECORD_STATUS, CLOSURE_REASON } from './collections.js';
 import { useConfirm } from './useConfirm.jsx';
+import { getErrorMessage } from './errorMessages.js';
 
 /**
  * Lets whoever's looking at a match (the owner themselves, or a volunteer/
@@ -45,6 +46,7 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, dir
   const [markResolved, setMarkResolved] = useState(false);
   const [resolving, setResolving] = useState(false);
   const [resolved, setResolved] = useState(false);
+  const [resolveError, setResolveError] = useState('');
   const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function handleSend() {
@@ -64,18 +66,36 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, dir
     }
     if (markResolved && !resolved) {
       setResolving(true);
+      setResolveError('');
       try {
+        // closedViaFoundReportId/closedViaLostCaseId let firestore.rules
+        // verify a real match naming that exact counterpart exists, and that
+        // this write's requester actually owns it - the same mechanism
+        // updateMatchStatus's own CLOSED branch uses (see matchingApi.js) -
+        // so whichever side of the match this person owns, they can still
+        // close out the other side through this confirmed-match flow,
+        // without needing to own both records or be an editor/admin.
         await Promise.all([
           updateLostCaseClosure(lostCase.id, RECORD_STATUS.RESOLVED, {
             closureDate: new Date().toISOString().slice(0, 10),
             closureReason: CLOSURE_REASON.RETURNED_TO_OWNER,
             closedBy: '',
             closingComment: 'סומן כהתאמה שנמצאה דרך התראת וואטסאפ',
+            closedViaFoundReportId: foundReportId,
           }),
-          updateFoundReportStatus(foundReportId, RECORD_STATUS.RESOLVED),
+          archiveFoundReport(foundReportId, {
+            status: RECORD_STATUS.RESOLVED,
+            closureDate: new Date().toISOString().slice(0, 10),
+            closureReason: CLOSURE_REASON.RETURNED_TO_OWNER,
+            closedBy: '',
+            closingComment: 'סומן כהתאמה שנמצאה דרך התראת וואטסאפ',
+            closedViaLostCaseId: lostCase.id,
+          }),
         ]);
         setResolved(true);
         onResolved?.();
+      } catch (err) {
+        setResolveError(getErrorMessage(err));
       } finally {
         setResolving(false);
       }
@@ -147,6 +167,7 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, dir
           {sent && <p className="text-xs text-emerald-600">הסטטוס של ההתאמה עודכן ל"נוצר קשר".</p>}
           {resolving && <p className="text-xs text-slate-500">סוגר את שתי הרשומות...</p>}
           {resolved && <p className="text-xs text-emerald-600">שני הרשומות סומנו כהתאמה שנמצאה וסגורות.</p>}
+          {resolveError && <p className="text-xs font-medium text-red-600">{resolveError}</p>}
 
           <div className="flex gap-2">
             <button

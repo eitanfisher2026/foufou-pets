@@ -31,6 +31,18 @@ service cloud.firestore {
       return request.auth.token.email == 'eitanfisher100@gmail.com';
     }
 
+    // Reasons that legitimately close a record as a direct consequence of a
+    // confirmed match between two specific records (see the closedVia*
+    // carve-outs on lostCases/foundReports below) - 'system_match_closed'
+    // from marking a match's own status CLOSED (updateMatchStatus in
+    // matchingApi.js), 'returned_to_owner' from NotifyOwnerDialog's "mark as
+    // resolved" checkbox. Both are still gated on the same verified-pairing
+    // check either way; this only widens WHICH closure reason can use that
+    // check, not who can use it.
+    function isMatchCloseReason(reason) {
+      return reason == 'system_match_closed' || reason == 'returned_to_owner';
+    }
+
     // Everyone who has ever signed in gets a profile doc (see usersApi.js:
     // upsertUserOnLogin). Only an admin can change someone's role after
     // creation; a user can still update their own doc (lastLoginAt,
@@ -57,13 +69,14 @@ service cloud.firestore {
     //   own, being checked against lost cases you don't) can still refresh
     //   the summary numbers on cases you're not the owner of.
     // - status/closureDate/closureReason/closedBy/closingComment/
-    //   closedViaFoundReportId/updatedAt ONLY when closureReason is
-    //   'system_match_closed' (see updateMatchStatus in matchingApi.js) AND
-    //   a real match naming that exact found report exists under this exact
-    //   case AND the requester actually owns that found report - so
-    //   marking a match CLOSED (a genuine "found!") can archive both sides
-    //   even when the closer only owns one of them, without opening this
-    //   case's status to anyone who merely claims a found report as theirs.
+    //   closedViaFoundReportId/updatedAt ONLY when closureReason is a real
+    //   match-close reason (see isMatchCloseReason above) AND a real match
+    //   naming that exact found report exists under this exact case AND the
+    //   requester actually owns that found report - so marking a match
+    //   CLOSED, or confirming it resolved via NotifyOwnerDialog, can close
+    //   both sides even when the closer only owns one of them, without
+    //   opening this case's status to anyone who merely claims a found
+    //   report as theirs.
     match /lostCases/{caseId} {
       allow read: if signedIn();
       allow create: if signedIn();
@@ -79,7 +92,7 @@ service cloud.firestore {
             'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment',
             'closedViaFoundReportId', 'updatedAt'
           ]) &&
-          request.resource.data.closureReason == 'system_match_closed' &&
+          isMatchCloseReason(request.resource.data.closureReason) &&
           exists(/databases/$(database)/documents/lostCases/$(caseId)/matches/$(request.resource.data.closedViaFoundReportId)) &&
           get(/databases/$(database)/documents/foundReports/$(request.resource.data.closedViaFoundReportId)).data.reportedByUid == request.auth.uid
         )
@@ -117,11 +130,11 @@ service cloud.firestore {
 
     // hasVisualMatch is the same denormalized counter carve-out as
     // lostCases' matchCount etc. above. The closure carve-out mirrors
-    // lostCases' own: only when closureReason is 'system_match_closed' AND
-    // a real match under the named lost case actually references this
-    // found report AND the requester owns that lost case - so a lost
-    // case's owner can close out the found report on the other end of
-    // their match too.
+    // lostCases' own: only when closureReason is a real match-close reason
+    // (see isMatchCloseReason above) AND a real match under the named lost
+    // case actually references this found report AND the requester owns
+    // that lost case - so a lost case's owner can close out the found
+    // report on the other end of their match too.
     match /foundReports/{reportId} {
       allow read: if signedIn();
       allow create: if signedIn();
@@ -134,7 +147,7 @@ service cloud.firestore {
             'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment',
             'closedViaLostCaseId', 'updatedAt'
           ]) &&
-          request.resource.data.closureReason == 'system_match_closed' &&
+          isMatchCloseReason(request.resource.data.closureReason) &&
           exists(/databases/$(database)/documents/lostCases/$(request.resource.data.closedViaLostCaseId)/matches/$(reportId)) &&
           get(/databases/$(database)/documents/lostCases/$(request.resource.data.closedViaLostCaseId)).data.ownerId == request.auth.uid
         )

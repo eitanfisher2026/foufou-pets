@@ -34,6 +34,7 @@ import {
 } from '../shared/collections.js';
 import { createLostCase, updateLostCase } from './lostReportApi.js';
 import { EMPTY_LOST_FIELDS, mergeExtractedLostFields } from './lostFieldMapping.js';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 export default function LostReportForm() {
   const { user, preferredSpecies } = useAuth();
@@ -72,6 +73,10 @@ export default function LostReportForm() {
   const [duplicateDialogMode, setDuplicateDialogMode] = useState('submit');
   const [colorCheckCaseId, setColorCheckCaseId] = useState(null);
   const [breedCheckCaseId, setBreedCheckCaseId] = useState(null);
+  // A failed submit/save used to fail completely silently - the button just
+  // went back to normal with no explanation, indistinguishable from success
+  // unless you noticed nothing actually navigated.
+  const [submitError, setSubmitError] = useState('');
   const detectedFbUrl = extractFacebookUrl(postText);
 
   function setField(key, value) {
@@ -161,9 +166,12 @@ export default function LostReportForm() {
 
   async function createCase() {
     setSubmitting(true);
+    setSubmitError('');
     try {
       const caseId = await createLostCase({ ...fields, source }, photos, user);
       runPostCreateChecks(caseId);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -193,7 +201,12 @@ export default function LostReportForm() {
   }
 
   async function handleBreedCheckSave(newBreed) {
-    await updateLostCase(breedCheckCaseId, { ...fields, breed: newBreed }, []);
+    try {
+      await updateLostCase(breedCheckCaseId, { ...fields, breed: newBreed }, []);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
+      return;
+    }
     setField('breed', newBreed);
     const id = breedCheckCaseId;
     setBreedCheckCaseId(null);
@@ -207,7 +220,12 @@ export default function LostReportForm() {
   }
 
   async function handleColorCheckSave(newColor) {
-    await updateLostCase(colorCheckCaseId, { ...fields, color: newColor }, []);
+    try {
+      await updateLostCase(colorCheckCaseId, { ...fields, color: newColor }, []);
+    } catch (err) {
+      setSubmitError(getErrorMessage(err));
+      return;
+    }
     navigate(`/lost/${colorCheckCaseId}`);
   }
 
@@ -222,9 +240,13 @@ export default function LostReportForm() {
     e.preventDefault();
     if (fields.sourceUrl?.trim() || fields.contactPhone?.trim()) {
       setSubmitting(true);
+      setSubmitError('');
       let matches = [];
       try {
         matches = await findDuplicates('lost', { sourceUrl: fields.sourceUrl, contactPhone: fields.contactPhone });
+      } catch (err) {
+        setSubmitError(getErrorMessage(err));
+        return;
       } finally {
         setSubmitting(false);
       }
@@ -530,6 +552,7 @@ export default function LostReportForm() {
         </Field>
       </FormSection>
 
+      {submitError && <p className="text-sm text-red-600">{submitError}</p>}
       <button
         type="submit"
         disabled={submitting}

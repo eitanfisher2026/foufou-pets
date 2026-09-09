@@ -10,6 +10,7 @@ import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
+import { getErrorMessage } from '../shared/errorMessages.js';
 
 function photoThresholdLabel(key) {
   if (key === 'never') return 'כבוי';
@@ -27,9 +28,11 @@ export default function SettingsPage() {
   const [rescanning, setRescanning] = useState(false);
   const [rescanProgress, setRescanProgress] = useState(null);
   const [rescanResult, setRescanResult] = useState(null);
+  const [rescanError, setRescanError] = useState('');
   const [photoBackfilling, setPhotoBackfilling] = useState(false);
   const [photoBackfillProgress, setPhotoBackfillProgress] = useState(null);
   const [photoBackfillResult, setPhotoBackfillResult] = useState(null);
+  const [photoBackfillError, setPhotoBackfillError] = useState('');
   // Both actions below silently do nothing if the threshold set in
   // "פרמטרים להתאמה" was never actually saved there (it's a separate page,
   // with its own save button at the bottom of a long form) - showing the
@@ -44,6 +47,7 @@ export default function SettingsPage() {
   const [archiving, setArchiving] = useState(false);
   const [archiveProgress, setArchiveProgress] = useState(null);
   const [archiveResult, setArchiveResult] = useState(null);
+  const [archiveError, setArchiveError] = useState('');
   // Pure preview, no side effects - unlike the real onboarding flow (see
   // Dashboard.jsx), closing this never touches hasSeenOnboarding, so
   // reviewing it here can't accidentally leave the admin's own account
@@ -61,11 +65,14 @@ export default function SettingsPage() {
   async function handleRescanAll() {
     setRescanning(true);
     setRescanResult(null);
+    setRescanError('');
     setRescanProgress({ done: 0, total: 0 });
     try {
       const result = await rescanAllLostCases((done, total) => setRescanProgress({ done, total }));
       setRescanResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setRescanError(getErrorMessage(err));
     } finally {
       setRescanning(false);
     }
@@ -74,6 +81,7 @@ export default function SettingsPage() {
   async function handlePhotoBackfill() {
     setPhotoBackfilling(true);
     setPhotoBackfillResult(null);
+    setPhotoBackfillError('');
     setPhotoBackfillProgress({ done: 0, total: 0 });
     try {
       const result = await backfillPhotoSimilarityForExistingMatches((done, total) =>
@@ -81,6 +89,8 @@ export default function SettingsPage() {
       );
       setPhotoBackfillResult(result);
       notifyVisualMatch(result.visualMatches);
+    } catch (err) {
+      setPhotoBackfillError(getErrorMessage(err));
     } finally {
       setPhotoBackfilling(false);
     }
@@ -94,9 +104,12 @@ export default function SettingsPage() {
   async function handlePreviewArchive() {
     setPreviewing(true);
     setArchiveResult(null);
+    setArchiveError('');
     try {
       const counts = await countOldActiveRecords(new Date(archiveCutoffDate));
       setArchivePreview({ cutoffDate: archiveCutoffDate, ...counts });
+    } catch (err) {
+      setArchiveError(getErrorMessage(err));
     } finally {
       setPreviewing(false);
     }
@@ -109,6 +122,7 @@ export default function SettingsPage() {
 
   async function handleConfirmArchive() {
     setArchiving(true);
+    setArchiveError('');
     setArchiveProgress({ done: 0, total: 0 });
     try {
       const result = await archiveOldRecords(new Date(archivePreview.cutoffDate), user?.displayName || user?.email || '', (done, total) =>
@@ -116,6 +130,8 @@ export default function SettingsPage() {
       );
       setArchiveResult(result);
       setArchivePreview(null);
+    } catch (err) {
+      setArchiveError(getErrorMessage(err));
     } finally {
       setArchiving(false);
     }
@@ -194,6 +210,7 @@ export default function SettingsPage() {
             נסרקו מחדש {rescanResult.casesProcessed} תיקי חיפוש, נמצאו {rescanResult.matchesScored} התאמות בסך הכל.
           </p>
         )}
+        {rescanError && <p className="mt-2 text-sm font-medium text-red-600">{rescanError}</p>}
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
@@ -237,6 +254,7 @@ export default function SettingsPage() {
             )}
           </p>
         )}
+        {photoBackfillError && <p className="mt-2 text-sm font-medium text-red-600">{photoBackfillError}</p>}
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
@@ -308,6 +326,7 @@ export default function SettingsPage() {
             הועברו לארכיון {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.
           </p>
         )}
+        {archiveError && <p className="mt-2 text-sm font-medium text-red-600">{archiveError}</p>}
       </section>
 
       <AppFooter />
