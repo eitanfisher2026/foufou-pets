@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from 'react';
  * order itself is meaningful - see ORDERED_MATCH_STATUSES in
  * matchStatusLabels.js for a real one).
  */
-export default function DropdownBadge({ value, labels, order, onChange, colorClass = 'bg-slate-100 text-slate-600' }) {
+export default function DropdownBadge({ value, labels, order, onChange, colorClass = 'bg-slate-100 text-slate-600', disabled = false }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef(null);
 
@@ -39,7 +39,8 @@ export default function DropdownBadge({ value, labels, order, onChange, colorCla
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex h-7 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 px-4 text-xs font-semibold leading-none shadow-sm ${colorClass}`}
+        disabled={disabled}
+        className={`inline-flex h-7 max-w-full items-center gap-1.5 whitespace-nowrap rounded-full border border-black/10 px-4 text-xs font-semibold leading-none shadow-sm disabled:opacity-50 ${colorClass}`}
       >
         {labels[value] || value}
         <span aria-hidden="true" className="text-[9px]">

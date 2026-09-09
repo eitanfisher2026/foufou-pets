@@ -59,6 +59,7 @@ export default function MatchAnalysisPage() {
   const [foundReport, setFoundReport] = useState(null);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
   const [rechecking, setRechecking] = useState(false);
+  const [changingStatus, setChangingStatus] = useState(false);
   const [lightboxUrl, setLightboxUrl] = useState(null);
   // The full candidate list for whichever side dir names, sorted by score
   // (see getMatches/getMatchesForFoundReport) - lets marking "אין התאמה"
@@ -128,15 +129,20 @@ export default function MatchAnalysisPage() {
   // reviewing for either side - this always goes straight to the fallback,
   // even if some other still-NEW candidate technically exists.
   async function handleStatusChange(status) {
-    await updateMatchStatus(caseId, foundReportId, status);
-    setMatch((prev) => ({ ...prev, status }));
-    if (nextMatch && status !== REPORT_STATUS.CLOSED) {
-      if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
-      else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
-    } else if (dir === 'report') {
-      navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
-    } else {
-      navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
+    setChangingStatus(true);
+    try {
+      await updateMatchStatus(caseId, foundReportId, status);
+      setMatch((prev) => ({ ...prev, status }));
+      if (nextMatch && status !== REPORT_STATUS.CLOSED) {
+        if (dir === 'report') navigate(`/lost/${nextMatch.lostCase.id}/analysis/${foundReportId}?dir=report`);
+        else navigate(`/lost/${caseId}/analysis/${nextMatch.foundReportId}`);
+      } else if (dir === 'report') {
+        navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
+      } else {
+        navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
+      }
+    } finally {
+      setChangingStatus(false);
     }
   }
 
@@ -172,26 +178,40 @@ export default function MatchAnalysisPage() {
         </button>
       </div>
 
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-slate-600">סטטוס בדיקה:</span>
-        <div className="flex items-center gap-2">
-          {match.status !== REPORT_STATUS.NOT_RELEVANT && (
-            <button
-              type="button"
-              onClick={() => handleStatusChange(REPORT_STATUS.NOT_RELEVANT)}
-              className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500"
-            >
-              ✕ אין התאמה
-            </button>
-          )}
-          <DropdownBadge
-            value={match.status}
-            labels={MATCH_STATUS_LABELS}
-            order={ORDERED_MATCH_STATUSES}
-            onChange={handleStatusChange}
-            colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
-          />
+      <div className="mb-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-sm font-medium text-slate-600">סטטוס בדיקה:</span>
+          <div className="flex items-center gap-2">
+            {match.status !== REPORT_STATUS.NOT_RELEVANT && (
+              <button
+                type="button"
+                onClick={() => handleStatusChange(REPORT_STATUS.NOT_RELEVANT)}
+                disabled={changingStatus}
+                className="shrink-0 whitespace-nowrap rounded-full border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 disabled:opacity-50"
+              >
+                ✕ אין התאמה
+              </button>
+            )}
+            <DropdownBadge
+              value={match.status}
+              labels={MATCH_STATUS_LABELS}
+              order={ORDERED_MATCH_STATUSES}
+              onChange={handleStatusChange}
+              colorClass={MATCH_STATUS_COLORS[match.status] || 'bg-slate-100 text-slate-600'}
+              disabled={changingStatus}
+            />
+          </div>
         </div>
+        {/* Marking a match navigates to the next candidate right after
+            saving - that save/navigate round trip takes a beat, and without
+            this the page just sat frozen with no sign anything was
+            happening, which is exactly what invited a second, third click
+            on "אין התאמה" while the first was still in flight. */}
+        {changingStatus && (
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-400" />
+          </div>
+        )}
       </div>
 
       {(lostCase.photos?.[0]?.url || foundReport.photos?.[0]?.url) && (
