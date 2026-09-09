@@ -13,6 +13,16 @@ import { mergeExtractedLostFields, EMPTY_LOST_FIELDS } from '../lost-report/lost
 import { createFoundReport, updateFoundReport } from '../found-report/foundReportApi.js';
 import { mergeExtractedFoundFields, EMPTY_FOUND_FIELDS } from '../found-report/foundFieldMapping.js';
 
+// Includes the raw Firebase error code/message (e.g. "permission-denied",
+// "unavailable") rather than just a generic sentence - the save step can
+// fail for genuinely different reasons (a permissions rule, a flaky
+// connection, a quota), and without this there was no way to tell which
+// from the phone alone, with no computer/DevTools to check against.
+function formatCreateError(err) {
+  const detail = err?.code || err?.message || 'שגיאה לא ידועה';
+  return `הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה (${detail}). אפשר לנסות שוב, או למלא את הטופס ידנית.`;
+}
+
 /**
  * The "classify lost vs. found from images, then create the record" flow
  * used by both the manual smart-intake upload button and the share-target
@@ -107,8 +117,8 @@ export function useSmartIntake() {
     if (result.reportType === 'lost' || result.reportType === 'found') {
       try {
         await createFromType(result, result.reportType, targetFiles, sourceUrlOverride, resolvedSpecies);
-      } catch {
-        setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      } catch (err) {
+        setCreateError(formatCreateError(err));
       }
     }
   }
@@ -129,7 +139,7 @@ export function useSmartIntake() {
       }
       await doCreate(result, type, uploadedFiles, sourceUrlOverride, species);
     } catch (err) {
-      setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      setCreateError(formatCreateError(err));
       throw err;
     }
   }
@@ -220,8 +230,8 @@ export function useSmartIntake() {
     setDuplicateMatches(null);
     setCreateError('');
     if (pending) {
-      doCreate(pending.result, pending.type, pending.uploadedFiles, pending.sourceUrlOverride, pending.species).catch(() => {
-        setCreateError('הפרטים זוהו בהצלחה, אבל שמירת הדיווח נכשלה. אפשר לנסות שוב, או למלא את הטופס ידנית.');
+      doCreate(pending.result, pending.type, pending.uploadedFiles, pending.sourceUrlOverride, pending.species).catch((err) => {
+        setCreateError(formatCreateError(err));
       });
     }
   }
