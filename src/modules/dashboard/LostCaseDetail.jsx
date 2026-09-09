@@ -909,8 +909,20 @@ export default function LostCaseDetail() {
         </div>
       )}
 
-      {canManage && checking && checkProgress?.total > 0 && (
+      {canManage && checking && checkProgress?.total > 0 && checkProgress.done < checkProgress.total && (
         <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+      )}
+      {/* The per-candidate scan itself is done once done===total, but
+          saving the results (writing every match, updating this case's
+          counters) still takes a real beat of its own - previously
+          unexplained, silent time once the bar above hit 100%. */}
+      {canManage && checking && checkProgress?.total > 0 && checkProgress.done === checkProgress.total && (
+        <div className="mb-4">
+          <p className="mb-1 text-xs text-slate-500">שומרים את התוצאות...</p>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-800" />
+          </div>
+        </div>
       )}
 
       {canManage && (

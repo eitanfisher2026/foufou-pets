@@ -285,6 +285,16 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   const batch = writeBatch(db);
   const visualMatches = [];
   let visualCostUsd = 0;
+  // Every match written in this loop is brand new (newCandidates above
+  // already excludes anything with an existing match record), so it can
+  // only ever turn a found report's hasVisualMatch flag ON, never off -
+  // recomputeFoundReportVisualFlag's full requery (a collection-group query
+  // across every lost case, plus one extra read per match it finds) isn't
+  // needed to know that. It used to run once per notable candidate here,
+  // which was the real cost behind the scan's progress bar reaching 100%
+  // and the whole thing still sitting for many more seconds with nothing to
+  // show for it - a direct, targeted write replaces it.
+  const reportIdsToFlag = new Set();
   ranked.forEach(({ report, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
     const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
@@ -303,7 +313,10 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
     });
     if (visual) {
       visualCostUsd += visual.costUsd;
-      if (isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
+      if (isNotableVisualVerdict(visual.verdict)) {
+        visualMatches.push(visual);
+        if (status === REPORT_STATUS.NEW) reportIdsToFlag.add(report.id);
+      }
     }
   });
   await batch.commit();
@@ -312,7 +325,7 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { visualMatchCostUsd: increment(visualCostUsd) }, { merge: true });
   }
   await Promise.all(
-    visuals.filter(Boolean).map((visual) => recomputeFoundReportVisualFlag(visual.foundReportId))
+    [...reportIdsToFlag].map((reportId) => setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId), { hasVisualMatch: true }, { merge: true }))
   );
 
   return { newCount: newCandidates.length, visualMatches };
@@ -646,6 +659,11 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
 
   const batch = writeBatch(db);
   const visualMatches = [];
+  // Same reasoning as checkMatchesForLostCase's own reportIdsToFlag: every
+  // match written here is brand new, so it can only ever turn this found
+  // report's hasVisualMatch flag ON - no need for
+  // recomputeFoundReportVisualFlag's full requery.
+  let hasNewNotableMatch = false;
   scored.forEach(({ lostCase, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
     const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
@@ -659,7 +677,10 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
       checkedAt: serverTimestamp(),
       ...(visual ? { visualSimilarity: visual } : {}),
     });
-    if (visual && isNotableVisualVerdict(visual.verdict)) visualMatches.push(visual);
+    if (visual && isNotableVisualVerdict(visual.verdict)) {
+      visualMatches.push(visual);
+      if (status === REPORT_STATUS.NEW) hasNewNotableMatch = true;
+    }
   });
   await batch.commit();
   await Promise.all(newCandidates.map((lostCase) => recomputeLostCaseCounts(lostCase.id)));
@@ -670,9 +691,9 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
       return setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCase.id), { visualMatchCostUsd: increment(cost) }, { merge: true });
     })
   );
-  // Every visual here (if any) is about this same single found report, so
-  // one recompute covers the whole batch, not one per lost case.
-  if (visuals.some(Boolean)) await recomputeFoundReportVisualFlag(foundReportId);
+  if (hasNewNotableMatch) {
+    await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId), { hasVisualMatch: true }, { merge: true });
+  }
 
   return { newCount: newCandidates.length, visualMatches };
 }

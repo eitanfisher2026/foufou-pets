@@ -3,7 +3,6 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
 import { randomUUID } from 'node:crypto';
-import sharp from 'sharp';
 import Anthropic from '@anthropic-ai/sdk';
 
 initializeApp();
@@ -758,6 +757,13 @@ async function uploadThumbnail(bucket, thumbPath, buffer) {
 }
 
 async function generateThumbnailFor(bucket, photo) {
+  // Loaded lazily, only here where it's actually used - sharp's native
+  // binding load is real cold-start weight every other function in this
+  // file (detectPetSpecies, extractReportFromImages, uploadReportPhoto,
+  // fetchFacebookLinkPreview) would otherwise pay on every cold start for
+  // no reason, since a static top-level import runs for every function's
+  // own container regardless of whether that function ever touches it.
+  const sharp = (await import('sharp')).default;
   const [buffer] = await bucket.file(photo.path).download();
   const thumbBuffer = await sharp(buffer)
     .resize(THUMB_MAX_DIMENSION, THUMB_MAX_DIMENSION, { fit: 'inside', withoutEnlargement: true })

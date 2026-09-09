@@ -848,8 +848,20 @@ export default function FoundReportDetail() {
 
       {!showEditForm && (
         <>
-          {canManage && checking && checkProgress?.total > 0 && (
+          {canManage && checking && checkProgress?.total > 0 && checkProgress.done < checkProgress.total && (
             <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+          )}
+          {/* Same reasoning as LostCaseDetail.jsx's own second phase: the
+              per-candidate scan finishing isn't the same as being done -
+              saving the results still takes a real, previously unexplained
+              beat of its own. */}
+          {canManage && checking && checkProgress?.total > 0 && checkProgress.done === checkProgress.total && (
+            <div className="mb-4">
+              <p className="mb-1 text-xs text-slate-500">שומרים את התוצאות...</p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-800" />
+              </div>
+            </div>
           )}
           {canManage && (
             <button
