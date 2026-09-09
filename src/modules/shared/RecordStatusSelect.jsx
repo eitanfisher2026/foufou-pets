@@ -14,8 +14,14 @@ const STATUS_COLORS = {
  * appropriate Hebrew text, since "resolved" means something different for
  * a lost case (cat found) than a found report (cat returned to its owner).
  */
-export default function RecordStatusSelect({ status, labels, onChange }) {
+export default function RecordStatusSelect({ status, labels, onChange, disabled = false }) {
   return (
-    <DropdownBadge value={status} labels={labels} onChange={onChange} colorClass={STATUS_COLORS[status] || 'bg-slate-100 text-slate-600'} />
+    <DropdownBadge
+      value={status}
+      labels={labels}
+      onChange={onChange}
+      colorClass={STATUS_COLORS[status] || 'bg-slate-100 text-slate-600'}
+      disabled={disabled}
+    />
   );
 }

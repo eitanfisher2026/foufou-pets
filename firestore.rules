@@ -50,18 +50,31 @@ service cloud.firestore {
     // else's case is editor/admin-only, EXCEPT the specific denormalized
     // fields a match-check writes back onto the case (matchCount etc.) -
     // "run the match for all" needs to write those on any case, not just
-    // your own, without opening up the rest of the record. visualMatchCostUsd
-    // and hasVisualMatch are the same story for the AI photo-similarity
-    // check (see matchingApi.js) - it can fire while checking matches
+    // your own, without opening up the rest of the record. visualMatchCostUsd,
+    // hasVisualMatch and importantMatchCount are the same story for the AI
+    // photo-similarity check and per-match status counters (see
+    // matchingApi.js) - both can fire while checking/reviewing matches
     // against someone else's lost case just as easily as your own.
+    // status/closureDate/closureReason/closedBy/closingComment/updatedAt are
+    // included too for the same reason as the /matches subcollection below
+    // being open to everyone: marking a match CLOSED (a genuine "found!")
+    // archives BOTH sides of the pair through this same open door - a found
+    // report's own owner needs to be able to close out the lost case on the
+    // other end of their match, not just editors/admins or that case's own
+    // owner, or the single most important status a match can reach would be
+    // the one action most people reviewing a match from their own side could
+    // never actually take.
     match /lostCases/{caseId} {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update: if signedIn() && (
         isEditorOrAdmin() ||
         resource.data.ownerId == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['matchCount', 'newMatchCount', 'topMatchScore', 'lastCheckedAt', 'visualMatchCostUsd', 'hasVisualMatch'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'matchCount', 'newMatchCount', 'importantMatchCount', 'topMatchScore', 'lastCheckedAt',
+          'visualMatchCostUsd', 'hasVisualMatch',
+          'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment', 'updatedAt'
+        ])
       );
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.ownerId == request.auth.uid);
 
@@ -88,14 +101,19 @@ service cloud.firestore {
 
     // hasVisualMatch is the same denormalized-field carve-out as
     // lostCases' matchCount etc. above - a match-check can set this on a
-    // found report you don't own just as easily as on your own.
+    // found report you don't own just as easily as on your own. The closure
+    // fields are the same "closing a match archives both sides" carve-out
+    // as lostCases' own closure fields - a lost case's owner needs to be
+    // able to close out a found report on the other end of their match too.
     match /foundReports/{reportId} {
       allow read: if signedIn();
       allow create: if signedIn();
       allow update: if signedIn() && (
         isEditorOrAdmin() ||
         resource.data.reportedByUid == request.auth.uid ||
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasVisualMatch'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'hasVisualMatch', 'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment', 'updatedAt'
+        ])
       );
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
     }

@@ -66,6 +66,7 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
+import { getErrorMessage } from '../shared/errorMessages.js';
 import ClosureDialog from '../shared/ClosureDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import {
@@ -139,6 +140,13 @@ export default function LostCaseDetail() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Covers every action below that changes the record itself (rename,
+  // status, photos, species fix, save, delete) - most of these used to have
+  // no error handling at all, so a rejected write (most commonly a
+  // permissions rule, since almost every action here is only ever shown to
+  // someone canManage already allows) just did nothing with zero
+  // indication anything went wrong.
+  const [actionError, setActionError] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   // Which of the per-status sections below "ממתינות לבדיקה" are expanded
   // (see MATCH_STATUS_DISPLAY_ORDER) - a set of REPORT_STATUS values, each
@@ -229,9 +237,14 @@ export default function LostCaseDetail() {
   // without needing to open full edit mode. Updates both lostCase and
   // fields so a subsequent "עריכה" starts from the renamed value too.
   async function handleQuickRename(newName) {
-    await updateLostCase(caseId, { ...lostCase, name: newName }, []);
-    setLostCase((prev) => ({ ...prev, name: newName }));
-    setFields((prev) => (prev ? { ...prev, name: newName } : prev));
+    setActionError('');
+    try {
+      await updateLostCase(caseId, { ...lostCase, name: newName }, []);
+      setLostCase((prev) => ({ ...prev, name: newName }));
+      setFields((prev) => (prev ? { ...prev, name: newName } : prev));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function loadReportSnapshots(matchList) {
@@ -317,17 +330,28 @@ export default function LostCaseDetail() {
       setPendingCloseStatus(status);
       return;
     }
-    await updateLostCaseStatus(caseId, status);
-    setLostCase((prev) => ({ ...prev, status }));
+    setActionError('');
+    try {
+      await updateLostCaseStatus(caseId, status);
+      setLostCase((prev) => ({ ...prev, status }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // Once a case is closed there's nothing left to do on its detail page
   // (matches, edit form) - head back to the working dashboard instead of
   // staying on a page for a case that's no longer active.
   async function handleConfirmClosure(closure) {
-    await updateLostCaseClosure(caseId, pendingCloseStatus, closure);
-    setPendingCloseStatus(null);
-    navigate('/');
+    setActionError('');
+    try {
+      await updateLostCaseClosure(caseId, pendingCloseStatus, closure);
+      setPendingCloseStatus(null);
+      navigate('/');
+    } catch (err) {
+      setPendingCloseStatus(null);
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // Same reasoning as handleConfirmClosure - once a match is confirmed via
@@ -346,15 +370,25 @@ export default function LostCaseDetail() {
   }
 
   async function handleRemoveExistingPhoto(photo) {
-    const remaining = await removeLostCasePhoto(caseId, photo, lostCase.photos || []);
-    setLostCase((prev) => ({ ...prev, photos: remaining }));
-    setFields((prev) => ({ ...prev, photos: remaining }));
+    setActionError('');
+    try {
+      const remaining = await removeLostCasePhoto(caseId, photo, lostCase.photos || []);
+      setLostCase((prev) => ({ ...prev, photos: remaining }));
+      setFields((prev) => ({ ...prev, photos: remaining }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleMakeMainPhoto(photo) {
-    const reordered = await makeLostCasePhotoMain(caseId, photo, lostCase.photos || []);
-    setLostCase((prev) => ({ ...prev, photos: reordered }));
-    setFields((prev) => ({ ...prev, photos: reordered }));
+    setActionError('');
+    try {
+      const reordered = await makeLostCasePhotoMain(caseId, photo, lostCase.photos || []);
+      setLostCase((prev) => ({ ...prev, photos: reordered }));
+      setFields((prev) => ({ ...prev, photos: reordered }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // A rare AI/human mistake (a dog read as a cat, or vice versa) with no
@@ -372,9 +406,14 @@ export default function LostCaseDetail() {
       { confirmLabel: `שינוי ל${SPECIES_LABELS[newSpecies]}`, danger: true }
     );
     if (!ok) return;
-    await fixLostCaseSpecies(caseId, newSpecies);
-    await clearMatches(caseId);
-    await load();
+    setActionError('');
+    try {
+      await fixLostCaseSpecies(caseId, newSpecies);
+      await clearMatches(caseId);
+      await load();
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleDelete() {
@@ -383,9 +422,12 @@ export default function LostCaseDetail() {
     });
     if (!ok) return;
     setDeleting(true);
+    setActionError('');
     try {
       await deleteLostCase(caseId, lostCase.photos || []);
       navigate('/');
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -412,6 +454,7 @@ export default function LostCaseDetail() {
 
   async function handleSave() {
     setSaving(true);
+    setActionError('');
     try {
       const existingCountBeforeSave = (fields.photos || []).length;
       await updateLostCase(caseId, fields, newPhotos);
@@ -429,16 +472,23 @@ export default function LostCaseDetail() {
         setEditing(false);
         await load();
       }
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleColorCheckSave(newColor) {
-    await updateLostCase(caseId, { ...fields, color: newColor }, []);
-    setColorCheckPending(false);
-    setEditing(false);
-    await load();
+    setActionError('');
+    try {
+      await updateLostCase(caseId, { ...fields, color: newColor }, []);
+      setColorCheckPending(false);
+      setEditing(false);
+      await load();
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleColorCheckSkip() {
@@ -491,6 +541,7 @@ export default function LostCaseDetail() {
                 status={lostCase.status || RECORD_STATUS.ACTIVE}
                 labels={LOST_CASE_STATUS_LABELS}
                 onChange={handleRecordStatusChange}
+                disabled={!canManage}
               />
               {lostCase.hasVisualMatch && (
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
@@ -518,22 +569,25 @@ export default function LostCaseDetail() {
                     {deleting ? 'מוחקים...' : 'מחיקת התיק'}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    handleRecordStatusChange(
-                      lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
-                        ? lostCase.status
-                        : RECORD_STATUS.ARCHIVED
-                    )
-                  }
-                  className="text-sm text-slate-600 underline"
-                >
-                  ארכיון
-                </button>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleRecordStatusChange(
+                        lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
+                          ? lostCase.status
+                          : RECORD_STATUS.ARCHIVED
+                      )
+                    }
+                    className="text-sm text-slate-600 underline"
+                  >
+                    ארכיון
+                  </button>
+                )}
               </div>
             </div>
           </div>
+          {actionError && <p className="mb-2 text-sm text-red-600">{actionError}</p>}
           {lostCase.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{lostCase.markings}</p>}
           {lostCase.contactPhone && (
             <p className="mb-2 text-sm text-slate-600">טלפון: {lostCase.contactPhone}</p>
@@ -820,6 +874,8 @@ export default function LostCaseDetail() {
               onDiscard={() => setPendingExtraction(null)}
             />
           )}
+
+          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
 
           <div className="sticky bottom-0 -mx-4 flex gap-2 border-t border-slate-200 bg-white p-4 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
             <button

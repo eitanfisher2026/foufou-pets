@@ -68,6 +68,7 @@ import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
+import { getErrorMessage } from '../shared/errorMessages.js';
 import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
 
 const EXTRACTION_FIELD_DEFS = [
@@ -114,6 +115,10 @@ export default function FoundReportDetail() {
   const [lightboxUrl, setLightboxUrl] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Same as LostCaseDetail.jsx's actionError - most actions here had no
+  // error handling at all, so a rejected write (most commonly a
+  // permissions rule) just did nothing with zero indication.
+  const [actionError, setActionError] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   const [matches, setMatches] = useState([]);
   const [checking, setChecking] = useState(false);
@@ -291,9 +296,14 @@ export default function FoundReportDetail() {
   // title, without needing to open full edit mode. Updates both report and
   // fields so a subsequent "עריכה" starts from the renamed value too.
   async function handleQuickRename(newTitle) {
-    await updateFoundReport(reportId, { ...report, title: newTitle }, []);
-    setReport((prev) => ({ ...prev, title: newTitle }));
-    setFields((prev) => (prev ? { ...prev, title: newTitle } : prev));
+    setActionError('');
+    try {
+      await updateFoundReport(reportId, { ...report, title: newTitle }, []);
+      setReport((prev) => ({ ...prev, title: newTitle }));
+      setFields((prev) => (prev ? { ...prev, title: newTitle } : prev));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   function setField(key, value) {
@@ -301,20 +311,35 @@ export default function FoundReportDetail() {
   }
 
   async function handleRecordStatusChange(status) {
-    await updateFoundReportStatus(reportId, status);
-    setReport((prev) => ({ ...prev, status }));
+    setActionError('');
+    try {
+      await updateFoundReportStatus(reportId, status);
+      setReport((prev) => ({ ...prev, status }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleRemoveExistingPhoto(photo) {
-    const remaining = await removeFoundReportPhoto(reportId, photo, report.photos || []);
-    setReport((prev) => ({ ...prev, photos: remaining }));
-    setFields((prev) => ({ ...prev, photos: remaining }));
+    setActionError('');
+    try {
+      const remaining = await removeFoundReportPhoto(reportId, photo, report.photos || []);
+      setReport((prev) => ({ ...prev, photos: remaining }));
+      setFields((prev) => ({ ...prev, photos: remaining }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleMakeMainPhoto(photo) {
-    const reordered = await makeFoundReportPhotoMain(reportId, photo, report.photos || []);
-    setReport((prev) => ({ ...prev, photos: reordered }));
-    setFields((prev) => ({ ...prev, photos: reordered }));
+    setActionError('');
+    try {
+      const reordered = await makeFoundReportPhotoMain(reportId, photo, report.photos || []);
+      setReport((prev) => ({ ...prev, photos: reordered }));
+      setFields((prev) => ({ ...prev, photos: reordered }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   // A rare AI/human mistake (a dog read as a cat, or vice versa) with no
@@ -332,9 +357,14 @@ export default function FoundReportDetail() {
       { confirmLabel: `שינוי ל${SPECIES_LABELS[newSpecies]}`, danger: true }
     );
     if (!ok) return;
-    await fixFoundReportSpecies(reportId, newSpecies);
-    await clearMatchesForFoundReport(reportId);
-    await load();
+    setActionError('');
+    try {
+      await fixFoundReportSpecies(reportId, newSpecies);
+      await clearMatchesForFoundReport(reportId);
+      await load();
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleDelete() {
@@ -343,9 +373,12 @@ export default function FoundReportDetail() {
     });
     if (!ok) return;
     setDeleting(true);
+    setActionError('');
     try {
       await deleteFoundReport(reportId, report.photos || []);
       navigate('/');
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setDeleting(false);
     }
@@ -372,6 +405,7 @@ export default function FoundReportDetail() {
 
   async function handleSave() {
     setSaving(true);
+    setActionError('');
     try {
       const existingCountBeforeSave = (fields.photos || []).length;
       await updateFoundReport(reportId, fields, newPhotos);
@@ -389,16 +423,23 @@ export default function FoundReportDetail() {
         setEditing(false);
         await load();
       }
+    } catch (err) {
+      setActionError(getErrorMessage(err));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleColorCheckSave(newColor) {
-    await updateFoundReport(reportId, { ...fields, color: newColor }, []);
-    setColorCheckPending(false);
-    setEditing(false);
-    await load();
+    setActionError('');
+    try {
+      await updateFoundReport(reportId, { ...fields, color: newColor }, []);
+      setColorCheckPending(false);
+      setEditing(false);
+      await load();
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
   }
 
   async function handleColorCheckSkip() {
@@ -449,6 +490,7 @@ export default function FoundReportDetail() {
                 status={report.status || RECORD_STATUS.ACTIVE}
                 labels={FOUND_REPORT_STATUS_LABELS}
                 onChange={handleRecordStatusChange}
+                disabled={!canManage}
               />
               {report.hasVisualMatch && (
                 <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">
@@ -475,6 +517,7 @@ export default function FoundReportDetail() {
               )}
             </div>
           </div>
+          {actionError && <p className="mb-2 text-sm text-red-600">{actionError}</p>}
           {report.markings && <p className="mb-2 whitespace-pre-line text-sm text-slate-600">{report.markings}</p>}
           {report.notes && <p className="mb-2 text-sm text-slate-600">{report.notes}</p>}
 
@@ -768,6 +811,8 @@ export default function FoundReportDetail() {
               onDiscard={() => setPendingExtraction(null)}
             />
           )}
+
+          {actionError && <p className="text-sm text-red-600">{actionError}</p>}
 
           <div className="sticky bottom-0 -mx-4 flex gap-2 border-t border-slate-200 bg-white p-4 shadow-[0_-2px_8px_rgba(0,0,0,0.06)]">
             <button
