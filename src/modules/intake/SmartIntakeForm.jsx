@@ -173,7 +173,7 @@ export default function SmartIntakeForm() {
         </button>
 
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
-        {creating && <AnalyzingIndicator />}
+        {creating && <AnalyzingIndicator label="שומרים את הדיווח..." />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
         {createError && <p className="mt-2 text-sm text-red-600">{createError}</p>}
       </div>

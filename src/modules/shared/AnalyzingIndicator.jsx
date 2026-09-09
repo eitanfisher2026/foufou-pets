@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
  * the AI cost for this attempt is already committed either way - cancelling
  * just means the result gets thrown away instead of applied.
  */
-export default function AnalyzingIndicator({ onCancel }) {
+export default function AnalyzingIndicator({ onCancel, label = 'קוראים את התמונה...' }) {
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -20,7 +20,9 @@ export default function AnalyzingIndicator({ onCancel }) {
   return (
     <div className="mt-2">
       <div className="mb-1 flex items-center justify-between gap-2">
-        <p className="text-sm text-slate-500">קוראים את התמונה... ({seconds} שניות)</p>
+        <p className="text-sm text-slate-500">
+          {label} ({seconds} שניות)
+        </p>
         {onCancel && (
           <button type="button" onClick={onCancel} className="shrink-0 text-xs text-slate-500 underline">
             ביטול
