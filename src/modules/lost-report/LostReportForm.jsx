@@ -319,7 +319,7 @@ export default function LostReportForm() {
             "regular photo" input inside the grid below. */}
         <p className="mb-1 text-xs text-slate-500">
           התמונה הראשונה שמועלית מסומנת "ראשית" - זו התמונה ש"זיהוי אוטומטי" קורא, וזו שתוצג כתמונה הראשית של התיק
-          (כולל בהשוואה מול תמונות בבדיקת התאמות). אפשר להעלות כמה תמונות ולסמן אחרת כראשית בכל שלב.
+          (כולל בהשוואה מול תמונות בבדיקת התאמות). אפשר להעלות כמה תמונות ולבחור אחרת כראשית לפני השליחה.
         </p>
         <EditablePhotoGrid
           existingPhotos={[]}
