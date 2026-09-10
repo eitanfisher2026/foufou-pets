@@ -18,6 +18,34 @@ const uploadReportPhoto = httpsCallable(functions, 'uploadReportPhoto');
 // stays client-side (free, and unrelated to the permissions problem).
 const folderToRecordType = { 'lost-cases': 'lost', 'found-reports': 'found' };
 
+// A share-target upload happens right as someone switches back to
+// Facebook/locks the phone (the share sheet itself backgrounds the PWA
+// the instant it hands off) - a mobile browser can pause an in-flight
+// fetch for however long the tab stays backgrounded, which reads to the
+// call itself as a stall right in the middle, not a clean, fast failure.
+// Retried on transient network/server codes (never on ones that mean the
+// request itself was rejected, like permission-denied or invalid-argument
+// - retrying those would just fail the same way every time).
+const TRANSIENT_CALLABLE_CODES = new Set([
+  'functions/deadline-exceeded',
+  'functions/unavailable',
+  'functions/internal',
+  'functions/cancelled',
+  'functions/unknown',
+]);
+const TRANSIENT_RETRY_DELAYS_MS = [1000, 3000];
+
+async function callUploadReportPhotoWithRetry(payload) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await uploadReportPhoto(payload);
+    } catch (err) {
+      if (!TRANSIENT_CALLABLE_CODES.has(err?.code) || attempt >= TRANSIENT_RETRY_DELAYS_MS.length) throw err;
+      await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
 /**
  * Compresses and uploads a batch of photo files under `folder/<reportId>/`.
  * Only the file at `thumbnailIndex` (if given) also gets a small dedicated
@@ -45,7 +73,7 @@ export async function uploadPhotos(files, folder, reportId, { thumbnailIndex = n
       thumbBase64 = await blobToBase64(await compressThumbnail(compressed));
     }
 
-    const { data } = await uploadReportPhoto({ recordType, recordId: reportId, path, base64, thumbPath, thumbBase64 });
+    const { data } = await callUploadReportPhotoWithRetry({ recordType, recordId: reportId, path, base64, thumbPath, thumbBase64 });
     return data;
   });
 
