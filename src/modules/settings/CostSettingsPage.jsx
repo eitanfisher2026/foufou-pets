@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { collection, getAggregateFromServer, getCountFromServer, sum } from 'firebase/firestore';
+import { db } from '../../firebase.js';
+import { COLLECTIONS } from '../shared/collections.js';
 import BackLink from '../shared/BackLink.jsx';
-import { listLostCases, listFoundReports } from '../dashboard/dashboardApi.js';
 
 // Rough size assumption only, since actual file sizes aren't stored per
 // photo - photos are compressed client-side to max 1280px / JPEG q0.75
@@ -8,6 +10,13 @@ import { listLostCases, listFoundReports } from '../dashboard/dashboardApi.js';
 // lands well under this per photo, so this errs on the high side rather
 // than understating cost.
 const ASSUMED_KB_PER_PHOTO = 150;
+// A record photo's own main photo plus, on average, roughly one more -
+// used only to turn a cheap document count into a rough photo-count
+// estimate (see estimatedPhotos below), not counted exactly per document -
+// exact per-photo aggregation would need a stored count field this app
+// doesn't keep, and isn't worth adding just for a number this page already
+// treats as a rough, high-side estimate.
+const ASSUMED_PHOTOS_PER_RECORD = 2;
 const FREE_STORAGE_GB = 5;
 const STORAGE_PRICE_PER_GB_MONTH = 0.026;
 
@@ -17,31 +26,39 @@ function formatUsd(n) {
 
 export default function CostSettingsPage() {
   const [loading, setLoading] = useState(true);
-  const [lostCases, setLostCases] = useState([]);
-  const [foundReports, setFoundReports] = useState([]);
+  const [stats, setStats] = useState(null);
 
+  // Server-side sum/count aggregations, not a full read of every record -
+  // this page used to fetch every lost case and found report in full just
+  // to add up two or three numeric fields client-side. A sum/count
+  // aggregation query computes the total on Firestore's own side and
+  // transfers back only the result, regardless of how many documents it's
+  // summing over - the real fix for "reads the entire collection just to
+  // show a handful of totals", not just a smaller page size.
   useEffect(() => {
-    Promise.all([listLostCases(), listFoundReports()]).then(([cases, reports]) => {
-      setLostCases(cases);
-      setFoundReports(reports);
+    const lostCasesRef = collection(db, COLLECTIONS.LOST_CASES);
+    const foundReportsRef = collection(db, COLLECTIONS.FOUND_REPORTS);
+    Promise.all([
+      getAggregateFromServer(lostCasesRef, { aiCost: sum('aiCostUsd'), visualMatchCost: sum('visualMatchCostUsd') }),
+      getAggregateFromServer(foundReportsRef, { aiCost: sum('aiCostUsd') }),
+      getCountFromServer(lostCasesRef),
+      getCountFromServer(foundReportsRef),
+    ]).then(([lostAgg, foundAgg, lostCount, foundCount]) => {
+      setStats({
+        lostAiCost: lostAgg.data().aiCost || 0,
+        foundAiCost: foundAgg.data().aiCost || 0,
+        visualMatchCost: lostAgg.data().visualMatchCost || 0,
+        recordCount: (lostCount.data().count || 0) + (foundCount.data().count || 0),
+      });
       setLoading(false);
     });
   }, []);
 
-  if (loading) return <p className="p-4 text-slate-500">טוען...</p>;
+  if (loading || !stats) return <p className="p-4 text-slate-500">טוען...</p>;
 
-  const lostAiCost = lostCases.reduce((sum, c) => sum + (c.aiCostUsd || 0), 0);
-  const foundAiCost = foundReports.reduce((sum, r) => sum + (r.aiCostUsd || 0), 0);
-  // Stored per lost case (see visualMatchCostUsd in matchingApi.js) since
-  // every match doc lives under a lost case regardless of which side
-  // triggered the check - found reports never carry this field.
-  const visualMatchCost = lostCases.reduce((sum, c) => sum + (c.visualMatchCostUsd || 0), 0);
-  const totalAiCost = lostAiCost + foundAiCost + visualMatchCost;
-
-  const totalPhotos =
-    lostCases.reduce((sum, c) => sum + (c.photos?.length || 0), 0) +
-    foundReports.reduce((sum, r) => sum + (r.photos?.length || 0), 0);
-  const estimatedStorageGB = (totalPhotos * ASSUMED_KB_PER_PHOTO) / (1024 * 1024);
+  const totalAiCost = stats.lostAiCost + stats.foundAiCost + stats.visualMatchCost;
+  const estimatedPhotos = stats.recordCount * ASSUMED_PHOTOS_PER_RECORD;
+  const estimatedStorageGB = (estimatedPhotos * ASSUMED_KB_PER_PHOTO) / (1024 * 1024);
   const storageOverageGB = Math.max(0, estimatedStorageGB - FREE_STORAGE_GB);
   const estimatedStorageCost = storageOverageGB * STORAGE_PRICE_PER_GB_MONTH;
 
@@ -51,7 +68,8 @@ export default function CostSettingsPage() {
       <h1 className="mb-1 text-xl font-bold text-slate-800">עלויות</h1>
       <p className="mb-6 text-sm text-slate-500">
         עלות ה-AI מבוססת על צריכת הטוקנים האמיתית שדווחה בכל קריאה בפועל - לא הערכה. עלות Firebase היא הערכה גסה בלבד,
-        ראו הסבר למטה.
+        ראו הסבר למטה. שתיהן מחושבות רק על רשומות קיימות כרגע - רשומות ישנות שנמחקו (ראו "מחיקת רשומות ישנות") כבר לא
+        נכללות.
       </p>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
@@ -59,15 +77,15 @@ export default function CostSettingsPage() {
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-slate-600">תיקי חיפוש (זיהוי מצילומי מסך)</span>
-            <span className="font-medium text-slate-800">{formatUsd(lostAiCost)}</span>
+            <span className="font-medium text-slate-800">{formatUsd(stats.lostAiCost)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-600">דיווחים (זיהוי מצילומי מסך)</span>
-            <span className="font-medium text-slate-800">{formatUsd(foundAiCost)}</span>
+            <span className="font-medium text-slate-800">{formatUsd(stats.foundAiCost)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-600">השוואת תמונות בהתאמות</span>
-            <span className="font-medium text-slate-800">{formatUsd(visualMatchCost)}</span>
+            <span className="font-medium text-slate-800">{formatUsd(stats.visualMatchCost)}</span>
           </div>
           <div className="flex items-center justify-between border-t border-slate-100 pt-2 font-semibold">
             <span className="text-slate-700">סה"כ עלות AI</span>
@@ -85,8 +103,8 @@ export default function CostSettingsPage() {
         <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות Firebase (הערכה גסה)</h2>
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-slate-600">סה"כ תמונות שהועלו</span>
-            <span className="font-medium text-slate-800">{totalPhotos}</span>
+            <span className="text-slate-600">תמונות משוערות</span>
+            <span className="font-medium text-slate-800">{estimatedPhotos}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-600">אחסון משוער</span>
@@ -98,10 +116,12 @@ export default function CostSettingsPage() {
           </div>
         </div>
         <p className="mt-3 text-xs text-slate-400">
-          זו הערכה בלבד: גודל כל תמונה לא נשמר בפועל, אז ההערכה מניחה כ-{ASSUMED_KB_PER_PHOTO}KB לתמונה בממוצע (התמונות
-          עצמן מכווצות לרזולוציה נמוכה-בינונית לפני ההעלאה, כך שזו הערכה שמרנית-כלפי-מעלה). {FREE_STORAGE_GB}GB
-          הראשונים באחסון פטורים ממכסת החינם של Firebase. עלויות קריאה/כתיבה ב-Firestore לא נכללות כאן - בנפח השימוש
-          הנוכחי הן כמעט בוודאות בתוך מכסת החינם היומית; לעלות מדויקת יש לבדוק ב-Firebase Console.
+          זו הערכה גסה יותר מבעבר: כדי לא לקרוא כל רשומה בנפרד, מספר התמונות עצמו הפך גם הוא להערכה - כ-
+          {ASSUMED_PHOTOS_PER_RECORD} תמונות בממוצע לרשומה (במקום ספירה מדויקת), כפול כ-{ASSUMED_KB_PER_PHOTO}KB
+          לתמונה (התמונות עצמן מכווצות לרזולוציה נמוכה-בינונית לפני ההעלאה, כך שזו הערכה שמרנית-כלפי-מעלה).{' '}
+          {FREE_STORAGE_GB}GB הראשונים באחסון פטורים ממכסת החינם של Firebase. עלויות קריאה/כתיבה ב-Firestore לא
+          נכללות כאן - בנפח השימוש הנוכחי הן כמעט בוודאות בתוך מכסת החינם היומית; לעלות מדויקת יש לבדוק ב-Firebase
+          Console.
         </p>
       </section>
     </div>

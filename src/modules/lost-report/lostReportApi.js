@@ -1,11 +1,18 @@
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS, RECORD_STATUS, SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS, CLOSURE_REASON, SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
 import { generatePhotoThumbnail } from '../shared/photoThumbnailApi.js';
 import { normalizePhone } from '../shared/duplicateCheckApi.js';
+import { incrementLostReportedCounter, incrementMatchedToOwnerCounter } from '../shared/lifetimeStatsApi.js';
+
+// Closure reasons that represent a genuine confirmed match/reunion, not
+// just any closure (aging out, given up on, died) - see updateLostCaseClosure
+// below, which counts a closure toward the permanent matchedToOwner audit
+// counter only for these two.
+const MATCHED_CLOSURE_REASONS = new Set([CLOSURE_REASON.RETURNED_TO_OWNER, CLOSURE_REASON.SYSTEM_MATCH_CLOSED]);
 
 // A dog record saved with a truly blank breed (not even the "מעורב (לא
 // ידוע)" default) can't be usefully compared on breed at all - the
@@ -76,6 +83,8 @@ export async function createLostCase(fields, photoFiles, owner) {
     const photos = await uploadPhotos(photoFiles, 'lost-cases', caseRef.id, { thumbnailIndex: 0 });
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, caseRef.id), { photos }, { merge: true });
   }
+
+  incrementLostReportedCounter(species);
 
   return caseRef.id;
 }
@@ -189,6 +198,16 @@ export async function updateLostCaseClosure(caseId, status, closure) {
     },
     { merge: true }
   );
+
+  // A genuine reunion (not just aging out or giving up) - counted once,
+  // permanently, regardless of which of the three flows closed it (manual
+  // ClosureDialog, updateMatchStatus's CLOSED branch, or NotifyOwnerDialog's
+  // "mark as resolved"). One extra read of a doc this call just wrote to,
+  // only on the rare "this case just got closed" path, not a hot loop.
+  if (MATCHED_CLOSURE_REASONS.has(closure.closureReason)) {
+    const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
+    if (snap.exists()) incrementMatchedToOwnerCounter(snap.data().species);
+  }
 }
 
 /**

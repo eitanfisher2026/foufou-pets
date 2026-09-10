@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage } from 'firebase-admin/storage';
@@ -994,5 +995,87 @@ export const comparePhotoSimilarity = onCall(
     } catch {
       throw new HttpsError('internal', 'Could not parse the result.');
     }
+  }
+);
+
+// Must match defaultArchiveCutoffDate in SettingsPage.jsx - the manual
+// "מחיקת רשומות ישנות" button and this weekly run are the same process, on
+// the same age threshold, one just runs itself automatically.
+const CLEANUP_MAX_AGE_DAYS = 30;
+
+function isRecordActive(status) {
+  return (status || 'active') === 'active';
+}
+
+async function deleteStoragePhotos(bucket, photos) {
+  await Promise.all(
+    (photos || [])
+      .flatMap((p) => [
+        p.path ? bucket.file(p.path).delete().catch(() => {}) : null,
+        p.thumbPath ? bucket.file(p.thumbPath).delete().catch(() => {}) : null,
+      ])
+      .filter(Boolean)
+  );
+}
+
+/**
+ * Server-side mirror of deleteLostCase/deleteFoundReport in the client's
+ * lostReportApi.js/foundReportApi.js (same three steps: matches
+ * subcollection, Storage photos, the record doc itself) - can't import
+ * client code into a Cloud Function, so this is kept in sync by hand, same
+ * pattern as the AI schema/color lists earlier in this file.
+ */
+async function deleteRecordAdmin(bucket, recordType, docId, photos) {
+  if (recordType === 'lost') {
+    const matchesSnap = await db.collection(COLLECTION_BY_RECORD_TYPE.lost).doc(docId).collection('matches').get();
+    if (!matchesSnap.empty) {
+      const batch = db.batch();
+      matchesSnap.docs.forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+  }
+  await deleteStoragePhotos(bucket, photos);
+  await db.collection(COLLECTION_BY_RECORD_TYPE[recordType]).doc(docId).delete();
+}
+
+/**
+ * Weekly, unattended equivalent of the "מחיקת רשומות ישנות" button in
+ * Settings (see archiveOldRecordsApi.js) - same rule (active records only,
+ * never touched a real closed outcome, older than CLEANUP_MAX_AGE_DAYS),
+ * just running itself on a schedule instead of needing an admin to
+ * remember to click it. The permanent lifetimeStats counters (see
+ * lifetimeStatsApi.js) were already incremented when each record was first
+ * created/closed, so nothing here needs to touch them - the audit trail
+ * survives this deletion the same way it does the manual button.
+ */
+export const weeklyCleanupOldRecords = onSchedule(
+  { schedule: 'every sunday 03:00', timeZone: 'Asia/Jerusalem', region: 'me-west1' },
+  async () => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - CLEANUP_MAX_AGE_DAYS);
+
+    const [lostSnap, foundSnap] = await Promise.all([
+      db.collection(COLLECTION_BY_RECORD_TYPE.lost).get(),
+      db.collection(COLLECTION_BY_RECORD_TYPE.found).get(),
+    ]);
+    const qualifies = (data) => {
+      if (!isRecordActive(data.status)) return false;
+      const created = data.createdAt?.toDate ? data.createdAt.toDate() : null;
+      return created !== null && created < cutoff;
+    };
+    const oldLostCases = lostSnap.docs.filter((d) => qualifies(d.data()));
+    const oldFoundReports = foundSnap.docs.filter((d) => qualifies(d.data()));
+
+    const bucket = getStorage().bucket();
+    for (const d of oldLostCases) {
+      await deleteRecordAdmin(bucket, 'lost', d.id, d.data().photos);
+    }
+    for (const d of oldFoundReports) {
+      await deleteRecordAdmin(bucket, 'found', d.id, d.data().photos);
+    }
+
+    console.log(
+      `weeklyCleanupOldRecords: deleted ${oldLostCases.length} lost cases, ${oldFoundReports.length} found reports (cutoff ${cutoff.toISOString()})`
+    );
   }
 );

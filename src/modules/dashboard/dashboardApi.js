@@ -1,6 +1,6 @@
 import { collection, getCountFromServer, getDocs, limit, orderBy, query, startAfter, where } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { COLLECTIONS } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS } from '../shared/collections.js';
 
 // Sorted client-side rather than via an orderBy('createdAt') alongside the
 // species filter - a where(equality) + orderBy(different field) query needs
@@ -69,6 +69,26 @@ export async function listFoundReportsPage(species, pageSize, cursor) {
     cursor: snap.docs[snap.docs.length - 1] || null,
     hasMore: snap.docs.length === pageSize,
   };
+}
+
+// ArchivePage.jsx used to fetch listLostCases() - every lost case,
+// regardless of species or status - just to filter down to archived/
+// resolved ones client-side. With old active records now getting deleted
+// weekly (see archiveOldRecordsApi.js) instead of piling up, closed-out
+// records are the ones that actually accumulate over time, so reading
+// everything just to throw most of it away only gets more wasteful. This
+// filters both species and status server-side; ArchivePage's own
+// closureReason/date-range filters still apply client-side afterward, over
+// this much smaller result instead of the whole collection.
+export async function listArchivedLostCases(species) {
+  const snap = await getDocs(
+    query(
+      collection(db, COLLECTIONS.LOST_CASES),
+      where('species', '==', species),
+      where('status', 'in', [RECORD_STATUS.ARCHIVED, RECORD_STATUS.RESOLVED])
+    )
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort(byCreatedAtDesc);
 }
 
 // A count-only aggregation query (no documents actually transferred) -

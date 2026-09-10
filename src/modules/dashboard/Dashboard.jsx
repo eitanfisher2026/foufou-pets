@@ -201,18 +201,23 @@ export default function Dashboard() {
   // went through handleSearch at all.
   useEffect(() => {
     if (roleLoading) return;
+    // Search deliberately covers archived/resolved records too, unlike the
+    // main working list below (openLostCases) - someone searching is
+    // usually looking for a specific animal/person by name or detail, and a
+    // case that already closed out is still a real, findable answer to
+    // that, not noise to hide the way it is from the day-to-day work list.
     if (searchCriteria?.recordType === 'found' || searchCriteria?.recordType === 'both') {
       setLoadingFoundSearch(true);
       listFoundReports(preferredSpecies)
-        .then((reports) =>
-          setFoundReportsForSearch(reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED))
-        )
+        .then(setFoundReportsForSearch)
+        .catch(() => setFoundReportsForSearch([]))
         .finally(() => setLoadingFoundSearch(false));
     }
     if (searchCriteria?.recordType === 'lost' || searchCriteria?.recordType === 'both') {
       setLoadingLostSearch(true);
       listLostCases(preferredSpecies)
-        .then((cases) => setLostCasesForSearch(cases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED)))
+        .then(setLostCasesForSearch)
+        .catch(() => setLostCasesForSearch([]))
         .finally(() => setLoadingLostSearch(false));
     }
   }, [roleLoading]);
@@ -223,8 +228,9 @@ export default function Dashboard() {
     if (criteria.recordType === 'found' || criteria.recordType === 'both') {
       setLoadingFoundSearch(true);
       try {
-        const reports = await listFoundReports(preferredSpecies);
-        setFoundReportsForSearch(reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED));
+        setFoundReportsForSearch(await listFoundReports(preferredSpecies));
+      } catch {
+        setFoundReportsForSearch([]);
       } finally {
         setLoadingFoundSearch(false);
       }
@@ -232,8 +238,9 @@ export default function Dashboard() {
     if (criteria.recordType === 'lost' || criteria.recordType === 'both') {
       setLoadingLostSearch(true);
       try {
-        const cases = await listLostCases(preferredSpecies);
-        setLostCasesForSearch(cases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED));
+        setLostCasesForSearch(await listLostCases(preferredSpecies));
+      } catch {
+        setLostCasesForSearch([]);
       } finally {
         setLoadingLostSearch(false);
       }

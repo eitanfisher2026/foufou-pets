@@ -7,10 +7,12 @@ import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
+import { getLifetimeStats } from '../shared/lifetimeStatsApi.js';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
+import { useConfirm } from '../shared/useConfirm.jsx';
 
 function photoThresholdLabel(key) {
   if (key === 'never') return 'כבוי';
@@ -53,14 +55,21 @@ export default function SettingsPage() {
   // reviewing it here can't accidentally leave the admin's own account
   // (or anyone else's) in a test state.
   const [showOnboardingPreview, setShowOnboardingPreview] = useState(false);
+  // Permanent audit counters (see lifetimeStatsApi.js) - shown here so
+  // there's a real, visible "how many were ever reported/reunited" number
+  // an admin can check before deleting old records for good, since that
+  // deletion itself no longer leaves anything else behind to count from.
+  const [lifetimeStats, setLifetimeStats] = useState(null);
 
   useEffect(() => {
     getMatchConfig().then((c) => {
       setPhotoMatchThreshold(c.photoMatchThreshold);
       setPhotoDisqualifyThreshold(c.photoDisqualifyThreshold);
     });
+    getLifetimeStats().then(setLifetimeStats);
   }, []);
   const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
+  const { confirm, dialog: confirmDialog } = useConfirm();
 
   async function handleRescanAll() {
     setRescanning(true);
@@ -121,13 +130,17 @@ export default function SettingsPage() {
   }
 
   async function handleConfirmArchive() {
+    const total = archivePreview.lostCats + archivePreview.lostDogs + archivePreview.foundCats + archivePreview.foundDogs;
+    const ok = await confirm(
+      `למחוק לצמיתות ${total} רשומות (${archivePreview.lostCats + archivePreview.lostDogs} תיקי חיפוש, ${archivePreview.foundCats + archivePreview.foundDogs} דיווחים)? כולל התמונות וההתאמות שלהן - לא ניתן לשחזר. המספרים הכוללים ("כמה דווחו/הוחזרו אי-פעם") לא נפגעים - אלו נשמרים בנפרד.`,
+      { confirmLabel: 'מחיקה לצמיתות', danger: true }
+    );
+    if (!ok) return;
     setArchiving(true);
     setArchiveError('');
     setArchiveProgress({ done: 0, total: 0 });
     try {
-      const result = await archiveOldRecords(new Date(archivePreview.cutoffDate), user?.displayName || user?.email || '', (done, total) =>
-        setArchiveProgress({ done, total })
-      );
+      const result = await archiveOldRecords(new Date(archivePreview.cutoffDate), (done, total) => setArchiveProgress({ done, total }));
       setArchiveResult(result);
       setArchivePreview(null);
     } catch (err) {
@@ -258,15 +271,45 @@ export default function SettingsPage() {
       </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">העברת רשומות ישנות לארכיון</h2>
+        <h2 className="mb-1 font-medium text-slate-700">מחיקת רשומות ישנות</h2>
         <p className="mb-3 text-sm text-slate-500">
-          מעביר לארכיון כל תיק חיפוש ודיווח פעילים (חתולים וכלבים) שנוצרו לפני התאריך שנבחר - שימושי לפינוי רשימות
-          עבודה מרשומות ישנות שכנראה לא רלוונטיות יותר. תיק שהועבר לארכיון בדרך זו מסומן ב"ארכוב אוטומטי - מעל חודש
-          במערכת" (נראה בעמוד הארכיון), ומפסיק להיבדק בסריקות התאמה עתידיות - בדיוק כמו כל רשומה לא פעילה אחרת.
-          הסטוריית ההתאמות הקיימת שלו נשארת כפי שהיא, לצפייה בלבד.
+          מוחק לצמיתות כל תיק חיפוש ודיווח פעילים (חתולים וכלבים) שנוצרו לפני התאריך שנבחר ומעולם לא נסגרו - כולל
+          התמונות שלהם וההתאמות שנמצאו עבורם. לא הופך אותם לארכיון: הם נעלמים לגמרי, בדיוק כמו "מחיקת התיק"/"מחיקת
+          הדיווח" הידניים, רק בכל הרשומות הישנות יחד. רשומה שכבר נסגרה בדרך אמיתית (נמצאה, הוחזרה, נפטרה) לא נוגעים
+          בה כאן בכלל - היא ממשיכה להופיע בעמוד הארכיון כרגיל. התהליך הזה רץ גם אוטומטית, פעם בשבוע (יום ראשון), בלי
+          צורך להריץ אותו ידנית.
         </p>
+
+        {lifetimeStats && (
+          <div className="mb-4 rounded-xl bg-slate-50 p-3">
+            <p className="mb-2 text-xs font-medium text-slate-600">
+              מספרים כוללים לביקורת (לא נפגעים ממחיקה - נשמרים לצמיתות מרגע הדיווח/ההחזרה):
+            </p>
+            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+              <div>
+                <p className="text-slate-400">דווחו כאבודים</p>
+                <p className="font-semibold text-slate-800">
+                  {lifetimeStats.lostReportedCat} חתולים · {lifetimeStats.lostReportedDog} כלבים
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-400">דווחו כנראו/נמצאו</p>
+                <p className="font-semibold text-slate-800">
+                  {lifetimeStats.foundReportedCat} חתולים · {lifetimeStats.foundReportedDog} כלבים
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-400">הותאמו/הוחזרו לבעלים</p>
+                <p className="font-semibold text-slate-800">
+                  {lifetimeStats.matchedToOwnerCat} חתולים · {lifetimeStats.matchedToOwnerDog} כלבים
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <label className="mb-3 block text-sm text-slate-600">
-          תיקים ודיווחים שנוצרו לפני תאריך זה יועברו לארכיון
+          תיקים ודיווחים שנוצרו לפני תאריך זה יימחקו לצמיתות
           <input
             type="date"
             dir="ltr"
@@ -290,23 +333,23 @@ export default function SettingsPage() {
         {archivePreview && !archiving && (
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="mb-3 text-sm text-slate-700">
-              נמצאו לארכוב: <strong>{archivePreview.lostCats + archivePreview.lostDogs}</strong> תיקי חיפוש (
+              נמצאו למחיקה: <strong>{archivePreview.lostCats + archivePreview.lostDogs}</strong> תיקי חיפוש (
               {archivePreview.lostCats} חתולים, {archivePreview.lostDogs} כלבים) ו-
               <strong>{archivePreview.foundCats + archivePreview.foundDogs}</strong> דיווחים ({archivePreview.foundCats}{' '}
               חתולים, {archivePreview.foundDogs} כלבים).
             </p>
             {archivePreview.lostCats + archivePreview.lostDogs + archivePreview.foundCats + archivePreview.foundDogs === 0 ? (
               <button type="button" onClick={() => setArchivePreview(null)} className="text-sm text-slate-500 underline">
-                אין מה לארכב - סגירה
+                אין מה למחוק - סגירה
               </button>
             ) : (
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={handleConfirmArchive}
-                  className="rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white"
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white"
                 >
-                  אישור והעברה לארכיון
+                  מחיקה לצמיתות
                 </button>
                 <button
                   type="button"
@@ -320,10 +363,10 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {archiving && <ProgressBar current={archiveProgress.done} total={archiveProgress.total} label="מעביר לארכיון..." />}
+        {archiving && <ProgressBar current={archiveProgress.done} total={archiveProgress.total} label="מוחק..." />}
         {archiveResult && (
           <p className="mt-2 text-sm text-emerald-700">
-            הועברו לארכיון {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.
+            נמחקו לצמיתות {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.
           </p>
         )}
         {archiveError && <p className="mt-2 text-sm font-medium text-red-600">{archiveError}</p>}
@@ -331,6 +374,7 @@ export default function SettingsPage() {
 
       <AppFooter />
       {visualMatchDialog}
+      {confirmDialog}
       {showOnboardingPreview && <OnboardingDialog onClose={() => setShowOnboardingPreview(false)} />}
     </div>
   );

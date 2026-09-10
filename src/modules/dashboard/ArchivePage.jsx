@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { RECORD_STATUS, CLOSURE_REASON, CLOSURE_REASON_LABELS } from '../shared/collections.js';
+import { CLOSURE_REASON, CLOSURE_REASON_LABELS } from '../shared/collections.js';
 import { useAuth } from '../auth/AuthProvider.jsx';
-import { listLostCases } from './dashboardApi.js';
+import { listArchivedLostCases } from './dashboardApi.js';
 import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { formatDate } from '../shared/formatDate.js';
 import BackLink from '../shared/BackLink.jsx';
 import SelectField from '../shared/SelectField.jsx';
 
 const STATUS_FILTER_OPTIONS = Object.values(CLOSURE_REASON).map((reason) => ({ value: reason, label: CLOSURE_REASON_LABELS[reason] }));
-
-const ARCHIVE_STATUSES = new Set([RECORD_STATUS.ARCHIVED, RECORD_STATUS.RESOLVED]);
 
 function ClosureTableRow({ lostCase: c }) {
   return (
@@ -42,26 +40,26 @@ export default function ArchivePage() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
 
+  // Species is now a server-side filter (see listArchivedLostCases), not a
+  // client-side one - re-fetches on toggle instead of filtering a larger,
+  // already-fetched, both-species list down.
   useEffect(() => {
-    listLostCases().then((cases) => {
-      setLostCases(cases.filter((c) => ARCHIVE_STATUSES.has(c.status)));
+    setLoading(true);
+    listArchivedLostCases(preferredSpecies).then((cases) => {
+      setLostCases(cases);
       setLoading(false);
     });
-  }, []);
+  }, [preferredSpecies]);
 
-  // Filtered to the currently-active species too, same as the working
-  // dashboard - the archive is still scoped to "what I'm working on right
-  // now", not a global list.
   const filteredCases = useMemo(
     () =>
       lostCases.filter((c) => {
-        if ((c.species || 'cat') !== preferredSpecies) return false;
         if (statusFilter && c.closureReason !== statusFilter) return false;
         if (dateFrom && (!c.closureDate || c.closureDate < dateFrom)) return false;
         if (dateTo && (!c.closureDate || c.closureDate > dateTo)) return false;
         return true;
       }),
-    [lostCases, preferredSpecies, statusFilter, dateFrom, dateTo]
+    [lostCases, statusFilter, dateFrom, dateTo]
   );
 
   return (

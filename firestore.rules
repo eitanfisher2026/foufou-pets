@@ -155,6 +155,30 @@ service cloud.firestore {
       allow delete: if signedIn() && (isEditorOrAdmin() || resource.data.reportedByUid == request.auth.uid);
     }
 
+    // Permanent audit counters (see lifetimeStatsApi.js) - how many lost/
+    // found reports and confirmed matches ever happened, per species. Any
+    // signed-in user increments these as a side effect of creating a report
+    // or closing a match (not an admin-only settings action), but only
+    // those six specific counter fields - matches the same narrow-carve-out
+    // pattern as lostCases'/foundReports' own denormalized counters above.
+    // More specific than the /config/{docId} rule below, so it wins for
+    // this exact path regardless of declaration order.
+    match /config/lifetimeStats {
+      allow read: if signedIn();
+      // Split create/update rather than one allow-write with diff() against
+      // resource.data - resource doesn't exist yet for this doc's very
+      // first-ever counter increment, and diffing against a nonexistent
+      // resource throws.
+      allow create: if signedIn() && request.resource.data.keys().hasOnly([
+        'lostReportedCat', 'lostReportedDog', 'foundReportedCat', 'foundReportedDog',
+        'matchedToOwnerCat', 'matchedToOwnerDog'
+      ]);
+      allow update: if signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'lostReportedCat', 'lostReportedDog', 'foundReportedCat', 'foundReportedDog',
+        'matchedToOwnerCat', 'matchedToOwnerDog'
+      ]);
+    }
+
     // Shared config (match weights, the customizable color list, the
     // about-dialog text) - read by everyone (forms/matching/AboutDialog use
     // these), written only from the admin-only settings screens that edit

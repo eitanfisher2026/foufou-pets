@@ -6,6 +6,7 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
 import { generatePhotoThumbnail } from '../shared/photoThumbnailApi.js';
 import { normalizePhone } from '../shared/duplicateCheckApi.js';
+import { incrementFoundReportedCounter } from '../shared/lifetimeStatsApi.js';
 
 // A dog record saved with a truly blank breed (not even the "מעורב (לא
 // ידוע)" default) can't be usefully compared on breed at all - the
@@ -80,6 +81,8 @@ export async function createFoundReport(fields, photoFiles, reporter) {
     const photos = await uploadPhotos(photoFiles, 'found-reports', reportRef.id, { thumbnailIndex: 0 });
     await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportRef.id), { photos }, { merge: true });
   }
+
+  incrementFoundReportedCounter(species);
 
   return reportRef.id;
 }
@@ -171,6 +174,11 @@ export async function archiveFoundReport(reportId, closure) {
     },
     { merge: true }
   );
+  // The permanent matchedToOwner audit counter is only incremented once per
+  // confirmed match, from updateLostCaseClosure - every flow that closes a
+  // found report this way (updateMatchStatus's CLOSED branch,
+  // NotifyOwnerDialog's "mark as resolved") always closes the paired lost
+  // case in the same breath, so counting here too would double it.
 }
 
 /**
