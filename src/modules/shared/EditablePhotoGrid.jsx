@@ -61,6 +61,11 @@ export default function EditablePhotoGrid({
     await onMakeMainExisting(photo);
   }
 
+  // "Make main" only means anything when there's a second photo to promote
+  // over the current one - with just one photo total, it's already main by
+  // definition, and showing a button for that would just be confusing.
+  const totalPhotos = existingPhotos.length + newPhotos.length;
+
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-600">{label}</label>
@@ -84,6 +89,7 @@ export default function EditablePhotoGrid({
                   ראשית
                 </span>
               ) : (
+                totalPhotos > 1 &&
                 onMakeMainExisting && (
                   <button
                     type="button"
@@ -123,13 +129,15 @@ export default function EditablePhotoGrid({
                     ראשית
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => makeNewPhotoMain(i)}
-                    className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
-                  >
-                    הפוך לראשית
-                  </button>
+                  totalPhotos > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => makeNewPhotoMain(i)}
+                      className="absolute bottom-1 left-1 rounded bg-slate-800/80 px-1 py-0.5 text-[9px] font-medium text-white"
+                    >
+                      הפוך לראשית
+                    </button>
+                  )
                 )}
                 <button
                   type="button"
