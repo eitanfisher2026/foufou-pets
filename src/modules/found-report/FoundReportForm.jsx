@@ -63,7 +63,6 @@ export default function FoundReportForm() {
   const patternSelectOptions = patternOptions.map((p) => ({ value: p, label: p, description: CAT_PATTERN_DESCRIPTIONS[p] }));
   const furTypeOptions = fields.species === SPECIES.DOG ? DOG_FUR_TYPES : CAT_FUR_TYPES;
   const [photos, setPhotos] = useState([]);
-  const [screenshotFiles, setScreenshotFiles] = useState([]);
   const [hasAutoMainPhoto, setHasAutoMainPhoto] = useState(false);
   const [postText, setPostText] = useState('');
   const [source, setSource] = useState('manual');
@@ -85,29 +84,26 @@ export default function FoundReportForm() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Adding a screenshot (by picking or pasting) only collects it - it does
-  // not analyze anything by itself, so someone can paste a photo, then
-  // paste the post's link, then add another photo, and only then run one
-  // extraction over everything they've gathered via the button below,
-  // instead of the first paste jumping the gun on a still-incomplete set.
-  function addScreenshots(newFiles) {
+  // Adding a photo (by picking or pasting) only collects it - it does not
+  // analyze anything by itself, so someone can paste a photo, then paste
+  // the post's link, then add another photo, and only then run one
+  // extraction via the button below, instead of the first paste jumping
+  // the gun on a still-incomplete set. Whichever photo ends up first
+  // (position 0 - see EditablePhotoGrid's own "ראשית"/make-main control)
+  // is THE main photo: the one "זיהוי אוטומטי" actually reads, and the one
+  // later used to compare against other reports' photos when checking
+  // matches - not just a display order.
+  function addPhotos(newFiles) {
     if (newFiles.length === 0) return;
-    setScreenshotFiles((prev) => [...prev, ...newFiles]);
     setSource('screenshot');
     setPhotos((prev) => [...prev, ...newFiles]);
-  }
-
-  function handleScreenshotUpload(e) {
-    const newFiles = Array.from(e.target.files || []);
-    e.target.value = '';
-    addScreenshots(newFiles);
   }
 
   function handlePasteText(e) {
     const imageFiles = getPastedImageFiles(e);
     if (imageFiles.length === 0) return;
     e.preventDefault();
-    addScreenshots(imageFiles);
+    addPhotos(imageFiles);
   }
 
   // Pulls the post's own public preview text/photo straight from a pasted
@@ -139,7 +135,7 @@ export default function FoundReportForm() {
         setPostText((prev) => `${prev}\n(פורסם בקבוצת פייסבוק: ${preview.groupName})`.trim());
       }
       if (preview.imageBase64) {
-        addScreenshots([base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);
+        addPhotos([base64ToFile(preview.imageBase64, preview.imageMimeType, 'facebook-preview.jpg')]);
       } else if (!preview.text) {
         setLinkFetchError('לא הצלחנו למשוך מידע מהקישור הזה (קורה כשתוכן הקבוצה גלוי לחברים בלבד) - אפשר להמשיך עם צילום מסך.');
       }
@@ -150,14 +146,25 @@ export default function FoundReportForm() {
     }
   }
 
+  // Reads only the current main photo (photos[0] - whatever's marked
+  // "ראשית" in the grid below), never every uploaded photo. Sending every
+  // photo used to let the AI pick which one, and which region of it, was
+  // the real animal shot (mainPhotoRegion) - across genuinely unrelated
+  // photos (e.g. an extra reference photo added alongside a screenshot),
+  // that could crop out of the wrong one entirely, silently making an
+  // unrelated animal the record's main photo (and, later, the one AI photo-
+  // matching actually compares). Reading only the photo the user already
+  // marked main removes that ambiguity outright: there's only ever one
+  // possible source for the crop.
   async function handleAnalyze() {
-    if (screenshotFiles.length === 0) return;
+    if (photos.length === 0) return;
+    const mainSource = photos[0];
     try {
-      const result = await read(screenshotFiles, postText, fields.species);
+      const result = await read([mainSource], postText, fields.species);
       setFields((prev) => mergeExtractedFoundFields(result, prev));
       setExtracted(true);
 
-      const mainPhoto = await extractMainPhoto(screenshotFiles, result.mainPhotoRegion);
+      const mainPhoto = await extractMainPhoto([mainSource], result.mainPhotoRegion);
       if (mainPhoto) {
         setPhotos((prev) => [mainPhoto, ...(hasAutoMainPhoto ? prev.slice(1) : prev)]);
         setHasAutoMainPhoto(true);
@@ -279,7 +286,10 @@ export default function FoundReportForm() {
               ישירות (עובד רק בפוסטים פומביים, לא בקבוצות סגורות).
             </li>
             <li>הדבקת תמונה ישירות לתוך התיבה (Ctrl+V) - בלי לשמור אותה קודם לקובץ.</li>
-            <li>אם בפוסט כמה תמונות של {labels.animalDef}, כדאי לצרף גם תמונה בודדת וממוקדת שלה, כדי שהתמונה הראשית תצא מדויקת.</li>
+            <li>
+              אפשר להעלות כמה תמונות, אבל "זיהוי אוטומטי" קורא רק את התמונה הראשית (המסומנת "ראשית") - אם יש כמה
+              תמונות של {labels.animalDef}, כדאי לוודא שהברורה ביותר מסומנת ראשית לפני הזיהוי.
+            </li>
           </ul>
         </InfoButton>
       </div>
@@ -304,30 +314,36 @@ export default function FoundReportForm() {
           </button>
         )}
         {linkFetchError && <p className="mb-2 text-xs text-red-600">{linkFetchError}</p>}
-        <input type="file" accept="image/*" multiple onChange={handleScreenshotUpload} />
 
-        {screenshotFiles.length > 0 && (
+        {/* One upload area, not two - a photo added here (by picking or
+            pasting into the text box above) is always both "a photo on the
+            report" and "eligible to become the main photo", instead of the
+            old split between a screenshot input up here and a separate
+            "regular photo" input inside the grid below. */}
+        <p className="mb-1 text-xs text-slate-500">
+          התמונה הראשונה שמועלית מסומנת "ראשית" - זו התמונה ש"זיהוי אוטומטי" קורא, וזו שתוצג כתמונה הראשית של הדיווח
+          (כולל בהשוואה מול תמונות בבדיקת התאמות). אפשר להעלות כמה תמונות ולסמן אחרת כראשית בכל שלב.
+        </p>
+        <EditablePhotoGrid
+          existingPhotos={[]}
+          newPhotos={photos}
+          onNewPhotosChange={setPhotos}
+          label="תמונות"
+          addLabel="הוספת תמונות"
+        />
+
+        {photos.length > 0 && (
           <button
             type="button"
             onClick={handleAnalyze}
             disabled={reading}
             className="mt-3 w-full rounded-xl bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
-            {reading ? 'מזהים פרטים...' : `זיהוי אוטומטי (${screenshotFiles.length} תמונות)`}
+            {reading ? 'מזהים פרטים...' : 'זיהוי אוטומטי מהתמונה הראשית'}
           </button>
         )}
         {reading && <AnalyzingIndicator onCancel={cancelReading} />}
         {readError && <p className="mt-2 text-sm text-red-600">{readError}</p>}
-
-        <div className="mt-4 border-t border-slate-200 pt-4">
-          <EditablePhotoGrid
-            existingPhotos={[]}
-            newPhotos={photos}
-            onNewPhotosChange={setPhotos}
-            label="תמונות שיתווספו לדיווח"
-            addLabel="יש לך גם תמונה רגילה (לא צילום מסך)? אפשר להוסיף אותה כאן"
-          />
-        </div>
       </div>
 
       {extracted && (
