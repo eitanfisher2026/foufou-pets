@@ -4,6 +4,8 @@ import { AuthProvider, useAuth } from './modules/auth/AuthProvider.jsx';
 import LoginScreen from './modules/auth/LoginScreen.jsx';
 import Dashboard from './modules/dashboard/Dashboard.jsx';
 import { useHomeHistoryGuard } from './modules/shared/useHomeHistoryGuard.js';
+import { useMaintenanceMode } from './modules/shared/useMaintenanceMode.js';
+import MaintenanceScreen from './modules/shared/MaintenanceScreen.jsx';
 
 // Every other route used to be a plain top-level import, so the ENTIRE
 // app - every settings page, every form, every detail page - shipped as
@@ -39,11 +41,23 @@ function RequireAdmin({ children }) {
 }
 
 function AppRoutes() {
-  const { user, loading, viewingAsRegular, toggleViewAsRegular } = useAuth();
+  const { user, loading, roleLoading, isRealAdmin, signOut, viewingAsRegular, toggleViewAsRegular } = useAuth();
+  // isRealAdmin, not the simulation-aware isAdmin - an admin previewing
+  // "as regular user" is still testing a live change under their own
+  // account and shouldn't get stuck behind maintenance mode just for
+  // having that preview toggle on; only an actually-demoted/disconnected
+  // admin should ever see the maintenance screen themselves.
+  const maintenanceMode = useMaintenanceMode(!!user);
   useHomeHistoryGuard();
 
   if (loading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
   if (!user) return <LoginScreen />;
+  // Only waits on role (and only blocks) when maintenance is actually on -
+  // the normal, overwhelmingly common case (maintenanceMode false) never
+  // pays for this at all, so nobody's regular page load gets slower just
+  // because this feature exists.
+  if (maintenanceMode && roleLoading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
+  if (maintenanceMode && !isRealAdmin) return <MaintenanceScreen onSignOut={signOut} />;
 
   // One responsive width cap for the whole app, same pattern as Buli: pages
   // themselves stay full-width and just fill this container, so the app

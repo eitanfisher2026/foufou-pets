@@ -8,11 +8,19 @@ import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
 import { getLifetimeStats } from '../shared/lifetimeStatsApi.js';
+import { useMaintenanceMode } from '../shared/useMaintenanceMode.js';
+import { setMaintenanceMode } from '../shared/maintenanceApi.js';
+import { listUsers } from '../users/usersApi.js';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
+
+// Same "opened the app recently" activity window as elsewhere in this file
+// would use if it needed one - not a true presence system, just a rough
+// sense of who'd actually feel a maintenance-mode kick-out right now.
+const MAINTENANCE_ACTIVE_WINDOW_MS = 30 * 60 * 1000;
 
 function photoThresholdLabel(key) {
   if (key === 'never') return 'כבוי';
@@ -60,6 +68,12 @@ export default function SettingsPage() {
   // an admin can check before deleting old records for good, since that
   // deletion itself no longer leaves anything else behind to count from.
   const [lifetimeStats, setLifetimeStats] = useState(null);
+  // Live, not a one-time read - see useMaintenanceMode.js. This page is
+  // already admin-only (RequireAdmin in App.jsx), so signed-in is already
+  // guaranteed here.
+  const maintenanceMode = useMaintenanceMode(true);
+  const [maintenanceSaving, setMaintenanceSaving] = useState(false);
+  const [maintenanceError, setMaintenanceError] = useState('');
 
   useEffect(() => {
     getMatchConfig().then((c) => {
@@ -70,6 +84,51 @@ export default function SettingsPage() {
   }, []);
   const { notify: notifyVisualMatch, dialog: visualMatchDialog } = useVisualMatchAlert();
   const { confirm, dialog: confirmDialog } = useConfirm();
+
+  // Turning it off never disrupts anyone, so that happens immediately -
+  // only turning it ON (which boots every non-admin out mid-session, see
+  // App.jsx) asks for confirmation first, with a headcount so the admin
+  // knows the blast radius before committing.
+  async function handleToggleMaintenance() {
+    setMaintenanceError('');
+    if (maintenanceMode) {
+      setMaintenanceSaving(true);
+      try {
+        await setMaintenanceMode(false);
+      } catch (err) {
+        setMaintenanceError(getErrorMessage(err));
+      } finally {
+        setMaintenanceSaving(false);
+      }
+      return;
+    }
+
+    let activeCount = 0;
+    try {
+      const users = await listUsers();
+      activeCount = users.filter(
+        (u) => u.id !== user.uid && u.lastLoginAt && Date.now() - u.lastLoginAt.toMillis() < MAINTENANCE_ACTIVE_WINDOW_MS
+      ).length;
+    } catch {
+      // A failed headcount isn't worth blocking the toggle over - the
+      // confirmation still makes sense without it, just less specific.
+    }
+    const ok = await confirm(
+      activeCount > 0
+        ? `${activeCount} משתמשים פתחו את האפליקציה ב-30 הדקות האחרונות ויועפו החוצה מיד למסך תחזוקה. להפעיל בכל זאת?`
+        : 'לא נראה שמישהו השתמש באפליקציה ב-30 הדקות האחרונות. להפעיל מצב תחזוקה?',
+      { confirmLabel: 'הפעלת תחזוקה', danger: true }
+    );
+    if (!ok) return;
+    setMaintenanceSaving(true);
+    try {
+      await setMaintenanceMode(true);
+    } catch (err) {
+      setMaintenanceError(getErrorMessage(err));
+    } finally {
+      setMaintenanceSaving(false);
+    }
+  }
 
   async function handleRescanAll() {
     setRescanning(true);
@@ -194,6 +253,33 @@ export default function SettingsPage() {
           התנתקות
         </button>
       </nav>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <button
+          type="button"
+          onClick={handleToggleMaintenance}
+          disabled={maintenanceSaving}
+          className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-right transition disabled:opacity-50 ${
+            maintenanceMode ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-slate-50'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <span className="w-7 shrink-0 text-center text-lg">🚧</span>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">מצב תחזוקה</p>
+              <p className="text-xs text-slate-500">
+                {maintenanceMode
+                  ? 'פעיל - משתמשים רגילים רואים מסך תחזוקה, אתם ממשיכים לראות הכל'
+                  : 'כבוי - האפליקציה פתוחה לכולם'}
+              </p>
+            </div>
+          </div>
+          <span className={`shrink-0 text-xs font-bold ${maintenanceMode ? 'text-amber-700' : 'text-slate-400'}`}>
+            {maintenanceSaving ? '...' : maintenanceMode ? 'פעיל' : 'כבוי'}
+          </span>
+        </button>
+        {maintenanceError && <p className="mt-2 text-sm font-medium text-red-600">{maintenanceError}</p>}
+      </section>
 
       <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
         <h2 className="mb-1 font-medium text-slate-700">סריקה מחדש של כל ההתאמות</h2>
