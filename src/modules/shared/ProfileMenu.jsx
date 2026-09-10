@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import { usePwaInstall } from './usePwaInstall.js';
+import { useMaintenanceMode } from './useMaintenanceMode.js';
 import HelpDialog from './HelpDialog.jsx';
 import PrivacyDialog from './PrivacyDialog.jsx';
 import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
@@ -18,6 +19,11 @@ import FeedbackDialog from '../feedback/FeedbackDialog.jsx';
 export default function ProfileMenu() {
   const { user, signOut, isAdmin, isRealAdmin, viewingAsRegular, toggleViewAsRegular } = useAuth();
   const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
+  // Only an admin can even reach this menu while maintenance mode is on -
+  // App.jsx already shows every non-admin the maintenance screen instead of
+  // the whole app, so nobody else is ever around to subscribe to this or
+  // need reminding about it.
+  const maintenanceMode = useMaintenanceMode(isRealAdmin);
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
@@ -79,8 +85,21 @@ export default function ProfileMenu() {
         {/* Same gear icon for everyone now, not just admins - it never
             depended on the role resolving (unlike the old avatar/gear
             switch, which needed a loading placeholder to avoid a flash),
-            so there's nothing left here to wait on. */}
-        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow">⚙️</span>
+            so there's nothing left here to wait on. A ring + a small 🚧
+            badge while maintenance mode is on (admin-only, see above) is
+            the whole point of this: an admin using the app completely
+            normally during maintenance has nothing else on screen
+            reminding them regular users are currently locked out.*/}
+        <span
+          className={`flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base shadow ${
+            isRealAdmin && maintenanceMode ? 'ring-2 ring-amber-500' : ''
+          }`}
+        >
+          ⚙️
+        </span>
+        {isRealAdmin && maintenanceMode && (
+          <span className="absolute -bottom-1 -left-1 text-[11px] leading-none">🚧</span>
+        )}
       </button>
 
       {open && (
@@ -88,6 +107,17 @@ export default function ProfileMenu() {
           className="absolute z-20 mt-2 w-64 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg"
           style={{ insetInlineEnd: 0 }}
         >
+          {isRealAdmin && maintenanceMode && (
+            <Link
+              to="/settings"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 border-b border-slate-100 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800"
+            >
+              <span>🚧</span>
+              <span>מצב תחזוקה פעיל - משתמשים רגילים חסומים</span>
+            </Link>
+          )}
+
           <div className="border-b border-slate-100 px-4 py-3">
             <p className="truncate font-medium text-slate-800">{user?.displayName}</p>
             <p className="truncate text-xs text-slate-500">{user?.email}</p>
