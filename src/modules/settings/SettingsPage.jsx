@@ -341,13 +341,17 @@ export default function SettingsPage() {
           <p className="mt-2 text-sm text-emerald-700">
             נסרקו {photoBackfillResult.casesScanned} תיקי חיפוש, הושוו תמונות ב-{photoBackfillResult.pairsChecked}{' '}
             התאמות.
-            {(photoBackfillResult.skippedBelowThreshold > 0 || photoBackfillResult.skippedClosed > 0) && (
+            {(photoBackfillResult.skippedBelowThreshold > 0 ||
+              photoBackfillResult.skippedClosed > 0 ||
+              photoBackfillResult.skippedOverCap > 0) && (
               <>
                 {' '}
                 <span className="text-slate-500">
                   ({photoBackfillResult.skippedBelowThreshold} מתחת לסף לפי הציון העדכני
-                  {photoBackfillResult.skippedClosed > 0 && `, ${photoBackfillResult.skippedClosed} בתיקים לא פעילים`} -
-                  לא נבדקו)
+                  {photoBackfillResult.skippedClosed > 0 && `, ${photoBackfillResult.skippedClosed} בתיקים לא פעילים`}
+                  {photoBackfillResult.skippedOverCap > 0 &&
+                    `, ${photoBackfillResult.skippedOverCap} מעל מקסימום ההשוואות לתיק (ריצה נוספת תבדוק אותן)`}{' '}
+                  - לא נבדקו)
                 </span>
               </>
             )}

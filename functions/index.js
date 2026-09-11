@@ -986,12 +986,22 @@ export const comparePhotoSimilarity = onCall(
       throw new HttpsError('internal', 'Could not load one of the photos.');
     }
 
+    // Read live from Firestore, same doc the admin's matching-parameters
+    // screen edits (see photoCompareThinking in matchingEngine.js/
+    // matchConfigApi.js) - so flipping this off/on in Settings takes effect
+    // immediately for every caller, no redeploy needed. Off by default:
+    // thinking tokens bill at the same rate as the answer itself and were
+    // the single biggest driver of this app's AI spend; on is the fallback
+    // if disabling it measurably brings back wrong verdicts.
+    const matchConfigSnap = await db.collection('config').doc('matchWeights').get();
+    const useThinking = matchConfigSnap.exists ? !!matchConfigSnap.data().photoCompareThinking : false;
+
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
       model: PHOTO_SIMILARITY_MODEL,
       max_tokens: 1200,
-      thinking: { type: 'adaptive' },
+      thinking: { type: useThinking ? 'adaptive' : 'disabled' },
       system: PHOTO_SIMILARITY_PROMPT,
       output_config: { format: { type: 'json_schema', schema: PHOTO_SIMILARITY_SCHEMA } },
       messages: [

@@ -273,9 +273,22 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
 
   let done = 0;
   onProgress?.(done, ranked.length);
+  // ranked is already sorted best-first (see rankMatches), so a plain
+  // running count of candidates that both clear the threshold AND are still
+  // under the cap gives the top-K by score, computed synchronously before
+  // any AI call starts - see maxPhotoChecksPerScan in matchingEngine.js.
+  let photoChecksUsed = 0;
+  const withinCap = ranked.map(({ score }) => {
+    if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return false;
+    if (photoChecksUsed >= config.maxPhotoChecksPerScan) return false;
+    photoChecksUsed += 1;
+    return true;
+  });
   const visuals = await Promise.all(
-    ranked.map(async ({ report, score }) => {
-      const result = await maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found');
+    ranked.map(async ({ report, score }, i) => {
+      const result = withinCap[i]
+        ? await maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found')
+        : null;
       done += 1;
       onProgress?.(done, ranked.length);
       return result;
@@ -509,6 +522,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
   let pairsChecked = 0;
   let skippedBelowThreshold = 0;
   let skippedClosed = 0;
+  let skippedOverCap = 0;
   const visualMatches = [];
   const foundReportIdsToRecompute = new Set();
 
@@ -549,18 +563,26 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       // exactly what makes this action a trustworthy "is everything
       // eligible actually checked" pass, matching what a per-match
       // "סריקה חוזרת" already does.
-      const candidates = [];
+      const eligible = [];
       uncheckedMatches.forEach((m, idx) => {
         const reportSnap = foundReportSnaps[idx];
         if (!reportSnap.exists()) return;
         const foundReport = reportSnap.data();
         const freshScore = scoreMatch(lostCase, foundReport, config).score;
         if (confidenceMeetsThreshold(freshScore, config.photoMatchThreshold)) {
-          candidates.push({ m, foundReport, freshScore });
+          eligible.push({ m, foundReport, freshScore });
         } else {
           skippedBelowThreshold += 1;
         }
       });
+      // Same per-scan cap as the live "check matches" actions (see
+      // maxPhotoChecksPerScan) - this lost case's own eligible pairs, best
+      // score first; anything past the cap is left unchecked this run
+      // rather than spent on, same as a candidate that never cleared the
+      // threshold at all.
+      eligible.sort((a, b) => b.freshScore - a.freshScore);
+      const candidates = eligible.slice(0, config.maxPhotoChecksPerScan);
+      skippedOverCap += eligible.length - candidates.length;
 
       if (candidates.length > 0) {
         const visuals = await Promise.all(
@@ -612,7 +634,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
 
   await Promise.all([...foundReportIdsToRecompute].map((id) => recomputeFoundReportVisualFlag(id)));
 
-  return { casesScanned: allLostCases.length, pairsChecked, skippedBelowThreshold, skippedClosed, visualMatches };
+  return { casesScanned: allLostCases.length, pairsChecked, skippedBelowThreshold, skippedClosed, skippedOverCap, visualMatches };
 }
 
 /**
@@ -645,12 +667,24 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   if (newCandidates.length === 0) return { newCount: 0, visualMatches: [] };
 
   const config = await getMatchConfig();
-  const scored = newCandidates.map((lostCase) => ({ lostCase, ...scoreMatch(lostCase, report, config) }));
+  // Sorted best-first, same as rankMatches on the other side - so the same
+  // synchronous top-K cap below actually keeps the K best candidates, not
+  // an arbitrary K in whatever order newCandidates happened to come back.
+  const scored = newCandidates.map((lostCase) => ({ lostCase, ...scoreMatch(lostCase, report, config) })).sort((a, b) => b.score - a.score);
   let done = 0;
   onProgress?.(done, scored.length);
+  let photoChecksUsed = 0;
+  const withinCap = scored.map(({ score }) => {
+    if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return false;
+    if (photoChecksUsed >= config.maxPhotoChecksPerScan) return false;
+    photoChecksUsed += 1;
+    return true;
+  });
   const visuals = await Promise.all(
-    scored.map(async ({ lostCase, score }) => {
-      const result = await maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost');
+    scored.map(async ({ lostCase, score }, i) => {
+      const result = withinCap[i]
+        ? await maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost')
+        : null;
       done += 1;
       onProgress?.(done, scored.length);
       return result;

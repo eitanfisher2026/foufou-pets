@@ -106,6 +106,8 @@ export async function getMatchConfig() {
     confidenceColors: { ...DEFAULT_MATCH_CONFIG.confidenceColors, ...data.confidenceColors },
     photoMatchThreshold: data.photoMatchThreshold ?? DEFAULT_MATCH_CONFIG.photoMatchThreshold,
     photoDisqualifyThreshold: data.photoDisqualifyThreshold ?? DEFAULT_MATCH_CONFIG.photoDisqualifyThreshold,
+    maxPhotoChecksPerScan: data.maxPhotoChecksPerScan ?? DEFAULT_MATCH_CONFIG.maxPhotoChecksPerScan,
+    photoCompareThinking: data.photoCompareThinking ?? DEFAULT_MATCH_CONFIG.photoCompareThinking,
   };
 }
 

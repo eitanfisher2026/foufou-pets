@@ -497,6 +497,38 @@ export default function MatchSettingsPage() {
           onChange={(v) => setConfig((prev) => ({ ...prev, photoDisqualifyThreshold: v }))}
           options={PHOTO_DISQUALIFY_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
         />
+
+        <p className="mb-2 mt-4 text-sm text-slate-500">
+          תקרת ביטחון על העלות: גם אם עשרות התאמות עוברות את הסף (למשל בעיר גדולה עם הרבה דיווחים על חתולים בצבע
+          נפוץ), רק המספר הזה, הכי גבוהות בציון, יקבלו בפועל השוואת תמונה בכל סריקה אחת - השאר עדיין מקבלות התאמה
+          לפי פרטים, רק בלי הרובד הנוסף הזה.
+        </p>
+        <label className="flex max-w-[12rem] flex-col gap-1 text-sm text-slate-700">
+          <span>מקסימום השוואות תמונה בסריקה אחת</span>
+          <input
+            type="number"
+            min="1"
+            className="input w-full"
+            value={config.maxPhotoChecksPerScan}
+            onChange={(e) => setConfig((prev) => ({ ...prev, maxPhotoChecksPerScan: Math.max(1, Number(e.target.value) || 1) }))}
+          />
+        </label>
+
+        <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={config.photoCompareThinking}
+            onChange={(e) => setConfig((prev) => ({ ...prev, photoCompareThinking: e.target.checked }))}
+          />
+          <span>
+            <span className="font-medium">חשיבה מורחבת (thinking) בהשוואת תמונות</span>
+            <br />
+            עולה משמעותית יותר לכל השוואה (זה היה רוב עלות ה-AI בפועל). כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג
+            המודל בעקבות מקרה של טעות בטוחה-אך-שגויה - אם אחרי כיבוי מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן
+            להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
+          </span>
+        </label>
       </div>
 
       <div className="mb-3 flex items-center justify-between">

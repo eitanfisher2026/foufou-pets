@@ -419,6 +419,30 @@ export const DEFAULT_MATCH_CONFIG = {
   // to go on, or a weak lean toward different) is left purely informational
   // by default, since that's real uncertainty, not a confident negative.
   photoDisqualifyThreshold: 'noMatch',
+  // Whether the photo-comparison AI call gets extended reasoning ("thinking")
+  // before answering. This was turned on (alongside a model upgrade) to fix
+  // a confirmed accuracy bug - a cheaper model confidently misjudging two
+  // photos - but that fix bundled two changes at once, so it was never
+  // proven thinking itself was the necessary part rather than just the
+  // stronger model. Off by default: thinking tokens bill at the same rate as
+  // the answer itself and were the dominant driver of this app's AI spend.
+  // Exposed here (not hardcoded server-side) specifically so it can be
+  // switched back on in one click, without a redeploy, if turning it off
+  // measurably hurts match quality - see the server-side read of this same
+  // field in functions/index.js's comparePhotoSimilarity.
+  photoCompareThinking: false,
+  // Hard ceiling on how many AI photo comparisons a single scan (one lost
+  // case's "check matches", one found report's, or one lost case's slice of
+  // the admin backfill) will ever pay for, even when far more candidates
+  // clear photoMatchThreshold - the field-score threshold alone doesn't
+  // bound cost, since a busy city/common color combination can put dozens
+  // of candidates into "high" confidence on fields alone as the record pool
+  // grows. Only the top-scoring candidates (by field score) within this cap
+  // actually get an AI photo check; the rest still get a real field-based
+  // match, just without the photo refinement layered on top - see
+  // checkMatchesForLostCase/checkMatchesForFoundReport/
+  // backfillPhotoSimilarityForExistingMatches in matchingApi.js.
+  maxPhotoChecksPerScan: 5,
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
