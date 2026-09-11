@@ -30,23 +30,32 @@ const RATE_LIMIT_MAX_CALLS = 60;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 /**
- * Per-user AI cost ledger, written server-side - uid comes from
- * request.auth, never trusted from the client - so the cost dashboard can
- * show which specific user is running up AI spend, not just a site-wide
- * total. Lifetime cost accumulates directly in the given field;
- * currentMonthCostUsd resets itself the moment a call lands in a new
- * calendar month, rather than needing a separate scheduled reset job.
- * Every caller awaits this (adds one small Firestore round-trip to an
- * AI call that already takes seconds) rather than firing-and-forgetting it,
- * since a v2 function's background work isn't guaranteed to run once the
- * response has already gone out - losing ledger entries silently would
- * defeat the whole point of this. Errors are swallowed here (logged, not
- * thrown) so a ledger write never fails the user-facing AI call itself.
+ * Writes into both cost ledgers this app keeps - one row per user
+ * (userCosts/{uid}, the per-user breakdown/flag in Settings) and one single
+ * site-wide row (config/costLedger, the "עלות AI" totals) - every time an
+ * AI call actually costs something. uid comes from request.auth, never
+ * trusted from the client. Both ledgers track a lifetime total per cost
+ * category (aiCostUsd = species-detect + screenshot extraction,
+ * visualMatchCostUsd = AI photo comparison) plus a current-calendar-month
+ * total that resets itself the moment a call lands in a new month key
+ * (YYYY-MM), no separate scheduled reset job needed. Every caller awaits
+ * this (adds one small Firestore round-trip to an AI call that already
+ * takes seconds) rather than firing-and-forgetting it, since a v2
+ * function's background work isn't guaranteed to run once the response has
+ * already gone out - losing ledger entries silently would defeat the whole
+ * point. Errors are swallowed (logged, not thrown) so a ledger write never
+ * fails the user-facing AI call itself.
  */
-async function recordUserCost(uid, field, costUsd) {
+async function recordCost(uid, field, costUsd) {
   if (!costUsd) return;
   const monthKey = new Date().toISOString().slice(0, 7);
-  const ref = db.collection('userCosts').doc(uid);
+  await Promise.all([
+    incrementUserCostDoc(db.collection('userCosts').doc(uid), field, costUsd, monthKey),
+    incrementGlobalCostDoc(db.collection('config').doc('costLedger'), field, costUsd, monthKey),
+  ]);
+}
+
+async function incrementUserCostDoc(ref, field, costUsd, monthKey) {
   try {
     const snap = await ref.get();
     const sameMonth = snap.exists && snap.data().currentMonthKey === monthKey;
@@ -60,7 +69,30 @@ async function recordUserCost(uid, field, costUsd) {
       { merge: true }
     );
   } catch (err) {
-    console.error('recordUserCost failed for', uid, err);
+    console.error('incrementUserCostDoc failed for', ref.path, err);
+  }
+}
+
+// Global ledger tracks each cost category's current-month total separately
+// (unlike the per-user doc's single combined currentMonthCostUsd, which is
+// only ever shown as one number) - so "עלות AI" can keep showing the same
+// extraction-vs-visual-match split for the current month that it always
+// showed for the lifetime total. On a month rollover, whichever category's
+// call happens to land first resets BOTH month fields (its own to this
+// call's cost, the other to 0) - the other category may not fire again for
+// a while, but its own "this month" total is still correctly zero either way.
+async function incrementGlobalCostDoc(ref, field, costUsd, monthKey) {
+  const monthField = field === 'aiCostUsd' ? 'currentMonthAiCostUsd' : 'currentMonthVisualMatchCostUsd';
+  const otherMonthField = field === 'aiCostUsd' ? 'currentMonthVisualMatchCostUsd' : 'currentMonthAiCostUsd';
+  try {
+    const snap = await ref.get();
+    const sameMonth = snap.exists && snap.data().currentMonthKey === monthKey;
+    const updates = { [field]: FieldValue.increment(costUsd), currentMonthKey: monthKey, updatedAt: FieldValue.serverTimestamp() };
+    updates[monthField] = sameMonth ? FieldValue.increment(costUsd) : costUsd;
+    if (!sameMonth) updates[otherMonthField] = 0;
+    await ref.set(updates, { merge: true });
+  } catch (err) {
+    console.error('incrementGlobalCostDoc failed for', ref.path, err);
   }
 }
 
@@ -510,7 +542,7 @@ export const detectPetSpecies = onCall(
           SPECIES_DETECT_PRICE_PER_MTOK_OUTPUT
         ),
       };
-      await recordUserCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
+      await recordCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the result.');
@@ -624,7 +656,7 @@ export const extractReportFromImages = onCall(
         outputTokens: response.usage?.output_tokens || 0,
         estimatedCostUsd: estimateCostUsd(response.usage),
       };
-      await recordUserCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
+      await recordCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the extraction result.');
@@ -1038,7 +1070,7 @@ export const comparePhotoSimilarity = onCall(
           PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT
         ),
       };
-      await recordUserCost(request.auth.uid, 'visualMatchCostUsd', parsed._aiUsage.estimatedCostUsd);
+      await recordCost(request.auth.uid, 'visualMatchCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the result.');
@@ -1127,3 +1159,66 @@ export const weeklyCleanupOldRecords = onSchedule(
     );
   }
 );
+
+/**
+ * One-time, admin-only move to the monthly cost-tracking model (see
+ * recordCost above): computes the site-wide lifetime AI total the same way
+ * the old cost dashboard always had (summing aiCostUsd/visualMatchCostUsd
+ * straight off every lostCases/foundReports record - a plain full-
+ * collection read is fine here specifically because this runs exactly
+ * once, never as a live page load), writes it into config/costLedger as
+ * the starting lifetime total, and starts the current calendar month at
+ * exactly $0. Also resets every existing userCosts/{uid} doc's own
+ * currentMonthCostUsd to $0 for the same reason - their lifetime totals
+ * need no change, they already correctly include everything up to today.
+ * Refuses to run a second time (config/costLedger already existing means
+ * this already happened) so an accidental re-click can't wipe out a real
+ * month of already-tracked spend back to zero.
+ */
+export const migrateCostTrackingToMonthly = onCall({ region: 'me-west1', cors: true, timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+  if (!callerSnap.exists || callerSnap.data().role !== 'admin') {
+    throw new HttpsError('permission-denied', 'מנהלים בלבד.');
+  }
+
+  const ledgerRef = db.collection('config').doc('costLedger');
+  const existingLedger = await ledgerRef.get();
+  if (existingLedger.exists) {
+    throw new HttpsError('failed-precondition', 'המעבר למעקב חודשי כבר בוצע.');
+  }
+
+  const [lostSnap, foundSnap] = await Promise.all([db.collection('lostCases').get(), db.collection('foundReports').get()]);
+  let aiCostUsd = 0;
+  let visualMatchCostUsd = 0;
+  lostSnap.docs.forEach((d) => {
+    aiCostUsd += d.data().aiCostUsd || 0;
+    visualMatchCostUsd += d.data().visualMatchCostUsd || 0;
+  });
+  foundSnap.docs.forEach((d) => {
+    aiCostUsd += d.data().aiCostUsd || 0;
+  });
+
+  const monthKey = new Date().toISOString().slice(0, 7);
+  await ledgerRef.set({
+    aiCostUsd,
+    visualMatchCostUsd,
+    currentMonthKey: monthKey,
+    currentMonthAiCostUsd: 0,
+    currentMonthVisualMatchCostUsd: 0,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  const userCostsSnap = await db.collection('userCosts').get();
+  for (let i = 0; i < userCostsSnap.docs.length; i += 400) {
+    const batch = db.batch();
+    userCostsSnap.docs.slice(i, i + 400).forEach((d) => {
+      batch.set(d.ref, { currentMonthKey: monthKey, currentMonthCostUsd: 0 }, { merge: true });
+    });
+    await batch.commit();
+  }
+
+  return { aiCostUsd, visualMatchCostUsd, usersReset: userCostsSnap.size };
+});
