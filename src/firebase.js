@@ -32,6 +32,12 @@ initializeAppCheck(app, {
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+// Without this, Google silently reuses whichever Google account is already
+// active in the browser and skips the account picker - which is exactly why
+// "sign in with a different account" kept landing back on the same one.
+// Forcing the chooser every time costs nothing for the normal single-account
+// case (Google still remembers the last choice as the default).
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 // me-west1 (Tel Aviv) - must match the region every function in
