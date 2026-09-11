@@ -3,6 +3,8 @@ import { collection, getAggregateFromServer, getCountFromServer, sum } from 'fir
 import { db } from '../../firebase.js';
 import { COLLECTIONS } from '../shared/collections.js';
 import BackLink from '../shared/BackLink.jsx';
+import { listUserCosts, getMonthlyFlagThreshold, setMonthlyFlagThreshold, DEFAULT_MONTHLY_FLAG_THRESHOLD_USD } from './userCostsApi.js';
+import { listUsers } from '../users/usersApi.js';
 
 // Rough size assumption only, since actual file sizes aren't stored per
 // photo - photos are compressed client-side to max 1280px / JPEG q0.75
@@ -27,6 +29,11 @@ function formatUsd(n) {
 export default function CostSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState(null);
+  const [userCosts, setUserCosts] = useState([]);
+  const [usersById, setUsersById] = useState({});
+  const [threshold, setThreshold] = useState(DEFAULT_MONTHLY_FLAG_THRESHOLD_USD);
+  const [thresholdInput, setThresholdInput] = useState(String(DEFAULT_MONTHLY_FLAG_THRESHOLD_USD));
+  const [savingThreshold, setSavingThreshold] = useState(false);
 
   // Server-side sum/count aggregations, not a full read of every record -
   // this page used to fetch every lost case and found report in full just
@@ -43,18 +50,52 @@ export default function CostSettingsPage() {
       getAggregateFromServer(foundReportsRef, { aiCost: sum('aiCostUsd') }),
       getCountFromServer(lostCasesRef),
       getCountFromServer(foundReportsRef),
-    ]).then(([lostAgg, foundAgg, lostCount, foundCount]) => {
+      listUserCosts(),
+      listUsers(),
+      getMonthlyFlagThreshold(),
+    ]).then(([lostAgg, foundAgg, lostCount, foundCount, costsByUser, users, monthlyThreshold]) => {
       setStats({
         lostAiCost: lostAgg.data().aiCost || 0,
         foundAiCost: foundAgg.data().aiCost || 0,
         visualMatchCost: lostAgg.data().visualMatchCost || 0,
         recordCount: (lostCount.data().count || 0) + (foundCount.data().count || 0),
       });
+      setUserCosts(costsByUser);
+      setUsersById(Object.fromEntries(users.map((u) => [u.id, u])));
+      setThreshold(monthlyThreshold);
+      setThresholdInput(String(monthlyThreshold));
       setLoading(false);
     });
   }, []);
 
+  async function handleSaveThreshold() {
+    const value = Number(thresholdInput);
+    if (!Number.isFinite(value) || value < 0) return;
+    setSavingThreshold(true);
+    try {
+      await setMonthlyFlagThreshold(value);
+      setThreshold(value);
+    } finally {
+      setSavingThreshold(false);
+    }
+  }
+
   if (loading || !stats) return <p className="p-4 text-slate-500">טוען...</p>;
+
+  const perUserRows = userCosts
+    .map((c) => {
+      const u = usersById[c.id];
+      const currentMonthCostUsd = c.currentMonthCostUsd || 0;
+      return {
+        id: c.id,
+        email: u?.email || '',
+        displayName: u?.displayName || '',
+        lifetimeCostUsd: (c.aiCostUsd || 0) + (c.visualMatchCostUsd || 0),
+        currentMonthCostUsd,
+        flagged: currentMonthCostUsd >= threshold,
+      };
+    })
+    .sort((a, b) => b.lifetimeCostUsd - a.lifetimeCostUsd);
 
   const totalAiCost = stats.lostAiCost + stats.foundAiCost + stats.visualMatchCost;
   const estimatedPhotos = stats.recordCount * ASSUMED_PHOTOS_PER_RECORD;
@@ -96,6 +137,58 @@ export default function CostSettingsPage() {
           זיהוי מצילומי מסך: קריאה אחת לכל דיווח בזמן ההעלאה (כולל סריקות חוזרות). בדיקת ההתאמות (matching) עצמה
           דטרמיניסטית וחינמית על שדות מובנים - "השוואת תמונות בהתאמות" היא היוצא מן הכלל היחיד: קריאת AI שרצה רק על
           התאמות שכבר עברו את סף הסבירות שנבחר ב"פרמטרים להתאמה", לא על כל זוג.
+        </p>
+      </section>
+
+      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-semibold text-slate-700">עלות לפי משתמש</h2>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>סימון מעל</span>
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={thresholdInput}
+              onChange={(e) => setThresholdInput(e.target.value)}
+              className="input w-16 text-center"
+            />
+            <span>$ בחודש</span>
+            <button
+              type="button"
+              onClick={handleSaveThreshold}
+              disabled={savingThreshold || Number(thresholdInput) === threshold}
+              className="rounded-lg bg-slate-800 px-2 py-1 font-medium text-white disabled:opacity-40"
+            >
+              {savingThreshold ? 'שומר...' : 'שמירה'}
+            </button>
+          </div>
+        </div>
+
+        {perUserRows.length === 0 ? (
+          <p className="text-sm text-slate-400">אף משתמש עדיין לא הפעיל תהליך AI (זיהוי מצילום מסך או השוואת תמונות).</p>
+        ) : (
+          <ul className="space-y-2">
+            {perUserRows.map((row) => (
+              <li key={row.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-2 text-sm">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-slate-800">
+                    {row.flagged && <span className="ml-1">⚠️</span>}
+                    {row.displayName || row.email || row.id}
+                  </p>
+                  {row.email && row.displayName && <p className="truncate text-xs text-slate-400">{row.email}</p>}
+                </div>
+                <div className="shrink-0 text-left">
+                  <p className="font-medium text-slate-800">{formatUsd(row.lifetimeCostUsd)}</p>
+                  <p className="text-xs text-slate-400">{formatUsd(row.currentMonthCostUsd)} החודש</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-3 text-xs text-slate-400">
+          עלות AI בלבד (לא כוללת אחסון). "החודש" מתאפס בתחילת כל חודש קלנדרי. משתמש עם ⚠️ חרג מהסכום שנקבע מעלה
+          החודש הנוכחי - שווה לבדוק שהשימוש שלו תקין.
         </p>
       </section>
 

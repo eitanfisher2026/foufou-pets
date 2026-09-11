@@ -29,6 +29,41 @@ const db = getFirestore();
 const RATE_LIMIT_MAX_CALLS = 60;
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
+/**
+ * Per-user AI cost ledger, written server-side - uid comes from
+ * request.auth, never trusted from the client - so the cost dashboard can
+ * show which specific user is running up AI spend, not just a site-wide
+ * total. Lifetime cost accumulates directly in the given field;
+ * currentMonthCostUsd resets itself the moment a call lands in a new
+ * calendar month, rather than needing a separate scheduled reset job.
+ * Every caller awaits this (adds one small Firestore round-trip to an
+ * AI call that already takes seconds) rather than firing-and-forgetting it,
+ * since a v2 function's background work isn't guaranteed to run once the
+ * response has already gone out - losing ledger entries silently would
+ * defeat the whole point of this. Errors are swallowed here (logged, not
+ * thrown) so a ledger write never fails the user-facing AI call itself.
+ */
+async function recordUserCost(uid, field, costUsd) {
+  if (!costUsd) return;
+  const monthKey = new Date().toISOString().slice(0, 7);
+  const ref = db.collection('userCosts').doc(uid);
+  try {
+    const snap = await ref.get();
+    const sameMonth = snap.exists && snap.data().currentMonthKey === monthKey;
+    await ref.set(
+      {
+        [field]: FieldValue.increment(costUsd),
+        currentMonthKey: monthKey,
+        currentMonthCostUsd: sameMonth ? FieldValue.increment(costUsd) : costUsd,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('recordUserCost failed for', uid, err);
+  }
+}
+
 async function enforceAiRateLimit(uid) {
   const userSnap = await db.collection('users').doc(uid).get();
   const role = userSnap.exists ? userSnap.data().role : 'regular';
@@ -475,6 +510,7 @@ export const detectPetSpecies = onCall(
           SPECIES_DETECT_PRICE_PER_MTOK_OUTPUT
         ),
       };
+      await recordUserCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the result.');
@@ -588,6 +624,7 @@ export const extractReportFromImages = onCall(
         outputTokens: response.usage?.output_tokens || 0,
         estimatedCostUsd: estimateCostUsd(response.usage),
       };
+      await recordUserCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the extraction result.');
@@ -991,6 +1028,7 @@ export const comparePhotoSimilarity = onCall(
           PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT
         ),
       };
+      await recordUserCost(request.auth.uid, 'visualMatchCostUsd', parsed._aiUsage.estimatedCostUsd);
       return parsed;
     } catch {
       throw new HttpsError('internal', 'Could not parse the result.');
