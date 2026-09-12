@@ -7,8 +7,6 @@ import {
   fieldLabel,
   CONFIDENCE_BUCKETS,
   CONFIDENCE_COLOR_PALETTE,
-  PHOTO_MATCH_THRESHOLD_OPTIONS,
-  PHOTO_DISQUALIFY_THRESHOLD_OPTIONS,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
@@ -57,15 +55,6 @@ const RECOMMENDED_PARAMETER_UPGRADES = {
   furType: { disqualifying: true },
   breed: { disqualifying: true },
 };
-
-// Shared by both photo-comparison SelectFields below (when to run the
-// check, and when a "different animal" verdict should disqualify) - both
-// pick from the same CONFIDENCE_BUCKETS vocabulary, plus a "never" opt-out
-// that isn't itself a bucket.
-function bucketOrNeverLabel(key) {
-  if (key === 'never') return 'כבוי';
-  return CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key;
-}
 
 function sameGroupContents(a, b) {
   return a.length === b.length && a.every((breed) => b.includes(breed));
@@ -468,79 +457,6 @@ export default function MatchSettingsPage() {
           שיש בו פחות מידע). כשלא מסומן, הציון הוא סכום ישיר מתוך 100.
         </span>
       </label>
-
-      <CollapsibleSection icon="📷" title="השוואת תמונות AI">
-        <p className="mb-3 text-sm text-slate-500">
-          בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
-          שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
-          כל זוג). "כבוי" מבטל את זה לגמרי. בחירת ספק ה-AI עצמו (LLM שיפוטי מול embedding זול) עברה לעמוד "עלויות".
-        </p>
-        <SelectField
-          className="w-full max-w-[12rem]"
-          label="סף להפעלת השוואת תמונות"
-          allowClear={false}
-          value={config.photoMatchThreshold}
-          onChange={(v) => setConfig((prev) => ({ ...prev, photoMatchThreshold: v }))}
-          options={PHOTO_MATCH_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
-        />
-
-        <p className="mb-2 mt-4 text-sm text-slate-500">
-          כשההשוואה רצה, היא מחזירה רמה - "סבירות גבוהה"/"בינונית"/"נמוכה" שמדובר באותה חיה, או "בוודאות אין
-          התאמה". רמה שמגיעה לסף שנבחר כאן פוסלת את ההתאמה לגמרי (ציון 0), בדיוק כמו אי-התאמת צבע או גזע - לא רק
-          מוצגת כהערה. "כבוי" משאיר את התוצאה כהערה מידעית בלבד, בלי להשפיע על הציון.
-        </p>
-        <SelectField
-          className="w-full max-w-[12rem]"
-          label="סף לפסילת התאמה לפי תמונה"
-          allowClear={false}
-          value={config.photoDisqualifyThreshold}
-          onChange={(v) => setConfig((prev) => ({ ...prev, photoDisqualifyThreshold: v }))}
-          options={PHOTO_DISQUALIFY_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
-        />
-
-        <p className="mb-2 mt-4 text-sm text-slate-500">
-          תקרת ביטחון על העלות: גם אם עשרות התאמות עוברות את הסף (למשל בעיר גדולה עם הרבה דיווחים על חתולים בצבע
-          נפוץ), רק המספר הזה, הכי גבוהות בציון, יקבלו בפועל השוואת תמונה בכל סריקה אחת - השאר עדיין מקבלות התאמה
-          לפי פרטים, רק בלי הרובד הנוסף הזה. עדיין רלוונטי גם עם ספק embedding (Jina/Voyage): השוואה עם תמונה חדשה
-          שעוד לא זוהתה בעבר עדיין עולה משהו בפעם הראשונה - רק השוואות שכבר זוהו קודם הן חינמיות. "ללא הגבלה" למטה
-          מבטל את התקרה לגמרי.
-        </p>
-        <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={!!config.unlimitedPhotoChecks}
-            onChange={(e) => setConfig((prev) => ({ ...prev, unlimitedPhotoChecks: e.target.checked }))}
-          />
-          <span>ללא הגבלה על מספר ההשוואות בסריקה אחת</span>
-        </label>
-        <label className="flex max-w-[12rem] flex-col gap-1 text-sm text-slate-700">
-          <span>מקסימום השוואות תמונה בסריקה אחת</span>
-          <input
-            type="number"
-            min="1"
-            disabled={!!config.unlimitedPhotoChecks}
-            className="input w-full disabled:opacity-40"
-            value={config.maxPhotoChecksPerScan}
-            onChange={(e) => setConfig((prev) => ({ ...prev, maxPhotoChecksPerScan: Math.max(1, Number(e.target.value) || 1) }))}
-          />
-        </label>
-
-        <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            className="mt-1"
-            checked={config.photoCompareThinking}
-            onChange={(e) => setConfig((prev) => ({ ...prev, photoCompareThinking: e.target.checked }))}
-          />
-          <span>
-            <span className="font-medium">חשיבה מורחבת (thinking) בהשוואת תמונות</span>
-            <br />
-            רלוונטי רק כשספק ההשוואה שנבחר בעמוד "עלויות" הוא Claude - עולה משמעותית יותר לכל השוואה (זה היה רוב
-            עלות ה-AI בפועל). כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג המודל בעקבות מקרה של טעות בטוחה-אך-שגויה -
-            אם אחרי כיבוי מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
-          </span>
-        </label>
-      </CollapsibleSection>
 
       <CollapsibleSection
         icon="⚖️"

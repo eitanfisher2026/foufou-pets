@@ -7,8 +7,19 @@ import { getGlobalCosts, runCostTrackingMigration } from './userCostsApi.js';
 import { getErrorMessage } from '../shared/errorMessages.js';
 import CollapsibleSection from '../shared/CollapsibleSection.jsx';
 import { getMatchConfig, saveMatchConfig } from '../matching/matchConfigApi.js';
+import { CONFIDENCE_BUCKETS, PHOTO_MATCH_THRESHOLD_OPTIONS, PHOTO_DISQUALIFY_THRESHOLD_OPTIONS } from '../matching/matchingEngine.js';
 import { getProviderKeys, setProviderKeys } from './aiProviderKeysApi.js';
 import ProviderModelPicker from './ProviderModelPicker.jsx';
+import SelectField from '../shared/SelectField.jsx';
+
+// Shared by both photo-comparison SelectFields below (when to run the
+// check, and when a "different animal" verdict should disqualify) - both
+// pick from the same CONFIDENCE_BUCKETS vocabulary, plus a "never" opt-out
+// that isn't itself a bucket.
+function bucketOrNeverLabel(key) {
+  if (key === 'never') return 'כבוי';
+  return CONFIDENCE_BUCKETS.find((b) => b.key === key)?.label || key;
+}
 
 // Rough size assumption only, since actual file sizes aren't stored per
 // photo - photos are compressed client-side to max 1280px / JPEG q0.75
@@ -184,11 +195,12 @@ export default function CostSettingsPage() {
         {providersError && <p className="mt-2 text-xs font-medium text-red-600">{providersError}</p>}
       </CollapsibleSection>
 
-      <CollapsibleSection icon="📷" title="ספק AI - השוואת תמונות">
+      <CollapsibleSection icon="📷" title="השוואת תמונות AI">
         <p className="mb-3 text-sm text-slate-500">
-          איזה ספק מריץ את השוואת התמונות בין תיק חיפוש לדיווח - LLM שיפוטי (Claude/Gemini/OpenAI/Fireworks) או
-          embedding זול (Jina/Voyage - ראו הסבר בתוך הבחירה). סף ההפעלה, סף הפסילה, והתקרה למספר ההשוואות עצמם
-          נמצאים בעמוד "פרמטרים להתאמה".
+          בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
+          שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
+          כל זוג). "כבוי" מבטל את זה לגמרי. ספק ה-AI - LLM שיפוטי (Claude/Gemini/OpenAI/Fireworks) או embedding זול
+          (Jina/Voyage - ראו הסבר בתוך הבחירה):
         </p>
         <ProviderModelPicker
           task="photoCompare"
@@ -201,13 +213,82 @@ export default function CostSettingsPage() {
           keyInputs={keyInputs}
           onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
         />
+
+        <SelectField
+          className="mt-4 w-full max-w-[12rem]"
+          label="סף להפעלת השוואת תמונות"
+          allowClear={false}
+          value={matchConfig.photoMatchThreshold}
+          onChange={(v) => setMatchConfig((prev) => ({ ...prev, photoMatchThreshold: v }))}
+          options={PHOTO_MATCH_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
+        />
+
+        <p className="mb-2 mt-4 text-sm text-slate-500">
+          כשההשוואה רצה, היא מחזירה רמה - "סבירות גבוהה"/"בינונית"/"נמוכה" שמדובר באותה חיה, או "בוודאות אין
+          התאמה". רמה שמגיעה לסף שנבחר כאן פוסלת את ההתאמה לגמרי (ציון 0), בדיוק כמו אי-התאמת צבע או גזע - לא רק
+          מוצגת כהערה. "כבוי" משאיר את התוצאה כהערה מידעית בלבד, בלי להשפיע על הציון.
+        </p>
+        <SelectField
+          className="w-full max-w-[12rem]"
+          label="סף לפסילת התאמה לפי תמונה"
+          allowClear={false}
+          value={matchConfig.photoDisqualifyThreshold}
+          onChange={(v) => setMatchConfig((prev) => ({ ...prev, photoDisqualifyThreshold: v }))}
+          options={PHOTO_DISQUALIFY_THRESHOLD_OPTIONS.map((key) => ({ value: key, label: bucketOrNeverLabel(key) }))}
+        />
+
+        <p className="mb-2 mt-4 text-sm text-slate-500">
+          תקרת ביטחון על העלות: גם אם עשרות התאמות עוברות את הסף (למשל בעיר גדולה עם הרבה דיווחים על חתולים בצבע
+          נפוץ), רק המספר הזה, הכי גבוהות בציון, יקבלו בפועל השוואת תמונה בכל סריקה אחת - השאר עדיין מקבלות התאמה
+          לפי פרטים, רק בלי הרובד הנוסף הזה. עדיין רלוונטי גם עם ספק embedding (Jina/Voyage): השוואה עם תמונה חדשה
+          שעוד לא זוהתה בעבר עדיין עולה משהו בפעם הראשונה - רק השוואות שכבר זוהו קודם הן חינמיות. "ללא הגבלה" למטה
+          מבטל את התקרה לגמרי.
+        </p>
+        <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={!!matchConfig.unlimitedPhotoChecks}
+            onChange={(e) => setMatchConfig((prev) => ({ ...prev, unlimitedPhotoChecks: e.target.checked }))}
+          />
+          <span>ללא הגבלה על מספר ההשוואות בסריקה אחת</span>
+        </label>
+        <label className="flex max-w-[12rem] flex-col gap-1 text-sm text-slate-700">
+          <span>מקסימום השוואות תמונה בסריקה אחת</span>
+          <input
+            type="number"
+            min="1"
+            disabled={!!matchConfig.unlimitedPhotoChecks}
+            className="input w-full disabled:opacity-40"
+            value={matchConfig.maxPhotoChecksPerScan}
+            onChange={(e) =>
+              setMatchConfig((prev) => ({ ...prev, maxPhotoChecksPerScan: Math.max(1, Number(e.target.value) || 1) }))
+            }
+          />
+        </label>
+
+        <label className="mt-4 flex items-start gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={matchConfig.photoCompareThinking}
+            onChange={(e) => setMatchConfig((prev) => ({ ...prev, photoCompareThinking: e.target.checked }))}
+          />
+          <span>
+            <span className="font-medium">חשיבה מורחבת (thinking) בהשוואת תמונות</span>
+            <br />
+            רלוונטי רק כשספק ההשוואה למעלה הוא Claude - עולה משמעותית יותר לכל השוואה (זה היה רוב עלות ה-AI בפועל).
+            כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג המודל בעקבות מקרה של טעות בטוחה-אך-שגויה - אם אחרי כיבוי
+            מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
+          </span>
+        </label>
+
         <button
           type="button"
           onClick={handleSaveProviders}
           disabled={savingProviders}
-          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          className="mt-4 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
-          {savingProviders ? 'שומר...' : providersSavedNotice ? 'נשמר ✓' : 'שמירת ספק ומודל'}
+          {savingProviders ? 'שומר...' : providersSavedNotice ? 'נשמר ✓' : 'שמירת הגדרות'}
         </button>
         {providersError && <p className="mt-2 text-xs font-medium text-red-600">{providersError}</p>}
       </CollapsibleSection>
