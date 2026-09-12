@@ -18,8 +18,6 @@ import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import CollapsibleSection from '../shared/CollapsibleSection.jsx';
-import { getProviderKeys, setProviderKeys } from './aiProviderKeysApi.js';
-import ProviderModelPicker from './ProviderModelPicker.jsx';
 
 const OTHER = 'אחר';
 
@@ -139,20 +137,6 @@ export default function MatchSettingsPage() {
   const [breedInput, setBreedInput] = useState('');
   const [patternInput, setPatternInput] = useState('');
   const [saveError, setSaveError] = useState('');
-  // Separate from config/handleSave below - these live in their own
-  // Firestore doc (config/aiProviderKeys, see aiProviderKeysApi.js), not
-  // config/matchWeights, so they get their own small save flow instead of
-  // riding along with the big "שמירת ההגדרות" button.
-  const [keyInputs, setKeyInputs] = useState({
-    geminiApiKey: '',
-    openaiApiKey: '',
-    fireworksApiKey: '',
-    jinaApiKey: '',
-    voyageApiKey: '',
-  });
-  const [savingKeys, setSavingKeys] = useState(false);
-  const [keysSavedNotice, setKeysSavedNotice] = useState(false);
-  const [keysError, setKeysError] = useState('');
   const { confirm, dialog } = useConfirm();
 
   const colorOptions = listSpecies === SPECIES.DOG ? dogColorOptions : catColorOptions;
@@ -167,23 +151,7 @@ export default function MatchSettingsPage() {
     getBreedOptions(SPECIES.CAT).then((breeds) => setCatBreedOptions(breeds.filter((b) => b !== OTHER)));
     getBreedOptions(SPECIES.DOG).then((breeds) => setDogBreedOptions(breeds.filter((b) => b !== OTHER)));
     getPatternOptions().then((patterns) => setPatternOptions(patterns.filter((p) => p !== OTHER)));
-    getProviderKeys().then(setKeyInputs);
   }, []);
-
-  async function handleSaveKeys() {
-    setSavingKeys(true);
-    setKeysError('');
-    setKeysSavedNotice(false);
-    try {
-      await setProviderKeys(keyInputs);
-      setKeysSavedNotice(true);
-      setTimeout(() => setKeysSavedNotice(false), 2500);
-    } catch (err) {
-      setKeysError(getErrorMessage(err));
-    } finally {
-      setSavingKeys(false);
-    }
-  }
 
   function addColorOption() {
     const value = colorInput.trim();
@@ -501,62 +469,12 @@ export default function MatchSettingsPage() {
         </span>
       </label>
 
-      <CollapsibleSection icon="🧩" title="ספק AI - אלגוריתם (חילוץ פרטים מצילומי מסך)">
-        <p className="mb-3 text-sm text-slate-500">
-          קריאת ה-AI שרצה פעם אחת לכל דיווח, בזמן ההעלאה, כדי לחלץ את הפרטים מהתמונה/הטקסט. ספק שאינו Claude דורש
-          מפתח API משלו למטה לפני שהוא באמת עובד - בחירה בספק בלי מפתח שמור תיכשל עם הודעת שגיאה ברורה בזמן הקריאה,
-          לא תעבוד בשקט לספק אחר.
-        </p>
-        <ProviderModelPicker
-          task="extraction"
-          providerKind={config.extractionProviderKind}
-          model={config.extractionModel}
-          onProviderChange={(kind, defaultModel) =>
-            setConfig((prev) => ({ ...prev, extractionProviderKind: kind, extractionModel: defaultModel }))
-          }
-          onModelChange={(model) => setConfig((prev) => ({ ...prev, extractionModel: model }))}
-          keyInputs={keyInputs}
-          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
-        />
-        <button
-          type="button"
-          onClick={handleSaveKeys}
-          disabled={savingKeys}
-          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
-        </button>
-        {keysError && <p className="mt-2 text-xs font-medium text-red-600">{keysError}</p>}
-        <p className="mt-2 text-xs text-slate-400">מפתחות ה-API משותפים לכל המשתמשים ולשני הסעיפים (כאן ובהשוואת תמונות למטה).</p>
-      </CollapsibleSection>
-
       <CollapsibleSection icon="📷" title="השוואת תמונות AI">
         <p className="mb-3 text-sm text-slate-500">
           בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
           שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
-          כל זוג). "כבוי" מבטל את זה לגמרי.
+          כל זוג). "כבוי" מבטל את זה לגמרי. בחירת ספק ה-AI עצמו (LLM שיפוטי מול embedding זול) עברה לעמוד "עלויות".
         </p>
-        <ProviderModelPicker
-          task="photoCompare"
-          providerKind={config.photoCompareProviderKind}
-          model={config.photoCompareModel}
-          onProviderChange={(kind, defaultModel) =>
-            setConfig((prev) => ({ ...prev, photoCompareProviderKind: kind, photoCompareModel: defaultModel }))
-          }
-          onModelChange={(model) => setConfig((prev) => ({ ...prev, photoCompareModel: model }))}
-          keyInputs={keyInputs}
-          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
-        />
-        <button
-          type="button"
-          onClick={handleSaveKeys}
-          disabled={savingKeys}
-          className="mb-4 mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
-        >
-          {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
-        </button>
-        {keysError && <p className="-mt-2 mb-4 text-xs font-medium text-red-600">{keysError}</p>}
-
         <SelectField
           className="w-full max-w-[12rem]"
           label="סף להפעלת השוואת תמונות"
@@ -583,14 +501,25 @@ export default function MatchSettingsPage() {
         <p className="mb-2 mt-4 text-sm text-slate-500">
           תקרת ביטחון על העלות: גם אם עשרות התאמות עוברות את הסף (למשל בעיר גדולה עם הרבה דיווחים על חתולים בצבע
           נפוץ), רק המספר הזה, הכי גבוהות בציון, יקבלו בפועל השוואת תמונה בכל סריקה אחת - השאר עדיין מקבלות התאמה
-          לפי פרטים, רק בלי הרובד הנוסף הזה.
+          לפי פרטים, רק בלי הרובד הנוסף הזה. עדיין רלוונטי גם עם ספק embedding (Jina/Voyage): השוואה עם תמונה חדשה
+          שעוד לא זוהתה בעבר עדיין עולה משהו בפעם הראשונה - רק השוואות שכבר זוהו קודם הן חינמיות. "ללא הגבלה" למטה
+          מבטל את התקרה לגמרי.
         </p>
+        <label className="mb-2 flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={!!config.unlimitedPhotoChecks}
+            onChange={(e) => setConfig((prev) => ({ ...prev, unlimitedPhotoChecks: e.target.checked }))}
+          />
+          <span>ללא הגבלה על מספר ההשוואות בסריקה אחת</span>
+        </label>
         <label className="flex max-w-[12rem] flex-col gap-1 text-sm text-slate-700">
           <span>מקסימום השוואות תמונה בסריקה אחת</span>
           <input
             type="number"
             min="1"
-            className="input w-full"
+            disabled={!!config.unlimitedPhotoChecks}
+            className="input w-full disabled:opacity-40"
             value={config.maxPhotoChecksPerScan}
             onChange={(e) => setConfig((prev) => ({ ...prev, maxPhotoChecksPerScan: Math.max(1, Number(e.target.value) || 1) }))}
           />
@@ -606,9 +535,9 @@ export default function MatchSettingsPage() {
           <span>
             <span className="font-medium">חשיבה מורחבת (thinking) בהשוואת תמונות</span>
             <br />
-            רלוונטי רק כשספק ההשוואה למעלה הוא Claude - עולה משמעותית יותר לכל השוואה (זה היה רוב עלות ה-AI בפועל).
-            כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג המודל בעקבות מקרה של טעות בטוחה-אך-שגויה - אם אחרי כיבוי
-            מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
+            רלוונטי רק כשספק ההשוואה שנבחר בעמוד "עלויות" הוא Claude - עולה משמעותית יותר לכל השוואה (זה היה רוב
+            עלות ה-AI בפועל). כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג המודל בעקבות מקרה של טעות בטוחה-אך-שגויה -
+            אם אחרי כיבוי מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
           </span>
         </label>
       </CollapsibleSection>

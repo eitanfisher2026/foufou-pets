@@ -6,6 +6,9 @@ import BackLink from '../shared/BackLink.jsx';
 import { getGlobalCosts, runCostTrackingMigration } from './userCostsApi.js';
 import { getErrorMessage } from '../shared/errorMessages.js';
 import CollapsibleSection from '../shared/CollapsibleSection.jsx';
+import { getMatchConfig, saveMatchConfig } from '../matching/matchConfigApi.js';
+import { getProviderKeys, setProviderKeys } from './aiProviderKeysApi.js';
+import ProviderModelPicker from './ProviderModelPicker.jsx';
 
 // Rough size assumption only, since actual file sizes aren't stored per
 // photo - photos are compressed client-side to max 1280px / JPEG q0.75
@@ -40,6 +43,28 @@ export default function CostSettingsPage() {
   const [globalCosts, setGlobalCosts] = useState(null);
   const [migrating, setMigrating] = useState(false);
   const [migrationError, setMigrationError] = useState('');
+  // Provider/model choice for the two paid AI calls (extraction, photo
+  // comparison) - lives in the same config/matchWeights doc the matching
+  // parameters page edits (see matchConfigApi.js), just surfaced here
+  // instead, since choosing a provider is fundamentally a cost decision.
+  const [matchConfig, setMatchConfig] = useState(null);
+  const [savingProviders, setSavingProviders] = useState(false);
+  const [providersSavedNotice, setProvidersSavedNotice] = useState(false);
+  const [providersError, setProvidersError] = useState('');
+  // Separate from matchConfig/handleSaveProviders above - these live in
+  // their own Firestore doc (config/aiProviderKeys, see
+  // aiProviderKeysApi.js), not config/matchWeights, so they get their own
+  // small save flow.
+  const [keyInputs, setKeyInputs] = useState({
+    geminiApiKey: '',
+    openaiApiKey: '',
+    fireworksApiKey: '',
+    jinaApiKey: '',
+    voyageApiKey: '',
+  });
+  const [savingKeys, setSavingKeys] = useState(false);
+  const [keysSavedNotice, setKeysSavedNotice] = useState(false);
+  const [keysError, setKeysError] = useState('');
 
   useEffect(() => {
     load();
@@ -54,13 +79,17 @@ export default function CostSettingsPage() {
   async function load() {
     const lostCasesRef = collection(db, COLLECTIONS.LOST_CASES);
     const foundReportsRef = collection(db, COLLECTIONS.FOUND_REPORTS);
-    const [lostCount, foundCount, global] = await Promise.all([
+    const [lostCount, foundCount, global, config, providerKeys] = await Promise.all([
       getCountFromServer(lostCasesRef),
       getCountFromServer(foundReportsRef),
       getGlobalCosts(),
+      getMatchConfig(),
+      getProviderKeys(),
     ]);
     setRecordCount((lostCount.data().count || 0) + (foundCount.data().count || 0));
     setGlobalCosts(global);
+    setMatchConfig(config);
+    setKeyInputs(providerKeys);
     setLoading(false);
   }
 
@@ -77,7 +106,41 @@ export default function CostSettingsPage() {
     }
   }
 
-  if (loading) return <p className="p-4 text-slate-500">טוען...</p>;
+  // Saves the WHOLE match config back (not just the two provider fields) -
+  // matchConfig here is the same object the matching-parameters page reads
+  // and writes, so this round-trips everything else it holds untouched,
+  // same principle as that page's own save button.
+  async function handleSaveProviders() {
+    setSavingProviders(true);
+    setProvidersError('');
+    setProvidersSavedNotice(false);
+    try {
+      await saveMatchConfig(matchConfig);
+      setProvidersSavedNotice(true);
+      setTimeout(() => setProvidersSavedNotice(false), 2500);
+    } catch (err) {
+      setProvidersError(getErrorMessage(err));
+    } finally {
+      setSavingProviders(false);
+    }
+  }
+
+  async function handleSaveKeys() {
+    setSavingKeys(true);
+    setKeysError('');
+    setKeysSavedNotice(false);
+    try {
+      await setProviderKeys(keyInputs);
+      setKeysSavedNotice(true);
+      setTimeout(() => setKeysSavedNotice(false), 2500);
+    } catch (err) {
+      setKeysError(getErrorMessage(err));
+    } finally {
+      setSavingKeys(false);
+    }
+  }
+
+  if (loading || !matchConfig) return <p className="p-4 text-slate-500">טוען...</p>;
 
   const estimatedPhotos = recordCount * ASSUMED_PHOTOS_PER_RECORD;
   const estimatedStorageGB = (estimatedPhotos * ASSUMED_KB_PER_PHOTO) / (1024 * 1024);
@@ -92,6 +155,109 @@ export default function CostSettingsPage() {
         עלות ה-AI מבוססת על צריכת הטוקנים האמיתית שדווחה בכל קריאה בפועל - לא הערכה. עלות Firebase היא הערכה גסה בלבד,
         ראו הסבר למטה. פירוט עלות לפי משתמש עבר לעמוד "ניהול משתמשים".
       </p>
+
+      <CollapsibleSection icon="🧩" title="ספק AI - אלגוריתם (חילוץ פרטים מצילומי מסך)">
+        <p className="mb-3 text-sm text-slate-500">
+          קריאת ה-AI שרצה פעם אחת לכל דיווח, בזמן ההעלאה, כדי לחלץ את הפרטים מהתמונה/הטקסט. ספק שאינו Claude דורש
+          מפתח API משלו למטה לפני שהוא באמת עובד - בחירה בספק בלי מפתח שמור תיכשל עם הודעת שגיאה ברורה בזמן הקריאה,
+          לא תעבוד בשקט לספק אחר.
+        </p>
+        <ProviderModelPicker
+          task="extraction"
+          providerKind={matchConfig.extractionProviderKind}
+          model={matchConfig.extractionModel}
+          onProviderChange={(kind, defaultModel) =>
+            setMatchConfig((prev) => ({ ...prev, extractionProviderKind: kind, extractionModel: defaultModel }))
+          }
+          onModelChange={(model) => setMatchConfig((prev) => ({ ...prev, extractionModel: model }))}
+          keyInputs={keyInputs}
+          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
+        />
+        <button
+          type="button"
+          onClick={handleSaveProviders}
+          disabled={savingProviders}
+          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingProviders ? 'שומר...' : providersSavedNotice ? 'נשמר ✓' : 'שמירת ספק ומודל'}
+        </button>
+        {providersError && <p className="mt-2 text-xs font-medium text-red-600">{providersError}</p>}
+      </CollapsibleSection>
+
+      <CollapsibleSection icon="📷" title="ספק AI - השוואת תמונות">
+        <p className="mb-3 text-sm text-slate-500">
+          איזה ספק מריץ את השוואת התמונות בין תיק חיפוש לדיווח - LLM שיפוטי (Claude/Gemini/OpenAI/Fireworks) או
+          embedding זול (Jina/Voyage - ראו הסבר בתוך הבחירה). סף ההפעלה, סף הפסילה, והתקרה למספר ההשוואות עצמם
+          נמצאים בעמוד "פרמטרים להתאמה".
+        </p>
+        <ProviderModelPicker
+          task="photoCompare"
+          providerKind={matchConfig.photoCompareProviderKind}
+          model={matchConfig.photoCompareModel}
+          onProviderChange={(kind, defaultModel) =>
+            setMatchConfig((prev) => ({ ...prev, photoCompareProviderKind: kind, photoCompareModel: defaultModel }))
+          }
+          onModelChange={(model) => setMatchConfig((prev) => ({ ...prev, photoCompareModel: model }))}
+          keyInputs={keyInputs}
+          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
+        />
+        <button
+          type="button"
+          onClick={handleSaveProviders}
+          disabled={savingProviders}
+          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingProviders ? 'שומר...' : providersSavedNotice ? 'נשמר ✓' : 'שמירת ספק ומודל'}
+        </button>
+        {providersError && <p className="mt-2 text-xs font-medium text-red-600">{providersError}</p>}
+      </CollapsibleSection>
+
+      <CollapsibleSection icon="🔑" title="מפתחות API">
+        <p className="mb-3 text-sm text-slate-500">
+          מפתח לכל ספק שאינו Claude (שכבר מוגדר בנפרד) - משותפים לכל המשתמשים, ומשמשים גם את בחירת הספק לאלגוריתם וגם
+          את בחירת הספק להשוואת תמונות למעלה.
+        </p>
+        <div className="space-y-3">
+          {[
+            { field: 'geminiApiKey', label: 'Gemini', getKeyUrl: 'https://aistudio.google.com/apikey' },
+            { field: 'openaiApiKey', label: 'OpenAI', getKeyUrl: 'https://platform.openai.com/api-keys' },
+            { field: 'fireworksApiKey', label: 'Fireworks', getKeyUrl: 'https://fireworks.ai/account/api-keys' },
+            { field: 'jinaApiKey', label: 'Jina AI', getKeyUrl: 'https://jina.ai/embeddings' },
+            { field: 'voyageApiKey', label: 'Voyage AI', getKeyUrl: 'https://dashboard.voyageai.com/api-keys' },
+          ].map(({ field, label, getKeyUrl }) => (
+            <div key={field}>
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-xs text-slate-500">{label}</span>
+                <a
+                  href={getKeyUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+                >
+                  🔑 קבלת מפתח API ↗
+                </a>
+              </div>
+              <input
+                type="password"
+                dir="ltr"
+                className="input w-full text-left"
+                value={keyInputs[field]}
+                onChange={(e) => setKeyInputs((prev) => ({ ...prev, [field]: e.target.value }))}
+                placeholder={keyInputs[field] ? '' : 'לא הוגדר'}
+              />
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={handleSaveKeys}
+          disabled={savingKeys}
+          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
+        </button>
+        {keysError && <p className="mt-2 text-xs font-medium text-red-600">{keysError}</p>}
+      </CollapsibleSection>
 
       <CollapsibleSection
         icon="💸"

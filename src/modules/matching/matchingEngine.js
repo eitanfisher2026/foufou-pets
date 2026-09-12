@@ -518,6 +518,15 @@ export const DEFAULT_MATCH_CONFIG = {
   // checkMatchesForLostCase/checkMatchesForFoundReport/
   // backfillPhotoSimilarityForExistingMatches in matchingApi.js.
   maxPhotoChecksPerScan: 5,
+  // Escape hatch for the cap above - with an embedding-based
+  // photoCompareProviderKind (Jina/Voyage), most comparisons end up free
+  // (an already-embedded photo costs nothing to compare again), so the cap
+  // can end up hiding real matches for no real cost benefit once a pool's
+  // photos are mostly already embedded. Still not entirely free even then:
+  // a photo that's never been compared before still needs a first, real
+  // embedding call. Off by default - the cap still applies unless an admin
+  // deliberately turns it off.
+  unlimitedPhotoChecks: false,
   // Which AI provider+model actually runs each of the app's two paid calls -
   // screenshot extraction, and this photo comparison - see AI_PROVIDER_KINDS
   // above. A provider other than Claude needs its own API key saved (see

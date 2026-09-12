@@ -107,6 +107,7 @@ export async function getMatchConfig() {
     photoMatchThreshold: data.photoMatchThreshold ?? DEFAULT_MATCH_CONFIG.photoMatchThreshold,
     photoDisqualifyThreshold: data.photoDisqualifyThreshold ?? DEFAULT_MATCH_CONFIG.photoDisqualifyThreshold,
     maxPhotoChecksPerScan: data.maxPhotoChecksPerScan ?? DEFAULT_MATCH_CONFIG.maxPhotoChecksPerScan,
+    unlimitedPhotoChecks: data.unlimitedPhotoChecks ?? DEFAULT_MATCH_CONFIG.unlimitedPhotoChecks,
     photoCompareThinking: data.photoCompareThinking ?? DEFAULT_MATCH_CONFIG.photoCompareThinking,
     extractionProviderKind: data.extractionProviderKind ?? DEFAULT_MATCH_CONFIG.extractionProviderKind,
     extractionModel: data.extractionModel ?? DEFAULT_MATCH_CONFIG.extractionModel,

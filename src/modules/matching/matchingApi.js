@@ -278,9 +278,10 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   // under the cap gives the top-K by score, computed synchronously before
   // any AI call starts - see maxPhotoChecksPerScan in matchingEngine.js.
   let photoChecksUsed = 0;
+  const photoChecksCap = config.unlimitedPhotoChecks ? Infinity : config.maxPhotoChecksPerScan;
   const withinCap = ranked.map(({ score }) => {
     if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return false;
-    if (photoChecksUsed >= config.maxPhotoChecksPerScan) return false;
+    if (photoChecksUsed >= photoChecksCap) return false;
     photoChecksUsed += 1;
     return true;
   });
@@ -582,7 +583,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
       // rather than spent on, same as a candidate that never cleared the
       // threshold at all.
       eligible.sort((a, b) => b.freshScore - a.freshScore);
-      const candidates = eligible.slice(0, config.maxPhotoChecksPerScan);
+      const candidates = config.unlimitedPhotoChecks ? eligible : eligible.slice(0, config.maxPhotoChecksPerScan);
       skippedOverCap += eligible.length - candidates.length;
 
       if (candidates.length > 0) {
@@ -675,9 +676,10 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   let done = 0;
   onProgress?.(done, scored.length);
   let photoChecksUsed = 0;
+  const photoChecksCap = config.unlimitedPhotoChecks ? Infinity : config.maxPhotoChecksPerScan;
   const withinCap = scored.map(({ score }) => {
     if (!confidenceMeetsThreshold(score, config.photoMatchThreshold)) return false;
-    if (photoChecksUsed >= config.maxPhotoChecksPerScan) return false;
+    if (photoChecksUsed >= photoChecksCap) return false;
     photoChecksUsed += 1;
     return true;
   });
