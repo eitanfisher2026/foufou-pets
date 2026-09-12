@@ -5,6 +5,7 @@ import { COLLECTIONS } from '../shared/collections.js';
 import BackLink from '../shared/BackLink.jsx';
 import { getGlobalCosts, runCostTrackingMigration } from './userCostsApi.js';
 import { getErrorMessage } from '../shared/errorMessages.js';
+import CollapsibleSection from '../shared/CollapsibleSection.jsx';
 
 // Rough size assumption only, since actual file sizes aren't stored per
 // photo - photos are compressed client-side to max 1280px / JPEG q0.75
@@ -92,9 +93,12 @@ export default function CostSettingsPage() {
         ראו הסבר למטה. פירוט עלות לפי משתמש עבר לעמוד "ניהול משתמשים".
       </p>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות AI</h2>
-
+      <CollapsibleSection
+        icon="💸"
+        title="עלות AI"
+        subtitle={globalCosts ? `סה"כ ${formatUsd(globalCosts.aiCostUsd + globalCosts.visualMatchCostUsd)}` : undefined}
+        defaultOpen
+      >
         {globalCosts === null ? (
           <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             <p className="mb-2">
@@ -159,10 +163,9 @@ export default function CostSettingsPage() {
             </p>
           </>
         )}
-      </section>
+      </CollapsibleSection>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-3 text-lg font-semibold text-slate-700">עלות Firebase (הערכה גסה)</h2>
+      <CollapsibleSection icon="🗄️" title="עלות Firebase (הערכה גסה)">
         <div className="space-y-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-slate-600">תמונות משוערות</span>
@@ -185,7 +188,7 @@ export default function CostSettingsPage() {
           נכללות כאן - בנפח השימוש הנוכחי הן כמעט בוודאות בתוך מכסת החינם היומית; לעלות מדויקת יש לבדוק ב-Firebase
           Console.
         </p>
-      </section>
+      </CollapsibleSection>
     </div>
   );
 }

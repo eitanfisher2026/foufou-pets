@@ -16,6 +16,7 @@ import AppFooter from '../shared/AppFooter.jsx';
 import ProgressBar from '../shared/ProgressBar.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
+import CollapsibleSection from '../shared/CollapsibleSection.jsx';
 
 // Same "opened the app recently" activity window as elsewhere in this file
 // would use if it needed one - not a true presence system, just a rough
@@ -254,7 +255,7 @@ export default function SettingsPage() {
         </button>
       </nav>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
+      <CollapsibleSection icon="🚧" title="מצב תחזוקה" subtitle={maintenanceMode ? 'פעיל' : 'כבוי'}>
         <button
           type="button"
           onClick={handleToggleMaintenance}
@@ -263,26 +264,19 @@ export default function SettingsPage() {
             maintenanceMode ? 'border-amber-300 bg-amber-50' : 'border-transparent bg-slate-50'
           }`}
         >
-          <div className="flex items-center gap-3">
-            <span className="w-7 shrink-0 text-center text-lg">🚧</span>
-            <div>
-              <p className="text-sm font-semibold text-slate-800">מצב תחזוקה</p>
-              <p className="text-xs text-slate-500">
-                {maintenanceMode
-                  ? 'פעיל - משתמשים רגילים רואים מסך תחזוקה, אתם ממשיכים לראות הכל'
-                  : 'כבוי - האפליקציה פתוחה לכולם'}
-              </p>
-            </div>
-          </div>
+          <p className="text-xs text-slate-500">
+            {maintenanceMode
+              ? 'פעיל - משתמשים רגילים רואים מסך תחזוקה, אתם ממשיכים לראות הכל'
+              : 'כבוי - האפליקציה פתוחה לכולם'}
+          </p>
           <span className={`shrink-0 text-xs font-bold ${maintenanceMode ? 'text-amber-700' : 'text-slate-400'}`}>
             {maintenanceSaving ? '...' : maintenanceMode ? 'פעיל' : 'כבוי'}
           </span>
         </button>
         {maintenanceError && <p className="mt-2 text-sm font-medium text-red-600">{maintenanceError}</p>}
-      </section>
+      </CollapsibleSection>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">סריקה מחדש של כל ההתאמות</h2>
+      <CollapsibleSection icon="🔄" title="סריקה מחדש של כל ההתאמות">
         <p className="mb-3 text-sm text-slate-500">
           מאפס וסורק מחדש את ההתאמות של כל תיק חיפוש פעיל (חתולים וכלבים) מול כל הדיווחים הפעילים - אותה פעולה כמו
           "איפוס כל ההתאמות וסריקה מחדש" בתוך תיק בודד, רק על כל התיקים יחד. שימושי אחרי שינוי באלגוריתם ההתאמה, כדי
@@ -310,10 +304,9 @@ export default function SettingsPage() {
           </p>
         )}
         {rescanError && <p className="mt-2 text-sm font-medium text-red-600">{rescanError}</p>}
-      </section>
+      </CollapsibleSection>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">השוואת תמונות AI להתאמות קיימות</h2>
+      <CollapsibleSection icon="🖼️" title="השוואת תמונות AI להתאמות קיימות">
         <p className="mb-3 text-sm text-slate-500">
           בלי לאפס או לסרוק מחדש שום דבר אחר - עובר על ההתאמות הקיימות של כל תיק חיפוש פעיל, ומחשב לכל התאמה שעדיין
           לא עברה השוואת תמונות (או שעברה בעזרת גרסת AI ישנה שהוחלפה) ציון עדכני (לפי הנתונים וההגדרות הנוכחיים, גם
@@ -358,10 +351,9 @@ export default function SettingsPage() {
           </p>
         )}
         {photoBackfillError && <p className="mt-2 text-sm font-medium text-red-600">{photoBackfillError}</p>}
-      </section>
+      </CollapsibleSection>
 
-      <section className="mb-6 rounded-xl border border-slate-200 bg-white p-4">
-        <h2 className="mb-1 font-medium text-slate-700">מחיקת רשומות ישנות</h2>
+      <CollapsibleSection icon="🗑️" title="מחיקת רשומות ישנות">
         <p className="mb-3 text-sm text-slate-500">
           מוחק לצמיתות כל תיק חיפוש ודיווח פעילים (חתולים וכלבים) שנוצרו לפני התאריך שנבחר ומעולם לא נסגרו - כולל
           התמונות שלהם וההתאמות שנמצאו עבורם. לא הופך אותם לארכיון: הם נעלמים לגמרי, בדיוק כמו "מחיקת התיק"/"מחיקת
@@ -460,7 +452,7 @@ export default function SettingsPage() {
           </p>
         )}
         {archiveError && <p className="mt-2 text-sm font-medium text-red-600">{archiveError}</p>}
-      </section>
+      </CollapsibleSection>
 
       <AppFooter />
       {visualMatchDialog}

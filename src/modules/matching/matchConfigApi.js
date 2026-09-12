@@ -108,6 +108,8 @@ export async function getMatchConfig() {
     photoDisqualifyThreshold: data.photoDisqualifyThreshold ?? DEFAULT_MATCH_CONFIG.photoDisqualifyThreshold,
     maxPhotoChecksPerScan: data.maxPhotoChecksPerScan ?? DEFAULT_MATCH_CONFIG.maxPhotoChecksPerScan,
     photoCompareThinking: data.photoCompareThinking ?? DEFAULT_MATCH_CONFIG.photoCompareThinking,
+    extractionProvider: data.extractionProvider ?? DEFAULT_MATCH_CONFIG.extractionProvider,
+    photoCompareProvider: data.photoCompareProvider ?? DEFAULT_MATCH_CONFIG.photoCompareProvider,
   };
 }
 

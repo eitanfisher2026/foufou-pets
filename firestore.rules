@@ -189,6 +189,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Raw AI provider API keys (Gemini/OpenAI/Fireworks - see
+    // aiProviderKeysApi.js) - admin-only for READ too, unlike the generic
+    // /config/{docId} rule below which lets any signed-in user read.
+    // Functions read this doc via the Admin SDK regardless, which bypasses
+    // rules entirely - this only governs direct client access.
+    match /config/aiProviderKeys {
+      allow read, write: if isAdmin();
+    }
+
     // Shared config (match weights, the customizable color list, the
     // about-dialog text) - read by everyone (forms/matching/AboutDialog use
     // these), written only from the admin-only settings screens that edit

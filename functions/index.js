@@ -117,22 +117,6 @@ async function enforceAiRateLimit(uid) {
   });
 }
 
-// Sonnet, not Opus: this is a bounded structured-extraction task (read a
-// screenshot, fill a form), not open-ended reasoning - Sonnet's accuracy on
-// multilingual OCR-plus-judgment is comfortably enough for this, at roughly
-// a fifth of Opus's per-call cost. Runs once per uploaded report, never at
-// match time - see comparePhotoSimilarity below for the one call that does
-// run at match time, deliberately gated to a small minority of pairs to
-// keep that exception cheap.
-const MODEL = 'claude-sonnet-5';
-
-// Claude Sonnet 5 list pricing, per million tokens - standard rate. Intro
-// pricing ($2/$10) applied through 2026-08-31; today is past that, so the
-// cost dashboard was quietly under-reporting the app's single highest-
-// volume AI call by a third until this was caught and updated.
-const PRICE_PER_MTOK_INPUT = 3.0;
-const PRICE_PER_MTOK_OUTPUT = 15.0;
-
 // Haiku, not Sonnet: the species pre-detect call (used only by the
 // smart-add/share-target flow, where species isn't known up front - see
 // detectPetSpecies below) is a plain single-label visual classification
@@ -148,7 +132,7 @@ const SPECIES_DETECT_PRICE_PER_MTOK_OUTPUT = 5.0;
 // (not currently used by either call below, since neither system prompt is
 // marked cacheable - kept here so cost stays correct if that changes) bill
 // at roughly a tenth of the input rate.
-function estimateCostUsd(usage, priceInput = PRICE_PER_MTOK_INPUT, priceOutput = PRICE_PER_MTOK_OUTPUT) {
+function estimateCostUsd(usage, priceInput, priceOutput) {
   if (!usage) return 0;
   const inputTokens = (usage.input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
   const cacheReadTokens = usage.cache_read_input_tokens || 0;
@@ -158,6 +142,256 @@ function estimateCostUsd(usage, priceInput = PRICE_PER_MTOK_INPUT, priceOutput =
     (cacheReadTokens * priceInput * 0.1) / 1e6 +
     (outputTokens * priceOutput) / 1e6
   );
+}
+
+// --- Multi-provider vision model support ------------------------------
+// The two AI calls that actually cost real money per report/match
+// (extractReportFromImages and comparePhotoSimilarity, further down) can
+// each be pointed at a different provider, chosen live in Settings > match
+// parameters (see extractionProvider/photoCompareProvider in
+// matchingEngine.js), not hardcoded here. Every adapter below takes the
+// same generic shape (system prompt, text parts, image parts, a JSON schema
+// written in Anthropic's own dialect - anyOf/type-array nulls,
+// additionalProperties:false, since that's this app's original, richest
+// target) and returns { parsed, costUsd, refused, truncated } - callers
+// don't need to know which provider actually ran.
+const PROVIDERS = {
+  'claude-sonnet': { label: 'Claude Sonnet 5', kind: 'anthropic', model: 'claude-sonnet-5', priceIn: 3.0, priceOut: 15.0 },
+  'claude-haiku': { label: 'Claude Haiku 4.5', kind: 'anthropic', model: 'claude-haiku-4-5', priceIn: 1.0, priceOut: 5.0 },
+  'gemini-flash': { label: 'Gemini 2.5 Flash', kind: 'gemini', model: 'gemini-2.5-flash', priceIn: 0.3, priceOut: 2.5 },
+  'gpt-4o-mini': { label: 'GPT-4o mini', kind: 'openai', model: 'gpt-4o-mini', priceIn: 0.15, priceOut: 0.6 },
+  'qwen-vl': {
+    label: 'Qwen2.5-VL 32B (Fireworks)',
+    kind: 'fireworks',
+    model: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct',
+    priceIn: 0.9,
+    priceOut: 0.9,
+  },
+};
+const DEFAULT_PROVIDER_ID = 'claude-sonnet';
+
+// Claude's key is the one provider that stays a real Firebase secret (this
+// path already worked before providers were switchable) - it throws the
+// same kind of clear, specific error the Firestore-backed lookup below does
+// if it's ever missing, rather than a bare "undefined" 401 from Anthropic.
+function requireAnthropicSecret() {
+  const value = process.env.ANTHROPIC_API_KEY;
+  if (!value) {
+    throw new HttpsError('failed-precondition', 'ANTHROPIC_API_KEY לא מוגדר.');
+  }
+  return value;
+}
+
+// Every other provider's key is a plain field on config/aiProviderKeys (see
+// aiProviderKeysApi.js) - a Firestore doc, not a Secret Manager secret,
+// specifically so an admin can paste/replace a key from the settings screen
+// itself, no redeploy or CLI access needed. A provider selected without its
+// key ever having been saved throws a clear, specific error rather than
+// silently falling back to another provider - a report that fails to
+// auto-fill is a minor inconvenience; one silently produced by the wrong
+// AI/cost line is worse.
+async function requireProviderApiKey(fieldName, providerLabel) {
+  const snap = await db.collection('config').doc('aiProviderKeys').get();
+  const value = snap.exists ? snap.data()[fieldName] : '';
+  if (!value) {
+    throw new HttpsError('failed-precondition', `לא הוגדר מפתח API עבור ${providerLabel} - יש להוסיף אותו בהגדרות AI לפני שאפשר לבחור בו.`);
+  }
+  return value;
+}
+
+/**
+ * Gemini's structured-output schema dialect doesn't support anyOf or a
+ * type:[...] array the way Anthropic's/OpenAI's do - "nullable" is a
+ * sibling flag on the type instead. This walks the same schema object every
+ * other provider already uses and rewrites just those two null-union
+ * patterns; everything else (enum, properties, items, required) passes
+ * through unchanged. additionalProperties is stripped since Gemini's schema
+ * has no such concept and rejects unrecognized keys.
+ */
+function toGeminiSchema(node) {
+  if (node == null || typeof node !== 'object') return node;
+  if (Array.isArray(node.anyOf)) {
+    const nonNull = node.anyOf.find((b) => b.type !== 'null') || {};
+    const hasNull = node.anyOf.some((b) => b.type === 'null');
+    const converted = toGeminiSchema(nonNull);
+    return hasNull ? { ...converted, nullable: true } : converted;
+  }
+  const result = {};
+  for (const [key, value] of Object.entries(node)) {
+    if (key === 'additionalProperties') continue;
+    if (key === 'type' && Array.isArray(value)) {
+      result.type = value.find((t) => t !== 'null');
+      if (value.includes('null')) result.nullable = true;
+      continue;
+    }
+    if (key === 'properties') {
+      result.properties = Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toGeminiSchema(v)]));
+      continue;
+    }
+    if (key === 'items') {
+      result.items = toGeminiSchema(value);
+      continue;
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+async function callAnthropicVision({ model, priceIn, priceOut, systemPrompt, textParts, imageParts, schema, maxTokens, thinking }) {
+  const client = new Anthropic({ apiKey: requireAnthropicSecret() });
+  const content = [
+    ...imageParts.map((img) => ({ type: 'image', source: { type: 'base64', media_type: img.mimeType, data: img.base64 } })),
+    ...textParts.map((text) => ({ type: 'text', text })),
+  ];
+  const response = await client.messages.create({
+    model,
+    max_tokens: maxTokens,
+    thinking: { type: thinking ? 'adaptive' : 'disabled' },
+    system: systemPrompt,
+    output_config: { format: { type: 'json_schema', schema } },
+    messages: [{ role: 'user', content }],
+  });
+  const textBlock = response.content.find((b) => b.type === 'text');
+  if (!textBlock) throw new Error('No result returned.');
+  const inputTokens = (response.usage?.input_tokens || 0) + (response.usage?.cache_creation_input_tokens || 0);
+  const cacheReadTokens = response.usage?.cache_read_input_tokens || 0;
+  const outputTokens = response.usage?.output_tokens || 0;
+  const costUsd = (inputTokens * priceIn) / 1e6 + (cacheReadTokens * priceIn * 0.1) / 1e6 + (outputTokens * priceOut) / 1e6;
+  return {
+    parsed: JSON.parse(textBlock.text),
+    costUsd,
+    refused: response.stop_reason === 'refusal',
+    truncated: response.stop_reason === 'max_tokens',
+  };
+}
+
+async function callGeminiVision({ model, priceIn, priceOut, systemPrompt, textParts, imageParts, schema, maxTokens }) {
+  const apiKey = await requireProviderApiKey('geminiApiKey', 'Gemini');
+  const parts = [
+    ...imageParts.map((img) => ({ inline_data: { mime_type: img.mimeType, data: img.base64 } })),
+    ...textParts.map((text) => ({ text })),
+  ];
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts }],
+      systemInstruction: { parts: [{ text: systemPrompt }] },
+      generationConfig: { maxOutputTokens: maxTokens, responseMimeType: 'application/json', responseSchema: toGeminiSchema(schema) },
+    }),
+  });
+  if (!res.ok) throw new Error(`Gemini API error ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  const data = await res.json();
+  const finishReason = data.candidates?.[0]?.finishReason;
+  const text = data.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '';
+  const inputTokens = data.usageMetadata?.promptTokenCount || 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount || 0;
+  return {
+    parsed: JSON.parse(text),
+    costUsd: (inputTokens * priceIn) / 1e6 + (outputTokens * priceOut) / 1e6,
+    refused: finishReason === 'SAFETY',
+    truncated: finishReason === 'MAX_TOKENS',
+  };
+}
+
+// Shared by OpenAI and Fireworks - both expose an OpenAI-compatible chat
+// completions endpoint. strictSchema uses OpenAI's own schema-validated
+// json_schema mode (well-supported there); Fireworks' hosted open-weight
+// model has no such guarantee, so it instead gets a loose json_object mode
+// plus the schema spelled out in the system prompt as an instruction - a
+// deliberately less strict fallback for a provider with no official
+// schema-conformance guarantee.
+async function callOpenAiCompatibleVision({
+  apiUrl,
+  apiKeyField,
+  providerLabel,
+  model,
+  priceIn,
+  priceOut,
+  systemPrompt,
+  textParts,
+  imageParts,
+  schema,
+  maxTokens,
+  strictSchema,
+}) {
+  const apiKey = await requireProviderApiKey(apiKeyField, providerLabel);
+  const content = [
+    ...textParts.map((text) => ({ type: 'text', text })),
+    ...imageParts.map((img) => ({ type: 'image_url', image_url: { url: `data:${img.mimeType};base64,${img.base64}` } })),
+  ];
+  const responseFormat = strictSchema
+    ? { type: 'json_schema', json_schema: { name: 'extraction', strict: true, schema } }
+    : { type: 'json_object' };
+  const system = strictSchema
+    ? systemPrompt
+    : `${systemPrompt}\n\nהשיבו אך ורק באובייקט JSON יחיד, ללא טקסט נוסף, התואם בדיוק לסכימה הבאה:\n${JSON.stringify(schema)}`;
+  const res = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content },
+      ],
+      response_format: responseFormat,
+    }),
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${(await res.text()).slice(0, 500)}`);
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  const inputTokens = data.usage?.prompt_tokens || 0;
+  const outputTokens = data.usage?.completion_tokens || 0;
+  return {
+    parsed: JSON.parse(choice?.message?.content || '{}'),
+    costUsd: (inputTokens * priceIn) / 1e6 + (outputTokens * priceOut) / 1e6,
+    refused: choice?.finish_reason === 'content_filter',
+    truncated: choice?.finish_reason === 'length',
+  };
+}
+
+/**
+ * Dispatches one vision+structured-JSON call to whichever provider is
+ * currently selected for this task - the one place that needs to know all
+ * four provider kinds exist. Falls back to DEFAULT_PROVIDER_ID for an
+ * unrecognized/unset id (e.g. before the config doc has ever been saved).
+ */
+async function callVisionModel(providerId, args) {
+  const provider = PROVIDERS[providerId] || PROVIDERS[DEFAULT_PROVIDER_ID];
+  const common = { model: provider.model, priceIn: provider.priceIn, priceOut: provider.priceOut, ...args };
+  switch (provider.kind) {
+    case 'anthropic':
+      return callAnthropicVision(common);
+    case 'gemini':
+      return callGeminiVision(common);
+    case 'openai':
+      return callOpenAiCompatibleVision({
+        ...common,
+        apiUrl: 'https://api.openai.com/v1/chat/completions',
+        apiKeyField: 'openaiApiKey',
+        providerLabel: provider.label,
+        strictSchema: true,
+      });
+    case 'fireworks':
+      return callOpenAiCompatibleVision({
+        ...common,
+        apiUrl: 'https://api.fireworks.ai/inference/v1/chat/completions',
+        apiKeyField: 'fireworksApiKey',
+        providerLabel: provider.label,
+        strictSchema: false,
+      });
+    default:
+      throw new HttpsError('internal', `Unknown provider kind: ${provider.kind}`);
+  }
+}
+
+/** Reads the admin-selected provider id for one task (config/matchWeights.{field}), falling back to the default. */
+async function getSelectedProvider(field) {
+  const snap = await db.collection('config').doc('matchWeights').get();
+  const id = snap.exists ? snap.data()[field] : null;
+  return PROVIDERS[id] ? id : DEFAULT_PROVIDER_ID;
 }
 
 // Must match CAT_COLORS/DOG_COLORS/CAT_BREEDS/DOG_BREEDS/COLLAR_COLORS in
@@ -555,6 +789,9 @@ export const extractReportFromImages = onCall(
   // reasoning + a 4096 max_tokens budget pushed real-world latency past it -
   // Cloud Run kills the request before the handler can return an error, which
   // the browser sees as a bare CORS failure instead of a real error message.
+  // ANTHROPIC_API_KEY is the only real Firebase secret here - every other
+  // provider's key lives in Firestore instead (see requireProviderApiKey
+  // above), so switching extractionProvider needs no redeploy.
   { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 120 },
   async (request) => {
     if (!request.auth) {
@@ -589,78 +826,58 @@ export const extractReportFromImages = onCall(
     // or similar degenerate input doesn't balloon token cost unbounded.
     const postText = typeof request.data?.postText === 'string' ? request.data.postText.slice(0, 20000) : '';
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const imageBlocks = images.map((img) => ({
-      type: 'image',
-      source: { type: 'base64', media_type: img.mimeType || 'image/jpeg', data: img.base64 },
-    }));
+    const imageParts = images.map((img) => ({ mimeType: img.mimeType || 'image/jpeg', base64: img.base64 }));
 
     // Computed fresh per request, not baked into the static system prompt -
     // a warm function instance can stay alive for hours/days between cold
     // starts, so "today" has to come from the request, not module load time.
     const todayIso = new Date().toISOString().slice(0, 10);
+    const textParts = [
+      ...(postText
+        ? [
+            `Additional text shared alongside the screenshot(s) - this is the post's own caption/link text and may include content cut off in the image (e.g. "...עוד"). Prefer it over the image where they overlap:\n${postText}`,
+          ]
+        : []),
+      `Today's date is ${todayIso}. Extract the fields from this post.`,
+    ];
 
-    const response = await client.messages.create({
-      model: MODEL,
-      max_tokens: 4096,
-      // Claude Sonnet 5 runs adaptive thinking by default when this is
-      // omitted - real reasoning time that this task doesn't need, since
-      // it's bounded visual classification into a fixed schema, not
-      // open-ended judgment. Disabling it is the single biggest lever on
-      // the ~1-minute latency this call was taking.
-      thinking: { type: 'disabled' },
-      system: SYSTEM_PROMPTS_BY_SPECIES[species],
-      output_config: { format: { type: 'json_schema', schema: SCHEMAS_BY_SPECIES[species] } },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            ...imageBlocks,
-            ...(postText
-              ? [
-                  {
-                    type: 'text',
-                    text: `Additional text shared alongside the screenshot(s) - this is the post's own caption/link text and may include content cut off in the image (e.g. "...עוד"). Prefer it over the image where they overlap:\n${postText}`,
-                  },
-                ]
-              : []),
-            { type: 'text', text: `Today's date is ${todayIso}. Extract the fields from this post.` },
-          ],
-        },
-      ],
-    });
+    const providerId = await getSelectedProvider('extractionProvider');
+    let result;
+    try {
+      result = await callVisionModel(providerId, {
+        systemPrompt: SYSTEM_PROMPTS_BY_SPECIES[species],
+        textParts,
+        imageParts,
+        schema: SCHEMAS_BY_SPECIES[species],
+        maxTokens: 4096,
+        // Bounded visual classification into a fixed schema, not open-ended
+        // judgment - extended reasoning is real extra time/cost this task
+        // doesn't need (Anthropic-only knob; other providers ignore it).
+        thinking: false,
+      });
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error('extractReportFromImages failed', providerId, err);
+      throw new HttpsError('internal', 'Could not process the extraction request.');
+    }
 
-    if (response.stop_reason === 'refusal') {
+    if (result.refused) {
       throw new HttpsError('aborted', 'The image could not be processed.');
     }
-    if (response.stop_reason === 'max_tokens') {
+    if (result.truncated) {
       throw new HttpsError('resource-exhausted', 'The extracted text was too long to complete.');
     }
 
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock) {
-      throw new HttpsError('internal', 'No extraction result returned.');
-    }
-
-    try {
-      const parsed = JSON.parse(textBlock.text);
-      // Cheap to log, useful when a main-photo crop comes out wrong - lets
-      // us check what box the model actually returned without guessing.
-      console.log('mainPhotoRegion:', JSON.stringify(parsed.mainPhotoRegion));
-      // Real per-call cost from the API's own usage figures, carried back to
-      // the client so it can accumulate onto the resulting record - this is
-      // the only AI spend in the app, so this is the whole cost picture.
-      parsed._aiUsage = {
-        inputTokens: response.usage?.input_tokens || 0,
-        outputTokens: response.usage?.output_tokens || 0,
-        estimatedCostUsd: estimateCostUsd(response.usage),
-      };
-      await recordCost(request.auth.uid, 'aiCostUsd', parsed._aiUsage.estimatedCostUsd);
-      return parsed;
-    } catch {
-      throw new HttpsError('internal', 'Could not parse the extraction result.');
-    }
+    const parsed = result.parsed;
+    // Cheap to log, useful when a main-photo crop comes out wrong - lets us
+    // check what box the model actually returned without guessing.
+    console.log('mainPhotoRegion:', JSON.stringify(parsed.mainPhotoRegion));
+    // Real per-call cost from the provider's own usage figures, carried back
+    // to the client so it can accumulate onto the resulting record - this
+    // (plus visual-match cost) is the whole AI cost picture.
+    parsed._aiUsage = { estimatedCostUsd: result.costUsd };
+    await recordCost(request.auth.uid, 'aiCostUsd', result.costUsd);
+    return parsed;
   }
 );
 
@@ -935,20 +1152,17 @@ export const uploadReportPhoto = onCall({ region: 'me-west1', cors: true, timeou
   return result;
 });
 
-// Haiku, not Sonnet: this is a single visual-similarity judgment between two
-// already-known photos, not open-ended extraction - the same reasoning as
-// Upgraded from claude-haiku-4-5 after two confirmed cases of confidently
-// wrong verdicts - not vague hedging, but flatly misdescribing a photo
-// (missing an obvious orange patch covering a cat's whole head/ears) even
-// after two rounds of prompt tuning aimed at exactly that failure mode.
-// Costs roughly 3x more per call, but this only ever runs on pairs that
-// already cleared the admin-configured field-score threshold (see
-// matchingApi.js) - a small minority of the whole pool, not every pair -
-// so the absolute cost stays small while accuracy matters a lot more here:
-// a wrong "noMatch" silently zeroes out a real match's score.
-const PHOTO_SIMILARITY_MODEL = 'claude-sonnet-5';
-const PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT = 3.0;
-const PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT = 15.0;
+// This call's model/pricing now comes from PROVIDERS (see photoCompareProvider
+// in matchingEngine.js/matchConfigApi.js, admin-selectable in Settings), not
+// a constant here. Historical note: it ran on claude-haiku-4-5 once, before
+// this was configurable, and was upgraded to Sonnet after two confirmed
+// cases of confidently wrong verdicts - not vague hedging, but flatly
+// misdescribing a photo (missing an obvious orange patch covering a cat's
+// whole head/ears) even after two rounds of prompt tuning aimed at exactly
+// that failure mode. A wrong "noMatch" silently zeroes out a real match's
+// score, so accuracy matters more here than on the cheap, high-volume
+// species-detect call above - worth remembering before picking a cheaper
+// provider for this specific task.
 
 // Verdict buckets deliberately reuse the exact same keys as
 // CONFIDENCE_BUCKETS in matchingEngine.js (noMatch/low/medium/high) - this
@@ -1019,62 +1233,44 @@ export const comparePhotoSimilarity = onCall(
     }
 
     // Read live from Firestore, same doc the admin's matching-parameters
-    // screen edits (see photoCompareThinking in matchingEngine.js/
-    // matchConfigApi.js) - so flipping this off/on in Settings takes effect
-    // immediately for every caller, no redeploy needed. Off by default:
-    // thinking tokens bill at the same rate as the answer itself and were
-    // the single biggest driver of this app's AI spend; on is the fallback
-    // if disabling it measurably brings back wrong verdicts.
+    // screen edits (photoCompareProvider/photoCompareThinking in
+    // matchingEngine.js/matchConfigApi.js) - so switching provider or
+    // toggling thinking in Settings takes effect immediately for every
+    // caller, no redeploy needed. Thinking off by default: it bills at the
+    // same rate as the answer itself and was the single biggest driver of
+    // this app's AI spend; on is the fallback if disabling it measurably
+    // brings back wrong verdicts.
     const matchConfigSnap = await db.collection('config').doc('matchWeights').get();
-    const useThinking = matchConfigSnap.exists ? !!matchConfigSnap.data().photoCompareThinking : false;
+    const matchConfigData = matchConfigSnap.exists ? matchConfigSnap.data() : {};
+    const useThinking = !!matchConfigData.photoCompareThinking;
+    const providerId = PROVIDERS[matchConfigData.photoCompareProvider] ? matchConfigData.photoCompareProvider : DEFAULT_PROVIDER_ID;
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    const response = await client.messages.create({
-      model: PHOTO_SIMILARITY_MODEL,
-      max_tokens: 1200,
-      thinking: { type: useThinking ? 'adaptive' : 'disabled' },
-      system: PHOTO_SIMILARITY_PROMPT,
-      output_config: { format: { type: 'json_schema', schema: PHOTO_SIMILARITY_SCHEMA } },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: 'תמונה מדיווח על חיה אבודה:' },
-            { type: 'image', source: { type: 'base64', media_type: lostImage.mimeType, data: lostImage.base64 } },
-            { type: 'text', text: 'תמונה מדיווח על חיה שנמצאה/נראתה:' },
-            { type: 'image', source: { type: 'base64', media_type: foundImage.mimeType, data: foundImage.base64 } },
-          ],
-        },
-      ],
-    });
-
-    const textBlock = response.content.find((b) => b.type === 'text');
-    if (!textBlock) {
-      throw new HttpsError('internal', 'No result returned.');
-    }
-
+    let result;
     try {
-      const parsed = JSON.parse(textBlock.text);
-      // Lets the client tell a verdict from a since-retired model apart
-      // from one that's still current - see isVisualSimilarityStale in
-      // matchingApi.js, which otherwise has no way to know a verdict was
-      // produced by an older, less reliable model version.
-      parsed.model = PHOTO_SIMILARITY_MODEL;
-      parsed._aiUsage = {
-        inputTokens: response.usage?.input_tokens || 0,
-        outputTokens: response.usage?.output_tokens || 0,
-        estimatedCostUsd: estimateCostUsd(
-          response.usage,
-          PHOTO_SIMILARITY_PRICE_PER_MTOK_INPUT,
-          PHOTO_SIMILARITY_PRICE_PER_MTOK_OUTPUT
-        ),
-      };
-      await recordCost(request.auth.uid, 'visualMatchCostUsd', parsed._aiUsage.estimatedCostUsd);
-      return parsed;
-    } catch {
-      throw new HttpsError('internal', 'Could not parse the result.');
+      result = await callVisionModel(providerId, {
+        systemPrompt: PHOTO_SIMILARITY_PROMPT,
+        textParts: ['תמונה מדיווח על חיה אבודה:', 'תמונה מדיווח על חיה שנמצאה/נראתה:'],
+        imageParts: [lostImage, foundImage],
+        schema: PHOTO_SIMILARITY_SCHEMA,
+        maxTokens: 1200,
+        thinking: useThinking,
+      });
+    } catch (err) {
+      if (err instanceof HttpsError) throw err;
+      console.error('comparePhotoSimilarity failed', providerId, err);
+      throw new HttpsError('internal', 'Could not process the comparison request.');
     }
+
+    const parsed = result.parsed;
+    // Lets the client tell a verdict produced under a since-changed provider
+    // apart from one still matching the currently selected provider - see
+    // isVisualSimilarityStale in matchingApi.js, which otherwise has no way
+    // to know a verdict came from a different (possibly less reliable, or
+    // just differently-tuned) provider than the one currently selected.
+    parsed.providerId = providerId;
+    parsed._aiUsage = { estimatedCostUsd: result.costUsd };
+    await recordCost(request.auth.uid, 'visualMatchCostUsd', result.costUsd);
+    return parsed;
   }
 );
 

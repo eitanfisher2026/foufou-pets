@@ -6,6 +6,7 @@ import { formatDateTime } from '../shared/formatDateTime.js';
 import SelectField from '../shared/SelectField.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
+import CollapsibleSection from '../shared/CollapsibleSection.jsx';
 import {
   listUserCosts,
   getMonthlyFlagThresholds,
@@ -154,6 +155,7 @@ export default function UsersSettingsPage() {
         בכלל. עלות ה-AI של כל אחד/ת (סך הכל וגם החודש הנוכחי) מוצגת בכרטיס שלהם למטה.
       </p>
 
+      <CollapsibleSection icon="⚠️" title="סף התראה על עלות">
       <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
         <label className="flex flex-col gap-1">
           <span>סימון מעל ($ בחודש) - משתמשים רגילים</span>
@@ -199,6 +201,7 @@ export default function UsersSettingsPage() {
         כברירת מחדל, כי הם עושים באופן לגיטימי יותר פעולות AI מרוכזות (סריקה מחדש, עדכון השוואת תמונות); למנהלים אין
         סף כלל, אבל העלות שלהם עדיין מוצגת.
       </p>
+      </CollapsibleSection>
 
       {loading && <p className="text-slate-500">טוען...</p>}
 

@@ -9,6 +9,7 @@ import {
   CONFIDENCE_COLOR_PALETTE,
   PHOTO_MATCH_THRESHOLD_OPTIONS,
   PHOTO_DISQUALIFY_THRESHOLD_OPTIONS,
+  AI_PROVIDER_OPTIONS,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
@@ -17,6 +18,18 @@ import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, CAT_BREEDS, DOG_BREEDS
 import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import SelectField from '../shared/SelectField.jsx';
+import CollapsibleSection from '../shared/CollapsibleSection.jsx';
+import { getProviderKeys, setProviderKeys } from './aiProviderKeysApi.js';
+
+// One "get an API key" link per provider that needs its own key pasted in
+// below (Claude doesn't - it's already configured as a Firebase secret).
+// Must match the provider ids in AI_PROVIDER_OPTIONS/PROVIDERS
+// (matchingEngine.js/functions/index.js).
+const PROVIDER_KEY_FIELDS = [
+  { keyField: 'geminiApiKey', label: 'Gemini', getKeyUrl: 'https://aistudio.google.com/apikey' },
+  { keyField: 'openaiApiKey', label: 'OpenAI', getKeyUrl: 'https://platform.openai.com/api-keys' },
+  { keyField: 'fireworksApiKey', label: 'Fireworks (Qwen2.5-VL)', getKeyUrl: 'https://fireworks.ai/account/api-keys' },
+];
 
 const OTHER = 'אחר';
 
@@ -136,6 +149,14 @@ export default function MatchSettingsPage() {
   const [breedInput, setBreedInput] = useState('');
   const [patternInput, setPatternInput] = useState('');
   const [saveError, setSaveError] = useState('');
+  // Separate from config/handleSave below - these live in their own
+  // Firestore doc (config/aiProviderKeys, see aiProviderKeysApi.js), not
+  // config/matchWeights, so they get their own small save flow instead of
+  // riding along with the big "שמירת ההגדרות" button.
+  const [keyInputs, setKeyInputs] = useState({ geminiApiKey: '', openaiApiKey: '', fireworksApiKey: '' });
+  const [savingKeys, setSavingKeys] = useState(false);
+  const [keysSavedNotice, setKeysSavedNotice] = useState(false);
+  const [keysError, setKeysError] = useState('');
   const { confirm, dialog } = useConfirm();
 
   const colorOptions = listSpecies === SPECIES.DOG ? dogColorOptions : catColorOptions;
@@ -150,7 +171,23 @@ export default function MatchSettingsPage() {
     getBreedOptions(SPECIES.CAT).then((breeds) => setCatBreedOptions(breeds.filter((b) => b !== OTHER)));
     getBreedOptions(SPECIES.DOG).then((breeds) => setDogBreedOptions(breeds.filter((b) => b !== OTHER)));
     getPatternOptions().then((patterns) => setPatternOptions(patterns.filter((p) => p !== OTHER)));
+    getProviderKeys().then(setKeyInputs);
   }, []);
+
+  async function handleSaveKeys() {
+    setSavingKeys(true);
+    setKeysError('');
+    setKeysSavedNotice(false);
+    try {
+      await setProviderKeys(keyInputs);
+      setKeysSavedNotice(true);
+      setTimeout(() => setKeysSavedNotice(false), 2500);
+    } catch (err) {
+      setKeysError(getErrorMessage(err));
+    } finally {
+      setSavingKeys(false);
+    }
+  }
 
   function addColorOption() {
     const value = colorInput.trim();
@@ -468,8 +505,97 @@ export default function MatchSettingsPage() {
         </span>
       </label>
 
-      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
-        <p className="mb-2 text-sm font-medium text-slate-700">השוואת תמונות AI (רענון)</p>
+      <CollapsibleSection
+        icon="🤖"
+        title="הגדרות AI"
+        subtitle={`חילוץ: ${AI_PROVIDER_OPTIONS.find((o) => o.value === config.extractionProvider)?.label} · השוואת תמונות: ${
+          AI_PROVIDER_OPTIONS.find((o) => o.value === config.photoCompareProvider)?.label
+        }`}
+      >
+        <p className="mb-3 text-sm text-slate-500">
+          איזה ספק AI מריץ כל אחת משתי קריאות ה-AI שבפועל עולות כסף באפליקציה - חילוץ פרטים מצילומי מסך, והשוואת
+          תמונות (בהמשך הדף). ספק שאינו Claude דורש מפתח API משלו למטה לפני שהוא באמת עובד - בחירה בספק בלי מפתח
+          שמורה תיכשל עם הודעת שגיאה ברורה בזמן הקריאה, לא תעבוד בשקט לספק אחר.
+        </p>
+
+        <p className="mb-1 text-xs font-medium text-slate-600">ספק לחילוץ פרטים מצילומי מסך</p>
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {AI_PROVIDER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setConfig((prev) => ({ ...prev, extractionProvider: opt.value }))}
+              className={`rounded-xl border px-2 py-2 text-center text-xs font-medium transition ${
+                config.extractionProvider === opt.value
+                  ? 'border-slate-800 bg-slate-800 text-white'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <p className="mb-1 text-xs font-medium text-slate-600">ספק להשוואת תמונות</p>
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {AI_PROVIDER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setConfig((prev) => ({ ...prev, photoCompareProvider: opt.value }))}
+              className={`rounded-xl border px-2 py-2 text-center text-xs font-medium transition ${
+                config.photoCompareProvider === opt.value
+                  ? 'border-slate-800 bg-slate-800 text-white'
+                  : 'border-slate-200 bg-white text-slate-600'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-xl bg-slate-50 p-3">
+          <p className="mb-3 text-xs font-medium text-slate-600">
+            מפתחות API (Claude כבר מוגדר בנפרד ולא מופיע כאן - משותפים לכל המשתמשים)
+          </p>
+          <div className="space-y-3">
+            {PROVIDER_KEY_FIELDS.map(({ keyField, label, getKeyUrl }) => (
+              <div key={keyField}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{label}</span>
+                  <a
+                    href={getKeyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+                  >
+                    🔑 קבלת מפתח API ↗
+                  </a>
+                </div>
+                <input
+                  type="password"
+                  dir="ltr"
+                  className="input w-full text-left"
+                  value={keyInputs[keyField]}
+                  onChange={(e) => setKeyInputs((prev) => ({ ...prev, [keyField]: e.target.value }))}
+                  placeholder={keyInputs[keyField] ? '' : 'לא הוגדר'}
+                />
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={handleSaveKeys}
+            disabled={savingKeys}
+            className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
+          </button>
+          {keysError && <p className="mt-2 text-xs font-medium text-red-600">{keysError}</p>}
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection icon="📷" title="השוואת תמונות AI (רענון)">
         <p className="mb-3 text-sm text-slate-500">
           בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
           שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
@@ -524,18 +650,18 @@ export default function MatchSettingsPage() {
           <span>
             <span className="font-medium">חשיבה מורחבת (thinking) בהשוואת תמונות</span>
             <br />
-            עולה משמעותית יותר לכל השוואה (זה היה רוב עלות ה-AI בפועל). כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג
-            המודל בעקבות מקרה של טעות בטוחה-אך-שגויה - אם אחרי כיבוי מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן
-            להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
+            רלוונטי רק כשספק ההשוואה למעלה הוא Claude - עולה משמעותית יותר לכל השוואה (זה היה רוב עלות ה-AI בפועל).
+            כבוי כברירת מחדל. הופעל בעבר יחד עם שדרוג המודל בעקבות מקרה של טעות בטוחה-אך-שגויה - אם אחרי כיבוי
+            מתחילות להופיע שוב תוצאות שגויות בבירור, ניתן להפעיל בחזרה כאן, בלי צורך בפריסה מחדש.
           </span>
         </label>
-      </div>
+      </CollapsibleSection>
 
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-700">פרמטרים ({config.parameters.length})</h2>
-        <span className="text-xs text-slate-400">סכום משקלים פעילים: {enabledWeightSum}</span>
-      </div>
-
+      <CollapsibleSection
+        icon="⚖️"
+        title={`פרמטרים (${config.parameters.length})`}
+        subtitle={`סכום משקלים פעילים: ${enabledWeightSum}`}
+      >
       <button
         type="button"
         onClick={applyRecommendedParameterUpgrades}
@@ -557,8 +683,9 @@ export default function MatchSettingsPage() {
       >
         + הוספת פרמטר
       </button>
+      </CollapsibleSection>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">הגדרות לפי סוג חיה</h2>
+      <CollapsibleSection icon="🐾" title="הגדרות לפי סוג חיה" subtitle={SPECIES_LABELS[listSpecies]}>
       <p className="mb-3 text-sm text-slate-500">
         צבעים, קבוצות צבעים דומים, גזעים, ותבניות פרווה - לכל סוג חיה יש הגדרות משלו. הבחירה כאן קובעת מה מוצג בכל
         הסעיפים למטה, עד שתבחרו סוג אחר.
@@ -829,8 +956,9 @@ export default function MatchSettingsPage() {
 
         <p className="text-xs text-slate-400">שינויים בכל הסעיפים כאן נשמרים יחד עם שאר ההגדרות בעמוד, בכפתור "שמירת ההגדרות" למטה.</p>
       </div>
+      </CollapsibleSection>
 
-      <h2 className="mb-1 mt-8 text-lg font-semibold text-slate-700">צבעי רמת התאמה</h2>
+      <CollapsibleSection icon="🎨" title="צבעי רמת התאמה">
       <p className="mb-3 text-sm text-slate-500">
         ציון גולמי (כמו "45/100") נראה מדויק יותר משהוא באמת - במקום זאת, כל התאמה מוצגת ברמת סבירות. אפשר לבחור איזה
         צבע מייצג כל רמה.
@@ -850,6 +978,7 @@ export default function MatchSettingsPage() {
           </div>
         ))}
       </div>
+      </CollapsibleSection>
 
       <div className="fixed inset-x-0 bottom-0 border-t border-slate-200 bg-white p-3">
         {saveError && <p className="mx-auto mb-2 max-w-2xl text-sm font-medium text-red-600">{saveError}</p>}

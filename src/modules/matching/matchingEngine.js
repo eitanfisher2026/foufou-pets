@@ -1,5 +1,16 @@
 import { SPECIES, DEFAULT_CAT_BREED, DEFAULT_DOG_BREED } from '../shared/collections.js';
 
+// Must match the PROVIDERS registry in functions/index.js (same ids, same
+// order) - see extractionProvider/photoCompareProvider in
+// DEFAULT_MATCH_CONFIG below for how these get selected and used.
+export const AI_PROVIDER_OPTIONS = [
+  { value: 'claude-sonnet', label: 'Claude Sonnet 5' },
+  { value: 'claude-haiku', label: 'Claude Haiku 4.5' },
+  { value: 'gemini-flash', label: 'Gemini 2.5 Flash' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o mini' },
+  { value: 'qwen-vl', label: 'Qwen2.5-VL 32B (Fireworks)' },
+];
+
 /**
  * Deterministic, explainable scoring - no AI call here on purpose. This runs
  * for every lost-case x found-report pair, so it has to stay free and instant;
@@ -443,6 +454,16 @@ export const DEFAULT_MATCH_CONFIG = {
   // checkMatchesForLostCase/checkMatchesForFoundReport/
   // backfillPhotoSimilarityForExistingMatches in matchingApi.js.
   maxPhotoChecksPerScan: 5,
+  // Which AI provider actually runs each of the app's two paid calls -
+  // screenshot extraction, and this photo comparison. Must match the
+  // PROVIDERS registry in functions/index.js (id -> label) - the functions
+  // package doesn't share modules with the client, so this list is kept in
+  // sync by hand, same pattern as the color/breed lists elsewhere in this
+  // file. A provider other than Claude needs its own API key added as a
+  // Firebase secret before it actually works - selecting one without a key
+  // configured fails clearly at call time rather than silently falling back.
+  extractionProvider: 'claude-sonnet',
+  photoCompareProvider: 'claude-sonnet',
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },
