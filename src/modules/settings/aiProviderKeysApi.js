@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebase.js';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../../firebase.js';
 
 const DOC_PATH = ['config', 'aiProviderKeys'];
 
@@ -26,4 +27,19 @@ export async function getProviderKeys() {
 
 export async function setProviderKeys(keys) {
   await setDoc(doc(db, ...DOC_PATH), keys, { merge: true });
+}
+
+/**
+ * Live model list for one provider, straight from that provider's own API -
+ * used by the "רענון רשימה" button (see ProviderModelPicker.jsx) so a model
+ * dropdown reflects what a provider currently actually offers, not just a
+ * small hand-maintained fallback list. apiKey is the value currently typed
+ * into the form (not necessarily saved yet, so a key can be tested before
+ * committing to it) - omitted for Claude, whose key the function reads from
+ * its own Firebase secret instead.
+ */
+export async function listProviderModels(providerKind, apiKey) {
+  const call = httpsCallable(functions, 'listProviderModels');
+  const result = await call({ providerKind, apiKey });
+  return result.data.models;
 }

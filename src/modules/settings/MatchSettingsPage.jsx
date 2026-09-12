@@ -9,7 +9,6 @@ import {
   CONFIDENCE_COLOR_PALETTE,
   PHOTO_MATCH_THRESHOLD_OPTIONS,
   PHOTO_DISQUALIFY_THRESHOLD_OPTIONS,
-  AI_PROVIDER_OPTIONS,
 } from '../matching/matchingEngine.js';
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
@@ -20,16 +19,7 @@ import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import CollapsibleSection from '../shared/CollapsibleSection.jsx';
 import { getProviderKeys, setProviderKeys } from './aiProviderKeysApi.js';
-
-// One "get an API key" link per provider that needs its own key pasted in
-// below (Claude doesn't - it's already configured as a Firebase secret).
-// Must match the provider ids in AI_PROVIDER_OPTIONS/PROVIDERS
-// (matchingEngine.js/functions/index.js).
-const PROVIDER_KEY_FIELDS = [
-  { keyField: 'geminiApiKey', label: 'Gemini', getKeyUrl: 'https://aistudio.google.com/apikey' },
-  { keyField: 'openaiApiKey', label: 'OpenAI', getKeyUrl: 'https://platform.openai.com/api-keys' },
-  { keyField: 'fireworksApiKey', label: 'Fireworks (Qwen2.5-VL)', getKeyUrl: 'https://fireworks.ai/account/api-keys' },
-];
+import ProviderModelPicker from './ProviderModelPicker.jsx';
 
 const OTHER = 'אחר';
 
@@ -505,102 +495,60 @@ export default function MatchSettingsPage() {
         </span>
       </label>
 
-      <CollapsibleSection
-        icon="🤖"
-        title="הגדרות AI"
-        subtitle={`חילוץ: ${AI_PROVIDER_OPTIONS.find((o) => o.value === config.extractionProvider)?.label} · השוואת תמונות: ${
-          AI_PROVIDER_OPTIONS.find((o) => o.value === config.photoCompareProvider)?.label
-        }`}
-      >
+      <CollapsibleSection icon="🧩" title="ספק AI - אלגוריתם (חילוץ פרטים מצילומי מסך)">
         <p className="mb-3 text-sm text-slate-500">
-          איזה ספק AI מריץ כל אחת משתי קריאות ה-AI שבפועל עולות כסף באפליקציה - חילוץ פרטים מצילומי מסך, והשוואת
-          תמונות (בהמשך הדף). ספק שאינו Claude דורש מפתח API משלו למטה לפני שהוא באמת עובד - בחירה בספק בלי מפתח
-          שמורה תיכשל עם הודעת שגיאה ברורה בזמן הקריאה, לא תעבוד בשקט לספק אחר.
+          קריאת ה-AI שרצה פעם אחת לכל דיווח, בזמן ההעלאה, כדי לחלץ את הפרטים מהתמונה/הטקסט. ספק שאינו Claude דורש
+          מפתח API משלו למטה לפני שהוא באמת עובד - בחירה בספק בלי מפתח שמור תיכשל עם הודעת שגיאה ברורה בזמן הקריאה,
+          לא תעבוד בשקט לספק אחר.
         </p>
-
-        <p className="mb-1 text-xs font-medium text-slate-600">ספק לחילוץ פרטים מצילומי מסך</p>
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {AI_PROVIDER_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setConfig((prev) => ({ ...prev, extractionProvider: opt.value }))}
-              className={`rounded-xl border px-2 py-2 text-center text-xs font-medium transition ${
-                config.extractionProvider === opt.value
-                  ? 'border-slate-800 bg-slate-800 text-white'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <p className="mb-1 text-xs font-medium text-slate-600">ספק להשוואת תמונות</p>
-        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
-          {AI_PROVIDER_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setConfig((prev) => ({ ...prev, photoCompareProvider: opt.value }))}
-              className={`rounded-xl border px-2 py-2 text-center text-xs font-medium transition ${
-                config.photoCompareProvider === opt.value
-                  ? 'border-slate-800 bg-slate-800 text-white'
-                  : 'border-slate-200 bg-white text-slate-600'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="rounded-xl bg-slate-50 p-3">
-          <p className="mb-3 text-xs font-medium text-slate-600">
-            מפתחות API (Claude כבר מוגדר בנפרד ולא מופיע כאן - משותפים לכל המשתמשים)
-          </p>
-          <div className="space-y-3">
-            {PROVIDER_KEY_FIELDS.map(({ keyField, label, getKeyUrl }) => (
-              <div key={keyField}>
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-slate-500">{label}</span>
-                  <a
-                    href={getKeyUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
-                  >
-                    🔑 קבלת מפתח API ↗
-                  </a>
-                </div>
-                <input
-                  type="password"
-                  dir="ltr"
-                  className="input w-full text-left"
-                  value={keyInputs[keyField]}
-                  onChange={(e) => setKeyInputs((prev) => ({ ...prev, [keyField]: e.target.value }))}
-                  placeholder={keyInputs[keyField] ? '' : 'לא הוגדר'}
-                />
-              </div>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={handleSaveKeys}
-            disabled={savingKeys}
-            className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
-          </button>
-          {keysError && <p className="mt-2 text-xs font-medium text-red-600">{keysError}</p>}
-        </div>
+        <ProviderModelPicker
+          providerKind={config.extractionProviderKind}
+          model={config.extractionModel}
+          onProviderChange={(kind, defaultModel) =>
+            setConfig((prev) => ({ ...prev, extractionProviderKind: kind, extractionModel: defaultModel }))
+          }
+          onModelChange={(model) => setConfig((prev) => ({ ...prev, extractionModel: model }))}
+          keyInputs={keyInputs}
+          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
+        />
+        <button
+          type="button"
+          onClick={handleSaveKeys}
+          disabled={savingKeys}
+          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
+        </button>
+        {keysError && <p className="mt-2 text-xs font-medium text-red-600">{keysError}</p>}
+        <p className="mt-2 text-xs text-slate-400">מפתחות ה-API משותפים לכל המשתמשים ולשני הסעיפים (כאן ובהשוואת תמונות למטה).</p>
       </CollapsibleSection>
 
-      <CollapsibleSection icon="📷" title="השוואת תמונות AI (רענון)">
+      <CollapsibleSection icon="📷" title="השוואת תמונות AI">
         <p className="mb-3 text-sm text-slate-500">
           בנוסף להתאמה לפי הפרטים שמולאו, ה-AI יכול גם להשוות את התמונה הראשית משני הצדדים ולהעריך עד כמה סביר
           שמדובר באותה חיה - פעולה שעולה כסף בפועל, ולכן רץ רק על התאמות שכבר עברו את רמת הסבירות שנבחרת כאן (לא על
           כל זוג). "כבוי" מבטל את זה לגמרי.
         </p>
+        <ProviderModelPicker
+          providerKind={config.photoCompareProviderKind}
+          model={config.photoCompareModel}
+          onProviderChange={(kind, defaultModel) =>
+            setConfig((prev) => ({ ...prev, photoCompareProviderKind: kind, photoCompareModel: defaultModel }))
+          }
+          onModelChange={(model) => setConfig((prev) => ({ ...prev, photoCompareModel: model }))}
+          keyInputs={keyInputs}
+          onKeyChange={(field, value) => setKeyInputs((prev) => ({ ...prev, [field]: value }))}
+        />
+        <button
+          type="button"
+          onClick={handleSaveKeys}
+          disabled={savingKeys}
+          className="mb-4 mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingKeys ? 'שומר...' : keysSavedNotice ? 'נשמר ✓' : 'שמירת מפתחות'}
+        </button>
+        {keysError && <p className="-mt-2 mb-4 text-xs font-medium text-red-600">{keysError}</p>}
+
         <SelectField
           className="w-full max-w-[12rem]"
           label="סף להפעלת השוואת תמונות"

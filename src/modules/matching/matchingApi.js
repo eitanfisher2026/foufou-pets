@@ -46,12 +46,12 @@ function isNotableVisualVerdict(verdict) {
  * error) just means no visualSimilarity gets attached to this match, not a
  * failed scan. Returns null when skipped or failed, otherwise
  * { verdict, explanation, label, lostCaseId, foundReportId, lostPhotoUrl,
- * foundPhotoUrl, providerId, costUsd, checkedAt } - lostCaseId/foundReportId
+ * foundPhotoUrl, providerModel, costUsd, checkedAt } - lostCaseId/foundReportId
  * let a caller (see VisualMatchAlertDialog.jsx) link straight to the match,
  * since an alert can be shown from a page (like the Settings bulk actions)
  * that has no other way to identify which pair it's even about. `label`
  * identifies the OTHER side of the pair for display. lostPhotoUrl/
- * foundPhotoUrl/providerId record exactly what produced this verdict - see
+ * foundPhotoUrl/providerModel record exactly what produced this verdict - see
  * isVisualSimilarityStale below, the reason they're stored at all.
  */
 async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config, labelSide) {
@@ -61,7 +61,7 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
   if (!lostPhotoUrl || !foundPhotoUrl) return null;
 
   try {
-    const { verdict, explanation, providerId, _aiUsage } = await comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl);
+    const { verdict, explanation, providerModel, _aiUsage } = await comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl);
     const label =
       labelSide === 'lost'
         ? displayLostCaseName(lostCase)
@@ -76,7 +76,7 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
       foundReportId,
       lostPhotoUrl,
       foundPhotoUrl,
-      providerId,
+      providerModel,
       costUsd: _aiUsage?.estimatedCostUsd || 0,
       checkedAt: serverTimestamp(),
     };
@@ -89,8 +89,9 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
 /**
  * A stored visualSimilarity is only trustworthy as long as it's still
  * describing the two photos actually shown today, AND was produced by the
- * provider currently selected (see photoCompareProvider in
- * matchingEngine.js/matchConfigApi.js, admin-editable in Settings). Either
+ * provider+model currently selected (see photoCompareProviderKind/
+ * photoCompareModel in matchingEngine.js/matchConfigApi.js, admin-editable
+ * in Settings). Either
  * side's main photo can change after the fact (a new photo uploaded and made
  * primary, an old one removed), and nothing about that touches the match doc
  * at all - before the photo-URL check, a reused cached verdict had no way to
@@ -98,21 +99,22 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
  * a now-meaningless comparison indefinitely (exactly what made LC087/FC008
  * confidently disqualify itself by describing a photo that wasn't the
  * current one). The provider check exists for the same reason on a
- * different axis: switching photoCompareProvider (e.g. after a confirmed
- * accuracy problem, or just to try a cheaper option) is pointless if every
+ * different axis: switching photoCompareProviderKind/photoCompareModel (e.g.
+ * after a confirmed accuracy problem, or just to try a cheaper option) is
+ * pointless if every
  * existing match just keeps reusing verdicts the old provider already
  * produced - a "recheck" needs to mean a fresh AI call in that case too, not
  * just when the photos themselves changed. A verdict saved before either
- * field existed (no lostPhotoUrl/providerId recorded at all) is treated as
+ * field existed (no lostPhotoUrl/providerModel recorded at all) is treated as
  * stale on both counts, rather than assumed still valid - safe default given
  * there's no way to know either way.
  */
-function isVisualSimilarityStale(visual, lostCase, foundReport, currentProviderId) {
+function isVisualSimilarityStale(visual, lostCase, foundReport, currentProviderModel) {
   if (!visual) return false;
   return (
     visual.lostPhotoUrl !== lostCase.photos?.[0]?.url ||
     visual.foundPhotoUrl !== foundReport.photos?.[0]?.url ||
-    visual.providerId !== currentProviderId
+    visual.providerModel !== currentProviderModel
   );
 }
 
@@ -388,7 +390,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   const prevStatus = prevData?.status;
 
   const reusableVisual =
-    prevData?.visualSimilarity && !isVisualSimilarityStale(prevData.visualSimilarity, lostCase, foundReport, config.photoCompareProvider)
+    prevData?.visualSimilarity && !isVisualSimilarityStale(prevData.visualSimilarity, lostCase, foundReport, `${config.photoCompareProviderKind}:${config.photoCompareModel}`)
       ? prevData.visualSimilarity
       : null;
   const visual = reusableVisual || (await maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, rawScore, config));
@@ -540,7 +542,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
     // URLs themselves in bulk (that's what the per-match "סריקה חוזרת" is
     // for) - just the provider.
     const uncheckedMatches = allMatches.filter(
-      (m) => !m.data.visualSimilarity || m.data.visualSimilarity.providerId !== config.photoCompareProvider
+      (m) => !m.data.visualSimilarity || m.data.visualSimilarity.providerModel !== `${config.photoCompareProviderKind}:${config.photoCompareModel}`
     );
 
     if (!isActive) {

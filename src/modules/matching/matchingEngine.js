@@ -1,14 +1,48 @@
 import { SPECIES, DEFAULT_CAT_BREED, DEFAULT_DOG_BREED } from '../shared/collections.js';
 
-// Must match the PROVIDERS registry in functions/index.js (same ids, same
-// order) - see extractionProvider/photoCompareProvider in
-// DEFAULT_MATCH_CONFIG below for how these get selected and used.
-export const AI_PROVIDER_OPTIONS = [
-  { value: 'claude-sonnet', label: 'Claude Sonnet 5' },
-  { value: 'claude-haiku', label: 'Claude Haiku 4.5' },
-  { value: 'gemini-flash', label: 'Gemini 2.5 Flash' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o mini' },
-  { value: 'qwen-vl', label: 'Qwen2.5-VL 32B (Fireworks)' },
+// Must match PROVIDER_KINDS in functions/index.js (same kind ids) - the
+// functions package doesn't share modules with the client, so this is kept
+// in sync by hand, same pattern as the color/breed lists elsewhere in this
+// file. Each kind's fallbackModels is a small hand-picked list shown before
+// "רענון רשימה" is ever pressed (or if it fails) - see ProviderModelPicker.jsx,
+// which fetches a provider's real live model list on demand instead of
+// relying on this staying up to date forever. keyField/getKeyUrl are null
+// for Claude, whose key is a Firebase secret, never a form field.
+export const AI_PROVIDER_KINDS = [
+  {
+    value: 'anthropic',
+    label: 'Claude',
+    keyField: null,
+    getKeyUrl: null,
+    fallbackModels: [
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
+    ],
+  },
+  {
+    value: 'gemini',
+    label: 'Gemini',
+    keyField: 'geminiApiKey',
+    getKeyUrl: 'https://aistudio.google.com/apikey',
+    fallbackModels: [
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+    ],
+  },
+  {
+    value: 'openai',
+    label: 'OpenAI',
+    keyField: 'openaiApiKey',
+    getKeyUrl: 'https://platform.openai.com/api-keys',
+    fallbackModels: [{ id: 'gpt-4o-mini', label: 'GPT-4o mini' }],
+  },
+  {
+    value: 'fireworks',
+    label: 'Fireworks',
+    keyField: 'fireworksApiKey',
+    getKeyUrl: 'https://fireworks.ai/account/api-keys',
+    fallbackModels: [{ id: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct', label: 'Qwen2.5-VL 32B' }],
+  },
 ];
 
 /**
@@ -454,16 +488,15 @@ export const DEFAULT_MATCH_CONFIG = {
   // checkMatchesForLostCase/checkMatchesForFoundReport/
   // backfillPhotoSimilarityForExistingMatches in matchingApi.js.
   maxPhotoChecksPerScan: 5,
-  // Which AI provider actually runs each of the app's two paid calls -
-  // screenshot extraction, and this photo comparison. Must match the
-  // PROVIDERS registry in functions/index.js (id -> label) - the functions
-  // package doesn't share modules with the client, so this list is kept in
-  // sync by hand, same pattern as the color/breed lists elsewhere in this
-  // file. A provider other than Claude needs its own API key added as a
-  // Firebase secret before it actually works - selecting one without a key
-  // configured fails clearly at call time rather than silently falling back.
-  extractionProvider: 'claude-sonnet',
-  photoCompareProvider: 'claude-sonnet',
+  // Which AI provider+model actually runs each of the app's two paid calls -
+  // screenshot extraction, and this photo comparison - see AI_PROVIDER_KINDS
+  // above. A provider other than Claude needs its own API key saved (see
+  // aiProviderKeysApi.js) before it actually works - selecting one without a
+  // key saved fails clearly at call time rather than silently falling back.
+  extractionProviderKind: 'anthropic',
+  extractionModel: 'claude-sonnet-5',
+  photoCompareProviderKind: 'anthropic',
+  photoCompareModel: 'claude-sonnet-5',
   parameters: [
     { key: 'microchip', label: 'מספר שבב', weight: 25, enabled: true, comparisonType: 'exact', lostField: 'microchipNumber', foundField: 'microchipNumber', mismatchPenalty: 20 },
     { key: 'specialMarks', label: 'סימנים מיוחדים', weight: 20, enabled: true, comparisonType: 'markList', lostField: 'markings', foundField: 'markings' },

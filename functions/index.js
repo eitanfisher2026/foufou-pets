@@ -147,28 +147,36 @@ function estimateCostUsd(usage, priceInput, priceOutput) {
 // --- Multi-provider vision model support ------------------------------
 // The two AI calls that actually cost real money per report/match
 // (extractReportFromImages and comparePhotoSimilarity, further down) can
-// each be pointed at a different provider, chosen live in Settings > match
-// parameters (see extractionProvider/photoCompareProvider in
-// matchingEngine.js), not hardcoded here. Every adapter below takes the
-// same generic shape (system prompt, text parts, image parts, a JSON schema
-// written in Anthropic's own dialect - anyOf/type-array nulls,
-// additionalProperties:false, since that's this app's original, richest
-// target) and returns { parsed, costUsd, refused, truncated } - callers
-// don't need to know which provider actually ran.
-const PROVIDERS = {
-  'claude-sonnet': { label: 'Claude Sonnet 5', kind: 'anthropic', model: 'claude-sonnet-5', priceIn: 3.0, priceOut: 15.0 },
-  'claude-haiku': { label: 'Claude Haiku 4.5', kind: 'anthropic', model: 'claude-haiku-4-5', priceIn: 1.0, priceOut: 5.0 },
-  'gemini-flash': { label: 'Gemini 2.5 Flash', kind: 'gemini', model: 'gemini-2.5-flash', priceIn: 0.3, priceOut: 2.5 },
-  'gpt-4o-mini': { label: 'GPT-4o mini', kind: 'openai', model: 'gpt-4o-mini', priceIn: 0.15, priceOut: 0.6 },
-  'qwen-vl': {
-    label: 'Qwen2.5-VL 32B (Fireworks)',
-    kind: 'fireworks',
-    model: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct',
-    priceIn: 0.9,
-    priceOut: 0.9,
-  },
+// each be pointed at a different provider AND a specific model within it,
+// chosen live in Settings > match parameters (see
+// extractionProviderKind/extractionModel and
+// photoCompareProviderKind/photoCompareModel in matchingEngine.js), not
+// hardcoded here. Every adapter below takes the same generic shape (system
+// prompt, text parts, image parts, a JSON schema written in Anthropic's own
+// dialect - anyOf/type-array nulls, additionalProperties:false, since
+// that's this app's original, richest target) and returns
+// { parsed, costUsd, refused, truncated } - callers don't need to know
+// which provider/model actually ran.
+const PROVIDER_KINDS = {
+  anthropic: { label: 'Claude', apiKeyField: null, defaultModel: 'claude-sonnet-5' },
+  gemini: { label: 'Gemini', apiKeyField: 'geminiApiKey', defaultModel: 'gemini-2.5-flash' },
+  openai: { label: 'OpenAI', apiKeyField: 'openaiApiKey', defaultModel: 'gpt-4o-mini' },
+  fireworks: { label: 'Fireworks', apiKeyField: 'fireworksApiKey', defaultModel: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct' },
 };
-const DEFAULT_PROVIDER_ID = 'claude-sonnet';
+
+// Known per-model pricing (per million tokens) for cost tracking - since the
+// admin can pick ANY model a provider's live list returns (see
+// listProviderModels below), not just these, an unrecognized choice falls
+// back to DEFAULT_PRICE rather than silently recording $0 cost.
+const PRICE_TABLE = {
+  'anthropic:claude-sonnet-5': { priceIn: 3.0, priceOut: 15.0 },
+  'anthropic:claude-haiku-4-5': { priceIn: 1.0, priceOut: 5.0 },
+  'gemini:gemini-2.5-flash': { priceIn: 0.3, priceOut: 2.5 },
+  'gemini:gemini-2.5-flash-lite': { priceIn: 0.1, priceOut: 0.4 },
+  'openai:gpt-4o-mini': { priceIn: 0.15, priceOut: 0.6 },
+  'fireworks:accounts/fireworks/models/qwen2p5-vl-32b-instruct': { priceIn: 0.9, priceOut: 0.9 },
+};
+const DEFAULT_PRICE = { priceIn: 1.0, priceOut: 5.0 };
 
 // Claude's key is the one provider that stays a real Firebase secret (this
 // path already worked before providers were switchable) - it throws the
@@ -353,15 +361,17 @@ async function callOpenAiCompatibleVision({
 }
 
 /**
- * Dispatches one vision+structured-JSON call to whichever provider is
+ * Dispatches one vision+structured-JSON call to whichever provider+model is
  * currently selected for this task - the one place that needs to know all
- * four provider kinds exist. Falls back to DEFAULT_PROVIDER_ID for an
- * unrecognized/unset id (e.g. before the config doc has ever been saved).
+ * four provider kinds exist. Falls back to the anthropic default for an
+ * unrecognized/unset kind (e.g. before the config doc has ever been saved).
  */
-async function callVisionModel(providerId, args) {
-  const provider = PROVIDERS[providerId] || PROVIDERS[DEFAULT_PROVIDER_ID];
-  const common = { model: provider.model, priceIn: provider.priceIn, priceOut: provider.priceOut, ...args };
-  switch (provider.kind) {
+async function callVisionModel(providerKind, model, args) {
+  const kind = PROVIDER_KINDS[providerKind] ? providerKind : 'anthropic';
+  const resolvedModel = model || PROVIDER_KINDS[kind].defaultModel;
+  const price = PRICE_TABLE[`${kind}:${resolvedModel}`] || DEFAULT_PRICE;
+  const common = { model: resolvedModel, priceIn: price.priceIn, priceOut: price.priceOut, ...args };
+  switch (kind) {
     case 'anthropic':
       return callAnthropicVision(common);
     case 'gemini':
@@ -371,7 +381,7 @@ async function callVisionModel(providerId, args) {
         ...common,
         apiUrl: 'https://api.openai.com/v1/chat/completions',
         apiKeyField: 'openaiApiKey',
-        providerLabel: provider.label,
+        providerLabel: PROVIDER_KINDS.openai.label,
         strictSchema: true,
       });
     case 'fireworks':
@@ -379,20 +389,89 @@ async function callVisionModel(providerId, args) {
         ...common,
         apiUrl: 'https://api.fireworks.ai/inference/v1/chat/completions',
         apiKeyField: 'fireworksApiKey',
-        providerLabel: provider.label,
+        providerLabel: PROVIDER_KINDS.fireworks.label,
         strictSchema: false,
       });
     default:
-      throw new HttpsError('internal', `Unknown provider kind: ${provider.kind}`);
+      throw new HttpsError('internal', `Unknown provider kind: ${kind}`);
   }
 }
 
-/** Reads the admin-selected provider id for one task (config/matchWeights.{field}), falling back to the default. */
-async function getSelectedProvider(field) {
+/** Reads the admin-selected provider kind + model for one task (config/matchWeights.{kindField}/{modelField}), falling back to defaults. */
+async function getSelectedProviderModel(kindField, modelField) {
   const snap = await db.collection('config').doc('matchWeights').get();
-  const id = snap.exists ? snap.data()[field] : null;
-  return PROVIDERS[id] ? id : DEFAULT_PROVIDER_ID;
+  const data = snap.exists ? snap.data() : {};
+  const kind = PROVIDER_KINDS[data[kindField]] ? data[kindField] : 'anthropic';
+  const model = data[modelField] || PROVIDER_KINDS[kind].defaultModel;
+  return { kind, model };
 }
+
+/**
+ * Admin-only: fetches the live list of available models for one provider,
+ * using either the key passed in from the (possibly not-yet-saved) settings
+ * form, or - for Claude - the ANTHROPIC_API_KEY secret directly, since that
+ * one is never typed into a form field. Lets the settings screen's "רענון
+ * רשימה" button show what a provider actually currently offers instead of a
+ * small hand-maintained fallback list.
+ */
+export const listProviderModels = onCall({ region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 30 }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Sign in required.');
+  }
+  const callerSnap = await db.collection('users').doc(request.auth.uid).get();
+  if (!callerSnap.exists || callerSnap.data().role !== 'admin') {
+    throw new HttpsError('permission-denied', 'מנהלים בלבד.');
+  }
+
+  const providerKind = request.data?.providerKind;
+  if (!PROVIDER_KINDS[providerKind]) {
+    throw new HttpsError('invalid-argument', 'ספק לא מוכר.');
+  }
+  const apiKey = providerKind === 'anthropic' ? process.env.ANTHROPIC_API_KEY : request.data?.apiKey;
+  if (!apiKey) {
+    throw new HttpsError('invalid-argument', 'נדרש מפתח API כדי לקבל רשימת מודלים.');
+  }
+
+  try {
+    if (providerKind === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      return { models: (data.data || []).map((m) => ({ id: m.id, label: m.display_name || m.id })) };
+    }
+    if (providerKind === 'gemini') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      const models = (data.models || [])
+        .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+        .filter((m) => !/embedding|aqa|imagen|veo/i.test(m.name))
+        .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName || m.name }));
+      return { models };
+    }
+    if (providerKind === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${apiKey}` } });
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      const models = (data.data || [])
+        .filter((m) => /^(gpt-|o[1-9]|chatgpt)/i.test(m.id))
+        .filter((m) => !/embedding|whisper|tts|dall-e|moderation/i.test(m.id))
+        .map((m) => ({ id: m.id, label: m.id }));
+      return { models };
+    }
+    // fireworks
+    const res = await fetch('https://api.fireworks.ai/inference/v1/models', { headers: { Authorization: `Bearer ${apiKey}` } });
+    if (!res.ok) throw new Error(`${res.status}`);
+    const data = await res.json();
+    const models = (data.data || []).filter((m) => /vl|vision|vlm/i.test(m.id)).map((m) => ({ id: m.id, label: m.id }));
+    return { models };
+  } catch (err) {
+    console.error('listProviderModels failed', providerKind, err);
+    throw new HttpsError('internal', 'לא ניתן היה לקבל רשימת מודלים - בדקו שהמפתח תקין.');
+  }
+});
 
 // Must match CAT_COLORS/DOG_COLORS/CAT_BREEDS/DOG_BREEDS/COLLAR_COLORS in
 // src/modules/shared/collections.js - the functions package doesn't share
@@ -841,10 +920,10 @@ export const extractReportFromImages = onCall(
       `Today's date is ${todayIso}. Extract the fields from this post.`,
     ];
 
-    const providerId = await getSelectedProvider('extractionProvider');
+    const { kind: providerKind, model } = await getSelectedProviderModel('extractionProviderKind', 'extractionModel');
     let result;
     try {
-      result = await callVisionModel(providerId, {
+      result = await callVisionModel(providerKind, model, {
         systemPrompt: SYSTEM_PROMPTS_BY_SPECIES[species],
         textParts,
         imageParts,
@@ -857,7 +936,7 @@ export const extractReportFromImages = onCall(
       });
     } catch (err) {
       if (err instanceof HttpsError) throw err;
-      console.error('extractReportFromImages failed', providerId, err);
+      console.error('extractReportFromImages failed', providerKind, model, err);
       throw new HttpsError('internal', 'Could not process the extraction request.');
     }
 
@@ -1152,9 +1231,10 @@ export const uploadReportPhoto = onCall({ region: 'me-west1', cors: true, timeou
   return result;
 });
 
-// This call's model/pricing now comes from PROVIDERS (see photoCompareProvider
-// in matchingEngine.js/matchConfigApi.js, admin-selectable in Settings), not
-// a constant here. Historical note: it ran on claude-haiku-4-5 once, before
+// This call's provider/model/pricing now comes from PROVIDER_KINDS/PRICE_TABLE
+// (see photoCompareProviderKind/photoCompareModel in matchingEngine.js/
+// matchConfigApi.js, admin-selectable in Settings), not a constant here.
+// Historical note: it ran on claude-haiku-4-5 once, before
 // this was configurable, and was upgraded to Sonnet after two confirmed
 // cases of confidently wrong verdicts - not vague hedging, but flatly
 // misdescribing a photo (missing an obvious orange patch covering a cat's
@@ -1233,21 +1313,22 @@ export const comparePhotoSimilarity = onCall(
     }
 
     // Read live from Firestore, same doc the admin's matching-parameters
-    // screen edits (photoCompareProvider/photoCompareThinking in
-    // matchingEngine.js/matchConfigApi.js) - so switching provider or
-    // toggling thinking in Settings takes effect immediately for every
-    // caller, no redeploy needed. Thinking off by default: it bills at the
-    // same rate as the answer itself and was the single biggest driver of
-    // this app's AI spend; on is the fallback if disabling it measurably
-    // brings back wrong verdicts.
+    // screen edits (photoCompareProviderKind/photoCompareModel/
+    // photoCompareThinking in matchingEngine.js/matchConfigApi.js) - so
+    // switching provider/model or toggling thinking in Settings takes
+    // effect immediately for every caller, no redeploy needed. Thinking off
+    // by default: it bills at the same rate as the answer itself and was
+    // the single biggest driver of this app's AI spend; on is the fallback
+    // if disabling it measurably brings back wrong verdicts.
     const matchConfigSnap = await db.collection('config').doc('matchWeights').get();
     const matchConfigData = matchConfigSnap.exists ? matchConfigSnap.data() : {};
     const useThinking = !!matchConfigData.photoCompareThinking;
-    const providerId = PROVIDERS[matchConfigData.photoCompareProvider] ? matchConfigData.photoCompareProvider : DEFAULT_PROVIDER_ID;
+    const providerKind = PROVIDER_KINDS[matchConfigData.photoCompareProviderKind] ? matchConfigData.photoCompareProviderKind : 'anthropic';
+    const model = matchConfigData.photoCompareModel || PROVIDER_KINDS[providerKind].defaultModel;
 
     let result;
     try {
-      result = await callVisionModel(providerId, {
+      result = await callVisionModel(providerKind, model, {
         systemPrompt: PHOTO_SIMILARITY_PROMPT,
         textParts: ['תמונה מדיווח על חיה אבודה:', 'תמונה מדיווח על חיה שנמצאה/נראתה:'],
         imageParts: [lostImage, foundImage],
@@ -1257,17 +1338,18 @@ export const comparePhotoSimilarity = onCall(
       });
     } catch (err) {
       if (err instanceof HttpsError) throw err;
-      console.error('comparePhotoSimilarity failed', providerId, err);
+      console.error('comparePhotoSimilarity failed', providerKind, model, err);
       throw new HttpsError('internal', 'Could not process the comparison request.');
     }
 
     const parsed = result.parsed;
-    // Lets the client tell a verdict produced under a since-changed provider
-    // apart from one still matching the currently selected provider - see
-    // isVisualSimilarityStale in matchingApi.js, which otherwise has no way
-    // to know a verdict came from a different (possibly less reliable, or
-    // just differently-tuned) provider than the one currently selected.
-    parsed.providerId = providerId;
+    // Lets the client tell a verdict produced under a since-changed
+    // provider/model apart from one still matching the currently selected
+    // combo - see isVisualSimilarityStale in matchingApi.js, which
+    // otherwise has no way to know a verdict came from a different
+    // (possibly less reliable, or just differently-tuned) provider/model
+    // than the one currently selected.
+    parsed.providerModel = `${providerKind}:${model}`;
     parsed._aiUsage = { estimatedCostUsd: result.costUsd };
     await recordCost(request.auth.uid, 'visualMatchCostUsd', result.costUsd);
     return parsed;
