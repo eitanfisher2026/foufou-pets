@@ -22,17 +22,48 @@ const VERDICT_META = {
  * fields too - "checked, came back low-confidence" is a real, useful
  * answer, not something to hide.
  *
+ * A missing visualSimilarity used to render nothing at all - "never
+ * checked" and "checked, but the section scrolled past" looked identical
+ * (both showed no photo-comparison content anywhere), which is exactly what
+ * made a failed check (e.g. a broken provider key) invisible instead of
+ * obviously wrong. Now shown as its own explicit "not checked" state
+ * instead of disappearing.
+ *
  * `disqualified` (pass match.status === REPORT_STATUS.NO_MATCH_PHOTO) marks
  * whether THIS verdict actually zeroed the match's score, per whatever
  * photoDisqualifyThreshold was configured at check time - that can differ
  * from what the verdict bucket alone would suggest if the threshold changes
  * later, so it's passed in rather than re-derived here.
+ *
+ * `showEmptyState` opts into the explicit "not checked" box above when
+ * there's no visualSimilarity yet - only MatchAnalysisPage passes this
+ * (one match at a time, so one extra box is helpful context, not noise). A
+ * match-card list (LostCaseDetail.jsx/FoundReportDetail.jsx) can show dozens
+ * of candidates that never qualified for a photo check at all, so those
+ * keep the original silent-nothing behavior there.
  */
-export default function VisualSimilarityNote({ visualSimilarity, disqualified }) {
-  if (!visualSimilarity) return null;
+export default function VisualSimilarityNote({ visualSimilarity, disqualified, showEmptyState = false }) {
+  if (!visualSimilarity) {
+    if (!showEmptyState) return null;
+    return (
+      <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">
+        <p className="font-medium">🔎 השוואת תמונות AI: לא נבדקה</p>
+        <p className="mt-0.5">
+          ייתכן שהציון לפי הפרטים לא הגיע לסף שנדרש כדי להפעיל השוואת תמונות, שאחת התמונות חסרה, או שהבדיקה נכשלה.
+        </p>
+      </div>
+    );
+  }
   const verdict = normalizeVisualVerdict(visualSimilarity.verdict);
   const meta = VERDICT_META[verdict] || VERDICT_META.low;
   const className = disqualified ? 'border-rose-300 bg-rose-50 text-rose-900' : meta.className;
+  // providerModel is "kind:model" (see comparePhotoSimilarity) - only the
+  // kind is worth showing here, the model name alone means little to a
+  // non-technical reader and the embedding-vs-LLM distinction is the part
+  // that actually explains why the confidence should be trusted more or
+  // less.
+  const providerKind = visualSimilarity.providerModel?.split(':')[0];
+  const providerLabel = { anthropic: 'Claude', gemini: 'Gemini', openai: 'OpenAI', fireworks: 'Fireworks', jina: 'Jina (embedding)', voyage: 'Voyage (embedding)' }[providerKind];
   return (
     <div className={`mb-2 rounded-lg border p-2 text-xs ${className}`}>
       <p className="font-medium">
@@ -40,6 +71,7 @@ export default function VisualSimilarityNote({ visualSimilarity, disqualified })
         {disqualified && ' - ההתאמה נפסלה'}
       </p>
       <p className="mt-0.5">{visualSimilarity.explanation}</p>
+      {providerLabel && <p className="mt-0.5 opacity-70">נבדק באמצעות: {providerLabel}</p>}
     </div>
   );
 }

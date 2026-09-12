@@ -179,6 +179,12 @@ export default function MatchAnalysisPage() {
         {displayLostCaseName(lostCase)} מול {displayFoundReportName(foundReport)}
       </p>
 
+      <VisualSimilarityNote
+        visualSimilarity={match.visualSimilarity}
+        disqualified={match.status === REPORT_STATUS.NO_MATCH_PHOTO}
+        showEmptyState
+      />
+
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-600">רמת התאמה כוללת:</span>
@@ -266,8 +272,6 @@ export default function MatchAnalysisPage() {
           </div>
         </div>
       )}
-
-      <VisualSimilarityNote visualSimilarity={match.visualSimilarity} disqualified={match.status === REPORT_STATUS.NO_MATCH_PHOTO} />
 
       <div className="space-y-2">
         {(match.breakdown || []).map((b, i) => {
