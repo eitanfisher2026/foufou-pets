@@ -167,6 +167,32 @@ export default function CostSettingsPage() {
         ראו הסבר למטה. פירוט עלות לפי משתמש עבר לעמוד "ניהול משתמשים".
       </p>
 
+      <CollapsibleSection icon="🎯" title="רמת ביטחון מינימלית לבדיקה ידנית">
+        <p className="mb-2 text-sm text-slate-700">
+          כל התאמה עם ציון גבוה מ-0 מוצגת כיום כ"ממתין לבדיקה", גם אם רמת הביטחון הכוללת שלה נמוכה מאוד (למשל 2
+          מתוך 100). הגבהה מ"סבירות נמוכה" ל"סבירות בינונית" תסמן אוטומטית כל התאמה שהמערכת עצמה כבר מזהה כחלשה
+          בתור "אין התאמה" - בלי לבזבז על כך את הזמן שלכם, ובלי קריאת AI כלשהי (זו סינון לפי הציון לפי הפרטים, שכבר
+          קיים בכל מקרה).
+        </p>
+        <SelectField
+          className="w-full max-w-[12rem]"
+          label="רמת ביטחון מינימלית"
+          allowClear={false}
+          value={matchConfig.minReviewConfidence}
+          onChange={(v) => setMatchConfig((prev) => ({ ...prev, minReviewConfidence: v }))}
+          options={CONFIDENCE_BUCKETS.filter((b) => b.key !== 'noMatch').map((b) => ({ value: b.key, label: b.label }))}
+        />
+        <button
+          type="button"
+          onClick={handleSaveProviders}
+          disabled={savingProviders}
+          className="mt-3 w-full rounded-xl bg-slate-800 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        >
+          {savingProviders ? 'שומר...' : providersSavedNotice ? 'נשמר ✓' : 'שמירת הגדרות'}
+        </button>
+        {providersError && <p className="mt-2 text-xs font-medium text-red-600">{providersError}</p>}
+      </CollapsibleSection>
+
       <CollapsibleSection icon="🧩" title="ספק AI - אלגוריתם (חילוץ פרטים מצילומי מסך)">
         <p className="mb-3 text-sm text-slate-500">
           קריאת ה-AI שרצה פעם אחת לכל דיווח, בזמן ההעלאה, כדי לחלץ את הפרטים מהתמונה/הטקסט. ספק שאינו Claude דורש
