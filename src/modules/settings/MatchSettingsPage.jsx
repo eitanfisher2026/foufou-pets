@@ -143,7 +143,13 @@ export default function MatchSettingsPage() {
   // Firestore doc (config/aiProviderKeys, see aiProviderKeysApi.js), not
   // config/matchWeights, so they get their own small save flow instead of
   // riding along with the big "שמירת ההגדרות" button.
-  const [keyInputs, setKeyInputs] = useState({ geminiApiKey: '', openaiApiKey: '', fireworksApiKey: '' });
+  const [keyInputs, setKeyInputs] = useState({
+    geminiApiKey: '',
+    openaiApiKey: '',
+    fireworksApiKey: '',
+    jinaApiKey: '',
+    voyageApiKey: '',
+  });
   const [savingKeys, setSavingKeys] = useState(false);
   const [keysSavedNotice, setKeysSavedNotice] = useState(false);
   const [keysError, setKeysError] = useState('');
@@ -502,6 +508,7 @@ export default function MatchSettingsPage() {
           לא תעבוד בשקט לספק אחר.
         </p>
         <ProviderModelPicker
+          task="extraction"
           providerKind={config.extractionProviderKind}
           model={config.extractionModel}
           onProviderChange={(kind, defaultModel) =>
@@ -530,6 +537,7 @@ export default function MatchSettingsPage() {
           כל זוג). "כבוי" מבטל את זה לגמרי.
         </p>
         <ProviderModelPicker
+          task="photoCompare"
           providerKind={config.photoCompareProviderKind}
           model={config.photoCompareModel}
           onProviderChange={(kind, defaultModel) =>

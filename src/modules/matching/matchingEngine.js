@@ -8,12 +8,19 @@ import { SPECIES, DEFAULT_CAT_BREED, DEFAULT_DOG_BREED } from '../shared/collect
 // which fetches a provider's real live model list on demand instead of
 // relying on this staying up to date forever. keyField/getKeyUrl are null
 // for Claude, whose key is a Firebase secret, never a form field.
+// allowedFor restricts which task(s) a kind can be picked for - the two
+// embedding providers (Jina/Voyage) return a similarity vector, not
+// structured JSON fields, so they can only ever be the photo-comparison
+// provider, never the extraction one. noRefresh/isEmbedding skip the live
+// "רענון רשימה" model lookup for them too, since there's only ever one
+// meaningful model per embedding provider, not a family to choose among.
 export const AI_PROVIDER_KINDS = [
   {
     value: 'anthropic',
     label: 'Claude',
     keyField: null,
     getKeyUrl: null,
+    allowedFor: ['extraction', 'photoCompare'],
     fallbackModels: [
       { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
       { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5' },
@@ -24,6 +31,7 @@ export const AI_PROVIDER_KINDS = [
     label: 'Gemini',
     keyField: 'geminiApiKey',
     getKeyUrl: 'https://aistudio.google.com/apikey',
+    allowedFor: ['extraction', 'photoCompare'],
     fallbackModels: [
       { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
       { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
@@ -34,6 +42,7 @@ export const AI_PROVIDER_KINDS = [
     label: 'OpenAI',
     keyField: 'openaiApiKey',
     getKeyUrl: 'https://platform.openai.com/api-keys',
+    allowedFor: ['extraction', 'photoCompare'],
     fallbackModels: [{ id: 'gpt-4o-mini', label: 'GPT-4o mini' }],
   },
   {
@@ -41,7 +50,28 @@ export const AI_PROVIDER_KINDS = [
     label: 'Fireworks',
     keyField: 'fireworksApiKey',
     getKeyUrl: 'https://fireworks.ai/account/api-keys',
+    allowedFor: ['extraction', 'photoCompare'],
     fallbackModels: [{ id: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct', label: 'Qwen2.5-VL 32B' }],
+  },
+  {
+    value: 'jina',
+    label: 'Jina AI (embedding)',
+    keyField: 'jinaApiKey',
+    getKeyUrl: 'https://jina.ai/embeddings',
+    allowedFor: ['photoCompare'],
+    isEmbedding: true,
+    noRefresh: true,
+    fallbackModels: [{ id: 'jina-clip-v2', label: 'Jina CLIP v2' }],
+  },
+  {
+    value: 'voyage',
+    label: 'Voyage AI (embedding)',
+    keyField: 'voyageApiKey',
+    getKeyUrl: 'https://dashboard.voyageai.com/api-keys',
+    allowedFor: ['photoCompare'],
+    isEmbedding: true,
+    noRefresh: true,
+    fallbackModels: [{ id: 'voyage-multimodal-3', label: 'Voyage Multimodal 3' }],
   },
 ];
 

@@ -162,12 +162,21 @@ const PROVIDER_KINDS = {
   gemini: { label: 'Gemini', apiKeyField: 'geminiApiKey', defaultModel: 'gemini-2.5-flash' },
   openai: { label: 'OpenAI', apiKeyField: 'openaiApiKey', defaultModel: 'gpt-4o-mini' },
   fireworks: { label: 'Fireworks', apiKeyField: 'fireworksApiKey', defaultModel: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct' },
+  // Embedding-based photo comparison, not an LLM judgment call - see
+  // getOrComputeEmbedding/cosineSimilarity below. Photo-compare only: these
+  // return a vector, not structured extraction fields, so they're excluded
+  // from extractionProviderKind's options client-side (see AI_PROVIDER_KINDS
+  // in matchingEngine.js).
+  jina: { label: 'Jina AI (embedding)', apiKeyField: 'jinaApiKey', defaultModel: 'jina-clip-v2', isEmbedding: true },
+  voyage: { label: 'Voyage AI (embedding)', apiKeyField: 'voyageApiKey', defaultModel: 'voyage-multimodal-3', isEmbedding: true },
 };
 
-// Known per-model pricing (per million tokens) for cost tracking - since the
-// admin can pick ANY model a provider's live list returns (see
-// listProviderModels below), not just these, an unrecognized choice falls
-// back to DEFAULT_PRICE rather than silently recording $0 cost.
+// Known per-model pricing for cost tracking - since the admin can pick ANY
+// model a provider's live list returns (see listProviderModels below), not
+// just these, an unrecognized choice falls back to DEFAULT_PRICE rather
+// than silently recording $0 cost. Embedding models bill a single blended
+// rate per million tokens (no separate input/output), so priceIn doubles as
+// that rate for them - see computeImageEmbedding below.
 const PRICE_TABLE = {
   'anthropic:claude-sonnet-5': { priceIn: 3.0, priceOut: 15.0 },
   'anthropic:claude-haiku-4-5': { priceIn: 1.0, priceOut: 5.0 },
@@ -175,8 +184,93 @@ const PRICE_TABLE = {
   'gemini:gemini-2.5-flash-lite': { priceIn: 0.1, priceOut: 0.4 },
   'openai:gpt-4o-mini': { priceIn: 0.15, priceOut: 0.6 },
   'fireworks:accounts/fireworks/models/qwen2p5-vl-32b-instruct': { priceIn: 0.9, priceOut: 0.9 },
+  'jina:jina-clip-v2': { priceIn: 0.05, priceOut: 0.05 },
+  'voyage:voyage-multimodal-3': { priceIn: 0.12, priceOut: 0.12 },
 };
 const DEFAULT_PRICE = { priceIn: 1.0, priceOut: 5.0 };
+
+/**
+ * One image's embedding vector from Jina AI or Voyage AI's multimodal
+ * embeddings API - a plain REST call, same "paste a key, pick a model"
+ * pattern as the LLM providers. Cost is real, from each API's own reported
+ * token usage, same principle as estimateCostUsd for the LLM path.
+ */
+async function computeImageEmbedding(providerKind, model, photoUrl) {
+  const price = PRICE_TABLE[`${providerKind}:${model}`] || DEFAULT_PRICE;
+  if (providerKind === 'jina') {
+    const apiKey = await requireProviderApiKey('jinaApiKey', 'Jina AI');
+    const res = await fetch('https://api.jina.ai/v1/embeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, input: [{ image: photoUrl }] }),
+    });
+    if (!res.ok) throw new Error(`Jina API error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json();
+    const tokens = data.usage?.total_tokens || 0;
+    return { vector: data.data[0].embedding, costUsd: (tokens * price.priceIn) / 1e6 };
+  }
+  if (providerKind === 'voyage') {
+    const apiKey = await requireProviderApiKey('voyageApiKey', 'Voyage AI');
+    const res = await fetch('https://api.voyageai.com/v1/multimodalembeddings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ inputs: [{ content: [{ type: 'image_url', image_url: photoUrl }] }], model }),
+    });
+    if (!res.ok) throw new Error(`Voyage API error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json();
+    const tokens = data.usage?.total_tokens || 0;
+    return { vector: data.data[0].embedding, costUsd: (tokens * price.priceIn) / 1e6 };
+  }
+  throw new HttpsError('internal', `Unknown embedding provider: ${providerKind}`);
+}
+
+/**
+ * Embeddings are cached directly on the record (mainPhotoEmbedding +
+ * mainPhotoEmbeddingUrl/Model, to know when the cache is stale - same
+ * photo-URL staleness check already used for LLM verdicts) since the whole
+ * point of an embedding approach is paying for a given photo's embedding
+ * ONCE, ever, and reusing it across every future comparison it's ever part
+ * of - unlike an LLM judgment call, which has no such reuse across
+ * different pairs. Recomputes automatically if the main photo or the
+ * selected embedding provider/model has changed since the cached value.
+ */
+async function getOrComputeEmbedding(collectionName, docId, photoUrl, providerKind, model) {
+  const ref = db.collection(collectionName).doc(docId);
+  const snap = await ref.get();
+  const data = snap.exists ? snap.data() : {};
+  const cacheKey = `${providerKind}:${model}`;
+  if (data.mainPhotoEmbedding && data.mainPhotoEmbeddingUrl === photoUrl && data.mainPhotoEmbeddingModel === cacheKey) {
+    return { vector: data.mainPhotoEmbedding, costUsd: 0 };
+  }
+  const { vector, costUsd } = await computeImageEmbedding(providerKind, model, photoUrl);
+  await ref.set({ mainPhotoEmbedding: vector, mainPhotoEmbeddingUrl: photoUrl, mainPhotoEmbeddingModel: cacheKey }, { merge: true });
+  return { vector, costUsd };
+}
+
+function cosineSimilarity(a, b) {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) || 1);
+}
+
+// Rough starting thresholds, NOT empirically validated against this app's
+// own real photos - CLIP-family cosine similarity for genuinely the same
+// individual animal typically lands high, but the exact cutoffs depend on
+// the embedding model and this app's actual photo quality/framing. Treat
+// these as a starting point to tune once real match feedback comes in, the
+// same way photoDisqualifyThreshold itself is admin-tunable.
+function embeddingSimilarityToVerdict(similarity) {
+  if (similarity >= 0.92) return 'high';
+  if (similarity >= 0.85) return 'medium';
+  if (similarity >= 0.75) return 'low';
+  return 'noMatch';
+}
 
 // Claude's key is the one provider that stays a real Firebase secret (this
 // path already worked before providers were switchable) - it throws the
@@ -1299,9 +1393,51 @@ export const comparePhotoSimilarity = onCall(
     }
     await enforceAiRateLimit(request.auth.uid);
 
-    const { lostPhotoUrl, foundPhotoUrl } = request.data || {};
+    const { lostPhotoUrl, foundPhotoUrl, lostCaseId, foundReportId } = request.data || {};
     if (typeof lostPhotoUrl !== 'string' || typeof foundPhotoUrl !== 'string') {
       throw new HttpsError('invalid-argument', 'lostPhotoUrl and foundPhotoUrl are required.');
+    }
+
+    // Read live from Firestore, same doc the admin's matching-parameters
+    // screen edits (photoCompareProviderKind/photoCompareModel/
+    // photoCompareThinking in matchingEngine.js/matchConfigApi.js) - so
+    // switching provider/model or toggling thinking in Settings takes
+    // effect immediately for every caller, no redeploy needed.
+    const matchConfigSnap = await db.collection('config').doc('matchWeights').get();
+    const matchConfigData = matchConfigSnap.exists ? matchConfigSnap.data() : {};
+    const providerKind = PROVIDER_KINDS[matchConfigData.photoCompareProviderKind] ? matchConfigData.photoCompareProviderKind : 'anthropic';
+    const model = matchConfigData.photoCompareModel || PROVIDER_KINDS[providerKind].defaultModel;
+    const providerModel = `${providerKind}:${model}`;
+
+    // Embedding-based comparison: no LLM judgment call at all - each
+    // photo's vector is computed once, ever, and cached directly on its own
+    // record (see getOrComputeEmbedding), so most calls here cost nothing
+    // and take milliseconds once both sides already have a cached
+    // embedding. Requires lostCaseId/foundReportId (not just the photo
+    // URLs) so the cache has somewhere to live.
+    if (PROVIDER_KINDS[providerKind]?.isEmbedding) {
+      if (typeof lostCaseId !== 'string' || typeof foundReportId !== 'string') {
+        throw new HttpsError('invalid-argument', 'lostCaseId and foundReportId are required for embedding-based comparison.');
+      }
+      let lostEmbed, foundEmbed;
+      try {
+        [lostEmbed, foundEmbed] = await Promise.all([
+          getOrComputeEmbedding('lostCases', lostCaseId, lostPhotoUrl, providerKind, model),
+          getOrComputeEmbedding('foundReports', foundReportId, foundPhotoUrl, providerKind, model),
+        ]);
+      } catch (err) {
+        console.error('embedding comparison failed', providerKind, model, err);
+        throw new HttpsError('internal', 'Could not compute photo embeddings.');
+      }
+      const similarity = cosineSimilarity(lostEmbed.vector, foundEmbed.vector);
+      const costUsd = lostEmbed.costUsd + foundEmbed.costUsd;
+      await recordCost(request.auth.uid, 'visualMatchCostUsd', costUsd);
+      return {
+        verdict: embeddingSimilarityToVerdict(similarity),
+        explanation: `דמיון embedding בין התמונות: ${(similarity * 100).toFixed(0)}%`,
+        providerModel,
+        _aiUsage: { estimatedCostUsd: costUsd },
+      };
     }
 
     let lostImage, foundImage;
@@ -1312,19 +1448,10 @@ export const comparePhotoSimilarity = onCall(
       throw new HttpsError('internal', 'Could not load one of the photos.');
     }
 
-    // Read live from Firestore, same doc the admin's matching-parameters
-    // screen edits (photoCompareProviderKind/photoCompareModel/
-    // photoCompareThinking in matchingEngine.js/matchConfigApi.js) - so
-    // switching provider/model or toggling thinking in Settings takes
-    // effect immediately for every caller, no redeploy needed. Thinking off
-    // by default: it bills at the same rate as the answer itself and was
-    // the single biggest driver of this app's AI spend; on is the fallback
-    // if disabling it measurably brings back wrong verdicts.
-    const matchConfigSnap = await db.collection('config').doc('matchWeights').get();
-    const matchConfigData = matchConfigSnap.exists ? matchConfigSnap.data() : {};
+    // Thinking off by default: it bills at the same rate as the answer
+    // itself and was the single biggest driver of this app's AI spend; on
+    // is the fallback if disabling it measurably brings back wrong verdicts.
     const useThinking = !!matchConfigData.photoCompareThinking;
-    const providerKind = PROVIDER_KINDS[matchConfigData.photoCompareProviderKind] ? matchConfigData.photoCompareProviderKind : 'anthropic';
-    const model = matchConfigData.photoCompareModel || PROVIDER_KINDS[providerKind].defaultModel;
 
     let result;
     try {
@@ -1349,7 +1476,7 @@ export const comparePhotoSimilarity = onCall(
     // otherwise has no way to know a verdict came from a different
     // (possibly less reliable, or just differently-tuned) provider/model
     // than the one currently selected.
-    parsed.providerModel = `${providerKind}:${model}`;
+    parsed.providerModel = providerModel;
     parsed._aiUsage = { estimatedCostUsd: result.costUsd };
     await recordCost(request.auth.uid, 'visualMatchCostUsd', result.costUsd);
     return parsed;

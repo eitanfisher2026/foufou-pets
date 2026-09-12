@@ -61,7 +61,12 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
   if (!lostPhotoUrl || !foundPhotoUrl) return null;
 
   try {
-    const { verdict, explanation, providerModel, _aiUsage } = await comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl);
+    const { verdict, explanation, providerModel, _aiUsage } = await comparePhotoSimilarity(
+      lostPhotoUrl,
+      foundPhotoUrl,
+      lostCaseId,
+      foundReportId
+    );
     const label =
       labelSide === 'lost'
         ? displayLostCaseName(lostCase)
