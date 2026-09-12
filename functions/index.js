@@ -1426,8 +1426,15 @@ export const comparePhotoSimilarity = onCall(
           getOrComputeEmbedding('foundReports', foundReportId, foundPhotoUrl, providerKind, model),
         ]);
       } catch (err) {
-        console.error('embedding comparison failed', providerKind, model, err);
-        throw new HttpsError('internal', 'Could not compute photo embeddings.');
+        if (err instanceof HttpsError) throw err;
+        // Message included in the thrown error itself (not just logged) -
+        // firebase functions:log has repeatedly failed to render this
+        // console.error's actual content (blank "E" lines with no text),
+        // so surfacing the real reason (bad/expired key, provider outage,
+        // wrong request shape, etc.) directly to the caller is the
+        // reliable way to see it at all right now.
+        console.error(`embedding comparison failed (${providerKind}:${model}): ${err.message}`);
+        throw new HttpsError('internal', `לא ניתן היה לחשב embedding לתמונה: ${err.message}`);
       }
       const similarity = cosineSimilarity(lostEmbed.vector, foundEmbed.vector);
       const costUsd = lostEmbed.costUsd + foundEmbed.costUsd;
