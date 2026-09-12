@@ -72,6 +72,7 @@ export default function CostSettingsPage() {
     fireworksApiKey: '',
     jinaApiKey: '',
     voyageApiKey: '',
+    siglip2EndpointUrl: '',
   });
   const [savingKeys, setSavingKeys] = useState(false);
   const [keysSavedNotice, setKeysSavedNotice] = useState(false);
@@ -337,26 +338,29 @@ export default function CostSettingsPage() {
             { field: 'fireworksApiKey', label: 'Fireworks', getKeyUrl: 'https://fireworks.ai/account/api-keys' },
             { field: 'jinaApiKey', label: 'Jina AI', getKeyUrl: 'https://jina.ai/embeddings' },
             { field: 'voyageApiKey', label: 'Voyage AI', getKeyUrl: 'https://dashboard.voyageai.com/api-keys' },
-          ].map(({ field, label, getKeyUrl }) => (
+            { field: 'siglip2EndpointUrl', label: 'SigLIP2 (עצמאי) - כתובת URL', getKeyUrl: null, isUrl: true },
+          ].map(({ field, label, getKeyUrl, isUrl }) => (
             <div key={field}>
               <div className="mb-1 flex items-center justify-between">
                 <span className="text-xs text-slate-500">{label}</span>
-                <a
-                  href={getKeyUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
-                >
-                  🔑 קבלת מפתח API ↗
-                </a>
+                {getKeyUrl && (
+                  <a
+                    href={getKeyUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+                  >
+                    🔑 קבלת מפתח API ↗
+                  </a>
+                )}
               </div>
               <input
-                type="password"
+                type={isUrl ? 'text' : 'password'}
                 dir="ltr"
                 className="input w-full text-left"
                 value={keyInputs[field]}
                 onChange={(e) => setKeyInputs((prev) => ({ ...prev, [field]: e.target.value }))}
-                placeholder={keyInputs[field] ? '' : 'לא הוגדר'}
+                placeholder={keyInputs[field] ? '' : isUrl ? 'https://...' : 'לא הוגדר'}
               />
             </div>
           ))}

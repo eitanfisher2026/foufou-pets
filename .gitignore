@@ -4,6 +4,9 @@ dist/
 .env.local
 functions/.env
 functions/node_modules/
+functions-python/venv/
+functions-python/__pycache__/
+functions-python/.env
 
 # Real example screenshots contain other people's names/phone numbers - never publish these
 photos/

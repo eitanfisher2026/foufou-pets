@@ -169,6 +169,16 @@ const PROVIDER_KINDS = {
   // in matchingEngine.js).
   jina: { label: 'Jina AI (embedding)', apiKeyField: 'jinaApiKey', defaultModel: 'jina-clip-v2', isEmbedding: true },
   voyage: { label: 'Voyage AI (embedding)', apiKeyField: 'voyageApiKey', defaultModel: 'voyage-multimodal-3', isEmbedding: true },
+  // Self-hosted, not a vendor API: a small Python Cloud Function
+  // (functions-python/) running AvitoTech's pet-specific Re-ID model
+  // (SigLIP2 fine-tuned on ~700K individual cats/dogs), reached over plain
+  // HTTP with a shared secret instead of an API key. No idle cost by
+  // deliberate choice (see computeImageEmbedding below) - min_instances is
+  // 0, so a call after any idle period waits ~15-30s for the model to load
+  // in that function's own instance before it can answer. This is an
+  // additional path to test alongside every other provider, not a
+  // replacement for any of them.
+  siglip2: { label: 'SigLIP2 Re-ID (עצמאי, איטי)', apiKeyField: 'siglip2EndpointUrl', defaultModel: 'siglip2-base', isEmbedding: true },
 };
 
 // Known per-model pricing for cost tracking - since the admin can pick ANY
@@ -221,7 +231,32 @@ async function computeImageEmbedding(providerKind, model, photoUrl) {
     const tokens = data.usage?.total_tokens || 0;
     return { vector: data.data[0].embedding, costUsd: (tokens * price.priceIn) / 1e6 };
   }
+  if (providerKind === 'siglip2') {
+    const endpointUrl = await requireProviderApiKey('siglip2EndpointUrl', 'SigLIP2 (עצמאי)');
+    const res = await fetch(endpointUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Shared-Secret': requireSiglip2Secret() },
+      body: JSON.stringify({ photoUrl }),
+    });
+    if (!res.ok) throw new Error(`SigLIP2 endpoint error ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = await res.json();
+    // Self-hosted, no per-call vendor bill - the only real cost here is the
+    // fixed Cloud Functions compute time, not tracked per-comparison.
+    return { vector: data.embedding, costUsd: 0 };
+  }
   throw new HttpsError('internal', `Unknown embedding provider: ${providerKind}`);
+}
+
+// SIGLIP2_SHARED_SECRET authenticates Node -> the self-hosted Python
+// function - it's not a vendor API key (nothing to look up on
+// config/aiProviderKeys), so it stays a real Firebase secret like
+// ANTHROPIC_API_KEY, referenced by both sides only by name.
+function requireSiglip2Secret() {
+  const value = process.env.SIGLIP2_SHARED_SECRET;
+  if (!value) {
+    throw new HttpsError('failed-precondition', 'SIGLIP2_SHARED_SECRET לא מוגדר.');
+  }
+  return value;
 }
 
 /**
@@ -1386,7 +1421,11 @@ async function fetchImageAsBase64(url) {
  * found-report pair in the whole pool.
  */
 export const comparePhotoSimilarity = onCall(
-  { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY'], timeoutSeconds: 60 },
+  // timeoutSeconds raised from 60 to 120: the siglip2 embedding path (see
+  // PROVIDER_KINDS above) can cold-start its own Python function for
+  // ~15-30s before it even starts loading the photo, on top of everything
+  // else here - every other provider still finishes well under that.
+  { region: 'me-west1', cors: true, secrets: ['ANTHROPIC_API_KEY', 'SIGLIP2_SHARED_SECRET'], timeoutSeconds: 120 },
   async (request) => {
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');

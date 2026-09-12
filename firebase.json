@@ -18,6 +18,11 @@
     {
       "source": "functions",
       "codebase": "default"
+    },
+    {
+      "source": "functions-python",
+      "codebase": "pyembeddings",
+      "runtime": "python313"
     }
   ],
   "firestore": {

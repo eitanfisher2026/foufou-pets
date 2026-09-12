@@ -1,0 +1,6 @@
+firebase-functions
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+transformers>=4.49
+pillow
+requests

@@ -13,9 +13,14 @@ import { functions } from '../../firebase.js';
  * (see maybeCheckPhotoSimilarity in matchingApi.js) are responsible for only
  * calling this for pairs that already cleared the configured confidence
  * threshold - this function itself has no gating logic.
+ *
+ * Timeout is 120s, not the default 70s - matches comparePhotoSimilarity's
+ * own timeoutSeconds in functions/index.js, raised for the siglip2
+ * self-hosted embedding path, which can spend ~15-30s just cold-starting
+ * its own function before it even starts on the photo.
  */
 export async function comparePhotoSimilarity(lostPhotoUrl, foundPhotoUrl, lostCaseId, foundReportId) {
-  const call = httpsCallable(functions, 'comparePhotoSimilarity', { timeout: 60000 });
+  const call = httpsCallable(functions, 'comparePhotoSimilarity', { timeout: 120000 });
   const result = await call({ lostPhotoUrl, foundPhotoUrl, lostCaseId, foundReportId });
   return result.data;
 }

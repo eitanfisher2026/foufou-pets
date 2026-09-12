@@ -73,6 +73,25 @@ export const AI_PROVIDER_KINDS = [
     noRefresh: true,
     fallbackModels: [{ id: 'voyage-multimodal-3', label: 'Voyage Multimodal 3' }],
   },
+  // Self-hosted, not a vendor: a small Python Cloud Function running a
+  // pet-specific Re-ID model (SigLIP2 fine-tuned on ~700K individual cats/
+  // dogs), reached via a URL pasted into keyField (see ProviderModelPicker's
+  // selfHosted branch - it's an endpoint, not an API key, but reuses the
+  // same storage/UI mechanism as every other provider's key). No idle cost
+  // by choice: a call after any idle period waits ~15-30s for the model to
+  // load before it can answer - an additional path to test, not a
+  // replacement for Jina/Voyage.
+  {
+    value: 'siglip2',
+    label: 'SigLIP2 Re-ID (עצמאי, איטי)',
+    keyField: 'siglip2EndpointUrl',
+    getKeyUrl: null,
+    allowedFor: ['photoCompare'],
+    isEmbedding: true,
+    noRefresh: true,
+    selfHosted: true,
+    fallbackModels: [{ id: 'siglip2-base', label: 'SigLIP2 Base (Re-ID)' }],
+  },
 ];
 
 /**

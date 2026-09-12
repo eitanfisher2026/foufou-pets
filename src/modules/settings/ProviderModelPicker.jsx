@@ -68,26 +68,37 @@ export default function ProviderModelPicker({ task, providerKind, model, onProvi
         </p>
       )}
 
+      {providerInfo.selfHosted && (
+        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          מודל עצמאי, לא שירות חיצוני בתשלום - אין עלות כשהוא לא בשימוש, אבל בדיוק בשביל זה: קריאה שמגיעה כשהוא
+          "קר" יכולה לקחת כ-15-30 שניות עד שהמודל נטען ועונה. מתאים לבדיקה, לא לתגובה מיידית.
+        </p>
+      )}
+
       {providerInfo.keyField && (
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className="text-xs text-slate-500">מפתח API - {providerInfo.label}</span>
-            <a
-              href={providerInfo.getKeyUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
-            >
-              🔑 קבלת מפתח API ↗
-            </a>
+            <span className="text-xs text-slate-500">
+              {providerInfo.selfHosted ? `כתובת URL - ${providerInfo.label}` : `מפתח API - ${providerInfo.label}`}
+            </span>
+            {providerInfo.getKeyUrl && (
+              <a
+                href={providerInfo.getKeyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+              >
+                🔑 קבלת מפתח API ↗
+              </a>
+            )}
           </div>
           <input
-            type="password"
+            type={providerInfo.selfHosted ? 'text' : 'password'}
             dir="ltr"
             className="input w-full text-left"
             value={keyInputs[providerInfo.keyField] || ''}
             onChange={(e) => onKeyChange(providerInfo.keyField, e.target.value)}
-            placeholder={keyInputs[providerInfo.keyField] ? '' : 'לא הוגדר'}
+            placeholder={keyInputs[providerInfo.keyField] ? '' : providerInfo.selfHosted ? 'https://...' : 'לא הוגדר'}
           />
         </div>
       )}

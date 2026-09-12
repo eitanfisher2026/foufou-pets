@@ -63,7 +63,15 @@ export default function VisualSimilarityNote({ visualSimilarity, disqualified, s
   // that actually explains why the confidence should be trusted more or
   // less.
   const providerKind = visualSimilarity.providerModel?.split(':')[0];
-  const providerLabel = { anthropic: 'Claude', gemini: 'Gemini', openai: 'OpenAI', fireworks: 'Fireworks', jina: 'Jina (embedding)', voyage: 'Voyage (embedding)' }[providerKind];
+  const providerLabel = {
+    anthropic: 'Claude',
+    gemini: 'Gemini',
+    openai: 'OpenAI',
+    fireworks: 'Fireworks',
+    jina: 'Jina (embedding)',
+    voyage: 'Voyage (embedding)',
+    siglip2: 'SigLIP2 Re-ID (עצמאי)',
+  }[providerKind];
   return (
     <div className={`mb-2 rounded-lg border p-2 text-xs ${className}`}>
       <p className="font-medium">

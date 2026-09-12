@@ -25,6 +25,7 @@ export async function getProviderKeys() {
     fireworksApiKey: data.fireworksApiKey || '',
     jinaApiKey: data.jinaApiKey || '',
     voyageApiKey: data.voyageApiKey || '',
+    siglip2EndpointUrl: data.siglip2EndpointUrl || '',
   };
 }
 
