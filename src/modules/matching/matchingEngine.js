@@ -477,6 +477,16 @@ export const DEFAULT_MATCH_CONFIG = {
   // those few fields from being penalized just for having less data than
   // a fully-filled-in pair would.
   relativeScoring: true,
+  // The lowest field-based confidence bucket still worth surfacing to a
+  // person at all - anything scoring below this is auto-marked "אין
+  // התאמה" (NO_MATCH) the same way an exact 0 always was, instead of only
+  // ever auto-dismissing a literal, total mismatch. 'low' (score 1-39)
+  // reproduces the original behavior exactly (only a true 0 was ever
+  // auto-dismissed) - raising this to 'medium' also auto-dismisses every
+  // "low confidence" match without a human ever needing to look at it,
+  // which is free (no AI call involved, purely a read of the already-
+  // computed field score) - see autoStatusFor in matchingApi.js.
+  minReviewConfidence: 'low',
   colorGroups: DEFAULT_COLOR_GROUPS,
   breedGroups: DEFAULT_BREED_GROUPS,
   confidenceColors: DEFAULT_CONFIDENCE_COLORS,

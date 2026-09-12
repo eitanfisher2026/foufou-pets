@@ -100,6 +100,7 @@ export async function getMatchConfig() {
   const data = snap.data();
   return {
     relativeScoring: data.relativeScoring ?? DEFAULT_MATCH_CONFIG.relativeScoring,
+    minReviewConfidence: data.minReviewConfidence ?? DEFAULT_MATCH_CONFIG.minReviewConfidence,
     parameters: mergeNewDefaultParameters(data.parameters),
     colorGroups: fromFirestoreColorGroups(data.colorGroups),
     breedGroups: fromFirestoreBreedGroups(data.breedGroups),

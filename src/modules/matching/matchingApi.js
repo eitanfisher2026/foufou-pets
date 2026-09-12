@@ -19,6 +19,8 @@ import {
   confidenceMeetsThreshold,
   visualVerdictMeetsDisqualifyThreshold,
   normalizeVisualVerdict,
+  getMatchConfidence,
+  CONFIDENCE_BUCKETS,
 } from './matchingEngine.js';
 import { getMatchConfig } from './matchConfigApi.js';
 import { comparePhotoSimilarity } from './photoSimilarityApi.js';
@@ -149,10 +151,18 @@ function applyVisualVerdict(score, reasons, visual, disqualifyThreshold) {
 
 // NO_MATCH_PHOTO is NO_MATCH's photo-driven sibling (see collections.js) -
 // picking between the two, or NEW, is otherwise identical to the original
-// score-only rule.
-function autoStatusFor(score, disqualifiedByPhoto) {
+// score-only rule. minReviewConfidence (see matchingEngine.js/
+// matchConfigApi.js) is the lowest confidence bucket still worth a human's
+// attention - anything scoring below it is auto-dismissed the same way a
+// literal 0 always was, instead of only ever filtering out an exact
+// disqualification. Defaults to 'low' so an unset config reproduces the
+// original score===0-only behavior exactly (noMatch is the one bucket
+// ranked below 'low').
+function autoStatusFor(score, disqualifiedByPhoto, minReviewConfidence = 'low') {
   if (disqualifiedByPhoto) return REPORT_STATUS.NO_MATCH_PHOTO;
-  return score === 0 ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
+  const bucketRank = CONFIDENCE_BUCKETS.findIndex((b) => b.key === getMatchConfidence(score).key);
+  const minRank = CONFIDENCE_BUCKETS.findIndex((b) => b.key === minReviewConfidence);
+  return bucketRank < minRank ? REPORT_STATUS.NO_MATCH : REPORT_STATUS.NEW;
 }
 
 // Both check functions' status-preservation rule: only a genuine human
@@ -312,7 +322,7 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   ranked.forEach(({ report, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
     const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
-    const status = autoStatusFor(score, disqualifiedByPhoto);
+    const status = autoStatusFor(score, disqualifiedByPhoto, config.minReviewConfidence);
     // breakdown is stored alongside score/reasons (not recomputed on demand)
     // so the "full analysis" view always shows exactly what was checked at
     // the time this match was scored, even if the config changes later.
@@ -409,7 +419,7 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
   // actually says - a re-check that now disqualifies a pairing (or
   // un-disqualifies one) should visibly move it, not leave a stale status
   // sitting on a score that no longer matches it.
-  const status = isAutoStatus(prevStatus) ? autoStatusFor(score, disqualifiedByPhoto) : prevStatus;
+  const status = isAutoStatus(prevStatus) ? autoStatusFor(score, disqualifiedByPhoto, config.minReviewConfidence) : prevStatus;
 
   await setDoc(
     matchRef,
@@ -704,7 +714,7 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   scored.forEach(({ lostCase, score: rawScore, reasons: rawReasons, breakdown }, i) => {
     const visual = visuals[i];
     const { score, reasons, disqualifiedByPhoto } = applyVisualVerdict(rawScore, rawReasons, visual, config.photoDisqualifyThreshold);
-    const status = autoStatusFor(score, disqualifiedByPhoto);
+    const status = autoStatusFor(score, disqualifiedByPhoto, config.minReviewConfidence);
     batch.set(doc(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches', foundReportId), {
       foundReportId,
       score,

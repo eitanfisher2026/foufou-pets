@@ -458,6 +458,25 @@ export default function MatchSettingsPage() {
         </span>
       </label>
 
+      <div className="mb-4 rounded-xl border border-slate-200 bg-white p-3">
+        <p className="mb-2 text-sm text-slate-700">
+          <span className="font-medium">רמת ביטחון מינימלית לבדיקה ידנית</span>
+          <br />
+          כל התאמה עם ציון גבוה מ-0 מוצגת כיום כ"ממתין לבדיקה", גם אם רמת הביטחון הכוללת שלה נמוכה מאוד (למשל 2
+          מתוך 100). הגבהה מ"סבירות נמוכה" ל"סבירות בינונית" תסמן אוטומטית כל התאמה שהמערכת עצמה כבר מזהה כחלשה
+          בתור "אין התאמה" - בלי לבזבז על כך את הזמן שלכם, ובלי קריאת AI כלשהי (זו סינון לפי הציון לפי הפרטים, שכבר
+          קיים בכל מקרה).
+        </p>
+        <SelectField
+          className="w-full max-w-[12rem]"
+          label="רמת ביטחון מינימלית"
+          allowClear={false}
+          value={config.minReviewConfidence}
+          onChange={(v) => setConfig((prev) => ({ ...prev, minReviewConfidence: v }))}
+          options={CONFIDENCE_BUCKETS.filter((b) => b.key !== 'noMatch').map((b) => ({ value: b.key, label: b.label }))}
+        />
+      </div>
+
       <CollapsibleSection
         icon="⚖️"
         title={`פרמטרים (${config.parameters.length})`}
