@@ -6,8 +6,19 @@ import { formatDateTime } from '../shared/formatDateTime.js';
 import SelectField from '../shared/SelectField.jsx';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
+import {
+  listUserCosts,
+  getMonthlyFlagThresholds,
+  setMonthlyFlagThresholds,
+  DEFAULT_REGULAR_MONTHLY_FLAG_THRESHOLD_USD,
+  DEFAULT_EDITOR_MONTHLY_FLAG_THRESHOLD_USD,
+} from './userCostsApi.js';
 
 const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({ value: role, label: ROLE_LABELS[role] }));
+
+function formatUsd(n) {
+  return `$${n.toFixed(n < 1 ? 4 : 2)}`;
+}
 
 /**
  * Admin-only: everyone who has ever signed in, their role, and when they
@@ -17,6 +28,7 @@ const ROLE_OPTIONS = Object.values(ROLES).map((role) => ({ value: role, label: R
 export default function UsersSettingsPage() {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState([]);
+  const [costsById, setCostsById] = useState({});
   const [loading, setLoading] = useState(true);
   const [savingUid, setSavingUid] = useState(null);
   const [disconnectingUid, setDisconnectingUid] = useState(null);
@@ -28,6 +40,15 @@ export default function UsersSettingsPage() {
   // Keyed by uid too, same reasoning as clearedResults - a failed action on
   // one person's row shouldn't get lost or misread as being about another.
   const [actionErrors, setActionErrors] = useState({});
+  const [thresholds, setThresholds] = useState({
+    [ROLES.REGULAR]: DEFAULT_REGULAR_MONTHLY_FLAG_THRESHOLD_USD,
+    [ROLES.EDITOR]: DEFAULT_EDITOR_MONTHLY_FLAG_THRESHOLD_USD,
+  });
+  const [thresholdInputs, setThresholdInputs] = useState({
+    [ROLES.REGULAR]: String(DEFAULT_REGULAR_MONTHLY_FLAG_THRESHOLD_USD),
+    [ROLES.EDITOR]: String(DEFAULT_EDITOR_MONTHLY_FLAG_THRESHOLD_USD),
+  });
+  const [savingThreshold, setSavingThreshold] = useState(false);
   const { confirm, dialog } = useConfirm();
 
   useEffect(() => {
@@ -36,10 +57,29 @@ export default function UsersSettingsPage() {
 
   async function load() {
     setLoading(true);
-    const list = await listUsers();
+    const [list, userCosts, monthlyThresholds] = await Promise.all([listUsers(), listUserCosts(), getMonthlyFlagThresholds()]);
     list.sort((a, b) => (b.lastLoginAt?.toMillis?.() || 0) - (a.lastLoginAt?.toMillis?.() || 0));
     setUsers(list);
+    setCostsById(Object.fromEntries(userCosts.map((c) => [c.id, c])));
+    setThresholds(monthlyThresholds);
+    setThresholdInputs({
+      [ROLES.REGULAR]: String(monthlyThresholds[ROLES.REGULAR]),
+      [ROLES.EDITOR]: String(monthlyThresholds[ROLES.EDITOR]),
+    });
     setLoading(false);
+  }
+
+  async function handleSaveThresholds() {
+    const regular = Number(thresholdInputs[ROLES.REGULAR]);
+    const editor = Number(thresholdInputs[ROLES.EDITOR]);
+    if (!Number.isFinite(regular) || regular < 0 || !Number.isFinite(editor) || editor < 0) return;
+    setSavingThreshold(true);
+    try {
+      await setMonthlyFlagThresholds({ regular, editor });
+      setThresholds({ [ROLES.REGULAR]: regular, [ROLES.EDITOR]: editor });
+    } finally {
+      setSavingThreshold(false);
+    }
   }
 
   async function handleRoleChange(uid, role) {
@@ -111,21 +151,81 @@ export default function UsersSettingsPage() {
       <h1 className="mb-1 text-xl font-bold text-slate-800">ניהול משתמשים</h1>
       <p className="mb-6 text-sm text-slate-500">
         כל מי שהתחבר לאפליקציה פעם אחת לפחות. מנהל/ת יכול/ה לשנות תפקיד; רגיל/ה ועורך/ת לא רואים את עמוד ההגדרות
-        בכלל.
+        בכלל. עלות ה-AI של כל אחד/ת (סך הכל וגם החודש הנוכחי) מוצגת בכרטיס שלהם למטה.
+      </p>
+
+      <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+        <label className="flex flex-col gap-1">
+          <span>סימון מעל ($ בחודש) - משתמשים רגילים</span>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={thresholdInputs[ROLES.REGULAR]}
+            onChange={(e) => setThresholdInputs((prev) => ({ ...prev, [ROLES.REGULAR]: e.target.value }))}
+            className="input w-24"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span>סימון מעל ($ בחודש) - עורכים</span>
+          <input
+            type="number"
+            min="0"
+            step="0.1"
+            value={thresholdInputs[ROLES.EDITOR]}
+            onChange={(e) => setThresholdInputs((prev) => ({ ...prev, [ROLES.EDITOR]: e.target.value }))}
+            className="input w-24"
+          />
+        </label>
+        <span className="flex flex-col gap-1 text-slate-400">
+          <span>מנהלים</span>
+          <span className="font-medium">ללא הגבלה</span>
+        </span>
+        <button
+          type="button"
+          onClick={handleSaveThresholds}
+          disabled={
+            savingThreshold ||
+            (Number(thresholdInputs[ROLES.REGULAR]) === thresholds[ROLES.REGULAR] &&
+              Number(thresholdInputs[ROLES.EDITOR]) === thresholds[ROLES.EDITOR])
+          }
+          className="rounded-lg bg-slate-800 px-3 py-1.5 font-medium text-white disabled:opacity-40"
+        >
+          {savingThreshold ? 'שומר...' : 'שמירה'}
+        </button>
+      </div>
+      <p className="mb-4 text-xs text-slate-400">
+        משתמש עם ⚠️ חרג מהסף שנקבע לתפקיד שלו החודש הנוכחי - שווה לבדוק שהשימוש שלו תקין. לעורכים סף גבוה יותר
+        כברירת מחדל, כי הם עושים באופן לגיטימי יותר פעולות AI מרוכזות (סריקה מחדש, עדכון השוואת תמונות); למנהלים אין
+        סף כלל, אבל העלות שלהם עדיין מוצגת.
       </p>
 
       {loading && <p className="text-slate-500">טוען...</p>}
 
       <ul className="space-y-2">
-        {users.map((u) => (
+        {users.map((u) => {
+          const role = u.role || ROLES.REGULAR;
+          const c = costsById[u.id];
+          const lifetimeCostUsd = (c?.aiCostUsd || 0) + (c?.visualMatchCostUsd || 0);
+          const currentMonthCostUsd = c?.currentMonthCostUsd || 0;
+          const roleThreshold = role === ROLES.ADMIN ? Infinity : thresholds[role] ?? thresholds[ROLES.REGULAR];
+          const flagged = currentMonthCostUsd >= roleThreshold;
+          return (
           <li key={u.id} className="rounded-xl border border-slate-200 bg-white p-3">
             <div className="flex items-center gap-3">
               {u.photoURL && (
                 <img src={u.photoURL} alt="" className="h-10 w-10 shrink-0 rounded-full" referrerPolicy="no-referrer" />
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-slate-800">{u.displayName || u.email}</p>
+                <p className="truncate font-medium text-slate-800">
+                  {flagged && <span className="ml-1">⚠️</span>}
+                  {u.displayName || u.email}
+                </p>
                 <p className="truncate text-xs text-slate-500">{u.email}</p>
+              </div>
+              <div className="shrink-0 text-left text-xs">
+                <p className="font-medium text-slate-800">{formatUsd(lifetimeCostUsd)} סך הכל</p>
+                <p className="text-slate-400">{formatUsd(currentMonthCostUsd)} החודש</p>
               </div>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -172,7 +272,8 @@ export default function UsersSettingsPage() {
             )}
             {actionErrors[u.id] && <p className="mt-1 text-xs font-medium text-red-600">{actionErrors[u.id]}</p>}
           </li>
-        ))}
+          );
+        })}
       </ul>
 
       {dialog}
