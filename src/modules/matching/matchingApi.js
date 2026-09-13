@@ -172,6 +172,49 @@ function isAutoStatus(status) {
   return !status || status === REPORT_STATUS.NEW || status === REPORT_STATUS.NO_MATCH || status === REPORT_STATUS.NO_MATCH_PHOTO;
 }
 
+/**
+ * Retroactively corrects one existing match if scoreMatch's CURRENT rules
+ * (the species hard-disqualify above all) would now score it 0, but it's
+ * still sitting on an old nonzero score from before whatever rule/config
+ * change made that so. The normal "check" actions (checkMatchesForLostCase/
+ * checkMatchesForFoundReport) only ever score brand-new candidates and
+ * deliberately never revisit an already-scored pairing (see the
+ * status-preservation rule above) - so a pairing scored before, say, the
+ * species check existed just sits there wrong forever, since nothing else
+ * ever gives it a second look. This is exactly how a found report of the
+ * wrong species can surface as "NEW" in a case's review queue despite
+ * species being an unconditional disqualifier today - not a photo-provider
+ * bug, a stale record nothing had reason to revisit until now.
+ *
+ * Free (no AI call - a 0 score never clears photoMatchThreshold, so it
+ * never reaches a paid photo check either), so it's safe to run
+ * unconditionally on every existing match, every time a check runs. Never
+ * touches a status a person already set by hand (isAutoStatus).
+ */
+function healIfNowDisqualified(matchRef, matchData, lostCase, foundReport, config) {
+  if (!isAutoStatus(matchData.status) || matchData.score === 0) return null;
+  const fresh = scoreMatch(lostCase, foundReport, config);
+  if (fresh.score !== 0) return null;
+  return { ref: matchRef, updates: { score: 0, reasons: fresh.reasons, breakdown: fresh.breakdown, status: REPORT_STATUS.NO_MATCH } };
+}
+
+async function healStaleMatches(matchDocs, getLostAndFound, config) {
+  if (matchDocs.length === 0) return 0;
+  const pairs = await Promise.all(matchDocs.map((m) => getLostAndFound(m)));
+  const healUpdates = [];
+  matchDocs.forEach((m, i) => {
+    const pair = pairs[i];
+    if (!pair) return;
+    const heal = healIfNowDisqualified(m.ref, m.data, pair.lostCase, pair.foundReport, config);
+    if (heal) healUpdates.push(heal);
+  });
+  if (healUpdates.length === 0) return 0;
+  const batch = writeBatch(db);
+  healUpdates.forEach(({ ref, updates }) => batch.set(ref, updates, { merge: true }));
+  await batch.commit();
+  return healUpdates.length;
+}
+
 // A pairing only ever gets scored once by the "check" action. After that,
 // its match record (score, reasons, status) is left alone until either a
 // person changes its status by hand, or the whole set is explicitly reset
@@ -276,9 +319,25 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   const existingSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCaseId, 'matches'));
   const existingIds = new Set(existingSnap.docs.map((d) => d.id));
   const newCandidates = foundReports.filter((r) => !existingIds.has(r.id));
-  if (newCandidates.length === 0) return { newCount: 0, visualMatches: [] };
 
   const config = await getMatchConfig();
+  // Every existing match gets a free re-look at whether it's still
+  // consistent with today's rules (see healStaleMatches) before anything
+  // else - cheap and worth doing on every check, not just when there
+  // happen to be new candidates too.
+  const healedCount = await healStaleMatches(
+    existingSnap.docs.map((d) => ({ ref: d.ref, data: d.data() })),
+    async (m) => {
+      const reportSnap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, m.data.foundReportId));
+      return reportSnap.exists() ? { lostCase, foundReport: reportSnap.data() } : null;
+    },
+    config
+  );
+  if (newCandidates.length === 0) {
+    if (healedCount > 0) await recomputeLostCaseCounts(lostCaseId);
+    return { newCount: 0, visualMatches: [], healedCount };
+  }
+
   const ranked = rankMatches(lostCase, newCandidates, config);
 
   let done = 0;
@@ -534,6 +593,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
   let skippedBelowThreshold = 0;
   let skippedClosed = 0;
   let skippedOverCap = 0;
+  let healedCount = 0;
   const visualMatches = [];
   const foundReportIdsToRecompute = new Set();
 
@@ -542,6 +602,18 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
     const isActive = (lostCase.status || RECORD_STATUS.ACTIVE) === RECORD_STATUS.ACTIVE;
     const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, lostCase.id, 'matches'));
     const allMatches = matchesSnap.docs.map((d) => ({ ref: d.ref, data: d.data() }));
+
+    // Free re-look at every existing match (open or closed case alike - no
+    // AI cost either way) for whether today's rules would now hard-
+    // disqualify it - see healStaleMatches.
+    healedCount += await healStaleMatches(
+      allMatches,
+      async (m) => {
+        const reportSnap = await getDoc(doc(db, COLLECTIONS.FOUND_REPORTS, m.data.foundReportId));
+        return reportSnap.exists() ? { lostCase, foundReport: reportSnap.data() } : null;
+      },
+      config
+    );
 
     // Already has a result from before this run (or before this flag
     // existed) - still needs its found report's flag caught up.
@@ -646,7 +718,7 @@ export async function backfillPhotoSimilarityForExistingMatches(onProgress) {
 
   await Promise.all([...foundReportIdsToRecompute].map((id) => recomputeFoundReportVisualFlag(id)));
 
-  return { casesScanned: allLostCases.length, pairsChecked, skippedBelowThreshold, skippedClosed, skippedOverCap, visualMatches };
+  return { casesScanned: allLostCases.length, pairsChecked, skippedBelowThreshold, skippedClosed, skippedOverCap, healedCount, visualMatches };
 }
 
 /**
@@ -676,9 +748,23 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   ]);
   const matchedCaseIds = new Set(matchesSnap.docs.map((d) => d.ref.parent.parent.id));
   const newCandidates = lostCases.filter((lostCase) => !matchedCaseIds.has(lostCase.id));
-  if (newCandidates.length === 0) return { newCount: 0, visualMatches: [] };
 
   const config = await getMatchConfig();
+  // Same free stale-disqualification re-look as checkMatchesForLostCase -
+  // see healStaleMatches.
+  const healedCount = await healStaleMatches(
+    matchesSnap.docs.map((d) => ({ ref: d.ref, data: d.data() })),
+    async (m) => {
+      const lostCaseSnap = await getDoc(m.ref.parent.parent);
+      return lostCaseSnap.exists() ? { lostCase: lostCaseSnap.data(), foundReport: report } : null;
+    },
+    config
+  );
+  if (newCandidates.length === 0) {
+    if (healedCount > 0) await Promise.all([...matchedCaseIds].map((id) => recomputeLostCaseCounts(id)));
+    return { newCount: 0, visualMatches: [], healedCount };
+  }
+
   // Sorted best-first, same as rankMatches on the other side - so the same
   // synchronous top-K cap below actually keeps the K best candidates, not
   // an arbitrary K in whatever order newCandidates happened to come back.
@@ -730,7 +816,9 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
     }
   });
   await batch.commit();
-  await Promise.all(newCandidates.map((lostCase) => recomputeLostCaseCounts(lostCase.id)));
+  const countsToRefresh = new Set(newCandidates.map((lostCase) => lostCase.id));
+  if (healedCount > 0) matchedCaseIds.forEach((id) => countsToRefresh.add(id));
+  await Promise.all([...countsToRefresh].map((id) => recomputeLostCaseCounts(id)));
   await Promise.all(
     scored.map(({ lostCase }, i) => {
       const cost = visuals[i]?.costUsd;
@@ -742,7 +830,7 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
     await setDoc(doc(db, COLLECTIONS.FOUND_REPORTS, foundReportId), { hasVisualMatch: true }, { merge: true });
   }
 
-  return { newCount: newCandidates.length, visualMatches };
+  return { newCount: newCandidates.length, visualMatches, healedCount };
 }
 
 /**
