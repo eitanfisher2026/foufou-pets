@@ -70,6 +70,7 @@ export default function MatchAnalysisPage() {
   // below jump straight to the next candidate instead of leaving the
   // reviewer stranded on the one they just closed out.
   const [allMatches, setAllMatches] = useState([]);
+  const [navNotice, setNavNotice] = useState('');
 
   useEffect(() => {
     Promise.all([getMatch(caseId, foundReportId), getLostCase(caseId), getFoundReport(foundReportId)]).then(
@@ -100,6 +101,25 @@ export default function MatchAnalysisPage() {
       : allMatches.findIndex((m) => m.foundReportId === foundReportId);
   const nextMatch =
     currentIndex >= 0 ? allMatches.slice(currentIndex + 1).find((m) => m.status === REPORT_STATUS.NEW) : null;
+
+  // Plain step-by-step browsing through the same score-sorted list, one
+  // literal adjacent entry at a time - distinct from nextMatch above, which
+  // skips ahead to the next still-undecided one specifically after a status
+  // change. This is for freely paging through every candidate regardless of
+  // status, to compare them side by side.
+  const prevInList = currentIndex > 0 ? allMatches[currentIndex - 1] : null;
+  const nextInList = currentIndex >= 0 && currentIndex < allMatches.length - 1 ? allMatches[currentIndex + 1] : null;
+
+  function goToAdjacent(item, boundaryMessage) {
+    if (!item) {
+      setNavNotice(boundaryMessage);
+      setTimeout(() => setNavNotice(''), 2500);
+      return;
+    }
+    setNavNotice('');
+    if (dir === 'report') navigate(`/lost/${item.lostCase.id}/analysis/${foundReportId}?dir=report`);
+    else navigate(`/lost/${caseId}/analysis/${item.foundReportId}`);
+  }
 
   // This page used to be pure read-only - seeing a stale or missing photo
   // comparison here (e.g. a match scored before the photo threshold cleared
@@ -208,6 +228,22 @@ export default function MatchAnalysisPage() {
         <div className="flex items-center justify-between gap-2">
           <span className="text-sm font-medium text-slate-600">סטטוס בדיקה:</span>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => goToAdjacent(prevInList, 'זו ההתאמה הראשונה ברשימה - אין קודמת.')}
+              aria-label="ההתאמה הקודמת"
+              className="shrink-0 rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500"
+            >
+              <span aria-hidden="true">←</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => goToAdjacent(nextInList, 'זו ההתאמה האחרונה ברשימה - אין הבאה.')}
+              aria-label="ההתאמה הבאה"
+              className="shrink-0 rounded-full border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500"
+            >
+              <span aria-hidden="true">→</span>
+            </button>
             {canManageMatch && match.status !== REPORT_STATUS.NOT_RELEVANT && (
               <button
                 type="button"
@@ -238,6 +274,7 @@ export default function MatchAnalysisPage() {
             <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-400" />
           </div>
         )}
+        {navNotice && <p className="mt-2 text-xs font-medium text-slate-500">{navNotice}</p>}
       </div>
 
       {(lostCase.photos?.[0]?.url || foundReport.photos?.[0]?.url) && (
