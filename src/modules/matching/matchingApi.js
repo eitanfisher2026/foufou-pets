@@ -45,15 +45,26 @@ function isNotableVisualVerdict(verdict) {
  * the admin-configured threshold (config.photoMatchThreshold - "never"
  * disables this entirely), and both sides need a main photo to compare.
  * Never throws - a failed photo check (missing photos, a transient AI
- * error) just means no visualSimilarity gets attached to this match, not a
- * failed scan. Returns null when skipped or failed, otherwise
- * { verdict, explanation, label, lostCaseId, foundReportId, lostPhotoUrl,
- * foundPhotoUrl, providerModel, costUsd, checkedAt } - lostCaseId/foundReportId
- * let a caller (see VisualMatchAlertDialog.jsx) link straight to the match,
- * since an alert can be shown from a page (like the Settings bulk actions)
- * that has no other way to identify which pair it's even about. `label`
- * identifies the OTHER side of the pair for display. lostPhotoUrl/
- * foundPhotoUrl/providerModel record exactly what produced this verdict - see
+ * error) just means no *verdict* gets attached to this match, not a failed
+ * scan. Returns null only when the check was never even attempted (below
+ * threshold, missing a photo, or over the per-scan cap). A genuine failure
+ * - wrong/expired provider config, a timed-out self-hosted endpoint, a
+ * provider outage - instead returns { error, costUsd: 0 }, so it's stored
+ * and shown as a distinct "check failed" state (see VisualSimilarityNote)
+ * instead of looking identical to "never attempted". This distinction is
+ * exactly what was missing while diagnosing the SigLIP2 endpoint URL that
+ * silently wasn't saving (see CostSettingsPage's handleSaveProviders) -
+ * every failed attempt looked like "not checked", with the real reason
+ * visible only in a browser console nobody was looking at.
+ *
+ * A successful check returns { verdict, explanation, label, lostCaseId,
+ * foundReportId, lostPhotoUrl, foundPhotoUrl, providerModel, costUsd,
+ * checkedAt } - lostCaseId/foundReportId let a caller (see
+ * VisualMatchAlertDialog.jsx) link straight to the match, since an alert
+ * can be shown from a page (like the Settings bulk actions) that has no
+ * other way to identify which pair it's even about. `label` identifies the
+ * OTHER side of the pair for display. lostPhotoUrl/foundPhotoUrl/
+ * providerModel record exactly what produced this verdict - see
  * isVisualSimilarityStale below, the reason they're stored at all.
  */
 async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foundReportId, score, config, labelSide) {
@@ -89,7 +100,7 @@ async function maybeCheckPhotoSimilarity(lostCase, lostCaseId, foundReport, foun
     };
   } catch (err) {
     console.error('photo similarity check failed', err);
-    return null;
+    return { error: err?.message || String(err), lostCaseId, foundReportId, costUsd: 0, checkedAt: serverTimestamp() };
   }
 }
 

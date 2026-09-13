@@ -48,9 +48,21 @@ export default function VisualSimilarityNote({ visualSimilarity, disqualified, s
     return (
       <div className="mb-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-xs text-slate-500">
         <p className="font-medium">🔎 השוואת תמונות AI: לא נבדקה</p>
-        <p className="mt-0.5">
-          ייתכן שהציון לפי הפרטים לא הגיע לסף שנדרש כדי להפעיל השוואת תמונות, שאחת התמונות חסרה, או שהבדיקה נכשלה.
-        </p>
+        <p className="mt-0.5">ייתכן שהציון לפי הפרטים לא הגיע לסף שנדרש כדי להפעיל השוואת תמונות, שאחת התמונות חסרה, או שההתאמה הזו לא הייתה בין המובילות בסריקה (יש הגבלה על מספר הבדיקות לסריקה).</p>
+      </div>
+    );
+  }
+
+  // A genuine failure (bad/missing provider config, a timed-out self-hosted
+  // endpoint, a provider outage) - distinct from "never attempted" above,
+  // which used to be the ONLY state a failure could show as (see
+  // maybeCheckPhotoSimilarity in matchingApi.js). Showing the real reason
+  // here is what "בדיקה חוזרת" needs to actually be worth pressing again.
+  if (visualSimilarity.error) {
+    return (
+      <div className="mb-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+        <p className="font-medium">🔎 השוואת תמונות AI: הבדיקה נכשלה</p>
+        <p className="mt-0.5">{visualSimilarity.error}</p>
       </div>
     );
   }
