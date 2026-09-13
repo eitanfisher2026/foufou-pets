@@ -54,8 +54,16 @@ def _json_response(body, status=200):
     secrets=["SIGLIP2_SHARED_SECRET"],
 )
 def compute_siglip2_embedding(req: https_fn.Request) -> https_fn.Response:
-    shared_secret = os.environ.get("SIGLIP2_SHARED_SECRET", "")
-    if not shared_secret or req.headers.get("X-Shared-Secret") != shared_secret:
+    # .strip() on both sides: the secret was created via a piped
+    # `openssl rand ... | firebase functions:secrets:set ...` command, which
+    # stores openssl's trailing newline as part of the secret's actual
+    # bytes. Node's fetch() silently strips trailing whitespace from an
+    # outgoing header value (the Fetch spec's header-value normalization),
+    # but Python's raw os.environ value keeps it - so an unstripped
+    # comparison here compared "secret" against "secret\n" and rejected
+    # every legitimate request with 401.
+    shared_secret = os.environ.get("SIGLIP2_SHARED_SECRET", "").strip()
+    if not shared_secret or req.headers.get("X-Shared-Secret", "").strip() != shared_secret:
         return _json_response({"error": "unauthorized"}, status=401)
 
     body = req.get_json(silent=True) or {}

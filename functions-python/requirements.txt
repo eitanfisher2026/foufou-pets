@@ -1,6 +1,7 @@
 firebase-functions
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
+torchvision
 transformers>=4.49
 pillow
 requests
