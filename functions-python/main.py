@@ -86,7 +86,14 @@ def compute_siglip2_embedding(req: https_fn.Request) -> https_fn.Response:
         processor, model = _get_model()
         with torch.no_grad():
             inputs = processor(images=[image], return_tensors="pt")
-            embedding = model.get_image_features(**inputs)
+            output = model.get_image_features(**inputs)
+            # The model card's own example treats this as already a plain
+            # pooled tensor, but on the installed transformers version it
+            # comes back as a BaseModelOutputWithPooling instead - .pooler_output
+            # IS that pooled representation by definition (what
+            # get_image_features would normally have already unwrapped), so
+            # this isn't a fallback guess, just unwrapping one extra layer.
+            embedding = output if torch.is_tensor(output) else output.pooler_output
             embedding = F.normalize(embedding, dim=1)
 
         return _json_response({"embedding": embedding[0].tolist()})
