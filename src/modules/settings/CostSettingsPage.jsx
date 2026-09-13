@@ -122,12 +122,25 @@ export default function CostSettingsPage() {
   // matchConfig here is the same object the matching-parameters page reads
   // and writes, so this round-trips everything else it holds untouched,
   // same principle as that page's own save button.
+  //
+  // Also saves keyInputs alongside it - every button wired to this handler
+  // sits directly under a ProviderModelPicker whose own key/URL field
+  // writes into keyInputs, not matchConfig (see aiProviderKeysApi.js). A
+  // real admin (self included, testing SigLIP2) typed a URL into that
+  // field, pressed THIS button since it's right there, and had the URL
+  // silently discarded - only the separate "מפתחות API" section's own save
+  // button actually persisted keyInputs. Every provider comparison since
+  // was silently running with no endpoint configured at all (the callable
+  // throws, and the caller swallows that into "not checked" - see
+  // maybeCheckPhotoSimilarity), not a real accuracy result for SigLIP2 or
+  // any newly-typed key. Saving both together here removes the trap
+  // entirely instead of just explaining it better.
   async function handleSaveProviders() {
     setSavingProviders(true);
     setProvidersError('');
     setProvidersSavedNotice(false);
     try {
-      await saveMatchConfig(matchConfig);
+      await Promise.all([saveMatchConfig(matchConfig), setProviderKeys(keyInputs)]);
       setProvidersSavedNotice(true);
       setTimeout(() => setProvidersSavedNotice(false), 2500);
     } catch (err) {
