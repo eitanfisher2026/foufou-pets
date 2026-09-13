@@ -49,6 +49,11 @@ def _json_response(body, status=200):
 @https_fn.on_request(
     region="me-west1",
     memory=options.MemoryOption.GB_4,
+    # Explicit rather than left to Cloud Run's implicit default for this
+    # memory tier - both so CPU-bound inference gets a predictable amount of
+    # compute, and so the cost estimate on the Costs page has a known,
+    # documented basis instead of guessing at an undocumented default.
+    cpu=2,
     timeout_sec=120,
     min_instances=0,
     secrets=["SIGLIP2_SHARED_SECRET"],

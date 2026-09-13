@@ -37,6 +37,33 @@ const ASSUMED_PHOTOS_PER_RECORD = 2;
 const FREE_STORAGE_GB = 5;
 const STORAGE_PRICE_PER_GB_MONTH = 0.026;
 
+// SigLIP2 (functions-python/main.py) isn't billed per-call by a vendor like
+// every other provider - it's Google Cloud compute time, billed separately
+// from this app's own AI-cost ledger above (which only ever shows real
+// reported per-call dollars, never an estimate - see this page's own intro
+// text). siglip2CallCount is a plain counter (see functions/index.js), and
+// this turns it into its own clearly-labeled estimate instead of silently
+// mixing a guessed number into the real ledger.
+// Rates are Cloud Run's on-demand Tier 1 pricing (per vCPU-second / GiB-
+// second); the function requests 2 vCPU + 4GiB (see main.py's explicit
+// cpu=2). Duration assumes a cold start most calls (min_instances=0 was a
+// deliberate no-idle-cost choice - see the amber note in
+// ProviderModelPicker.jsx), landing in the middle of the documented ~15-30s
+// cold-start range - a warm call (rare, back-to-back requests on the same
+// still-live instance) costs meaningfully less than this per-call figure.
+const SIGLIP2_ASSUMED_SECONDS_PER_CALL = 20;
+const SIGLIP2_VCPU_COUNT = 2;
+const SIGLIP2_MEMORY_GB = 4;
+const CLOUD_RUN_PRICE_PER_VCPU_SECOND = 0.000024;
+const CLOUD_RUN_PRICE_PER_GB_SECOND = 0.0000025;
+const SIGLIP2_ESTIMATED_COST_PER_CALL =
+  SIGLIP2_VCPU_COUNT * SIGLIP2_ASSUMED_SECONDS_PER_CALL * CLOUD_RUN_PRICE_PER_VCPU_SECOND +
+  SIGLIP2_MEMORY_GB * SIGLIP2_ASSUMED_SECONDS_PER_CALL * CLOUD_RUN_PRICE_PER_GB_SECOND;
+// Cloud Run's free tier (180,000 vCPU-seconds + 360,000 GiB-seconds/month)
+// covers this call volume many times over at this app's current scale - so
+// the gross estimate below is very likely not actually being charged yet.
+const CLOUD_RUN_FREE_TIER_VCPU_SECONDS_PER_MONTH = 180000;
+
 function formatUsd(n) {
   return `$${n.toFixed(n < 1 ? 4 : 2)}`;
 }
@@ -171,6 +198,11 @@ export default function CostSettingsPage() {
   const estimatedStorageGB = (estimatedPhotos * ASSUMED_KB_PER_PHOTO) / (1024 * 1024);
   const storageOverageGB = Math.max(0, estimatedStorageGB - FREE_STORAGE_GB);
   const estimatedStorageCost = storageOverageGB * STORAGE_PRICE_PER_GB_MONTH;
+
+  const siglip2CallCount = globalCosts?.siglip2CallCount || 0;
+  const siglip2EstimatedTotalCost = siglip2CallCount * SIGLIP2_ESTIMATED_COST_PER_CALL;
+  const siglip2VcpuSecondsUsed = siglip2CallCount * SIGLIP2_VCPU_COUNT * SIGLIP2_ASSUMED_SECONDS_PER_CALL;
+  const siglip2LikelyWithinFreeTier = siglip2VcpuSecondsUsed < CLOUD_RUN_FREE_TIER_VCPU_SECONDS_PER_MONTH;
 
   return (
     <div className="p-4 pb-10">
@@ -484,6 +516,29 @@ export default function CostSettingsPage() {
           נכללות כאן - בנפח השימוש הנוכחי הן כמעט בוודאות בתוך מכסת החינם היומית; לעלות מדויקת יש לבדוק ב-Firebase
           Console.
         </p>
+
+        {siglip2CallCount > 0 && (
+          <>
+            <div className="mt-4 space-y-2 border-t border-slate-100 pt-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-600">קריאות ל-SigLIP2 (עצמאי, לכל הזמנים)</span>
+                <span className="font-medium text-slate-800">{siglip2CallCount}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2 font-semibold">
+                <span className="text-slate-700">עלות מחשוב SigLIP2 משוערת</span>
+                <span className="text-slate-900">{formatUsd(siglip2EstimatedTotalCost)}</span>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              זו לא עלות בפועל אלא הערכה: {SIGLIP2_VCPU_COUNT} vCPU + {SIGLIP2_MEMORY_GB}GB זיכרון, כ-
+              {SIGLIP2_ASSUMED_SECONDS_PER_CALL} שניות בממוצע לקריאה (רוב הקריאות מתחילות "קרות" במכוון - אין מופע
+              קבוע פעיל - כך שזו הנחה סבירה לאמצע הטווח, לא המקרה הכי גרוע), לפי תעריפי Cloud Run הרשמיים. בנפח
+              השימוש הנוכחי זה {siglip2LikelyWithinFreeTier ? 'כמעט בוודאות עדיין בתוך' : 'קרוב לחרוג ממכסת'} מכסת
+              החינם החודשית של Cloud Run ({CLOUD_RUN_FREE_TIER_VCPU_SECONDS_PER_MONTH.toLocaleString()} vCPU-שניות) -
+              לעלות מדויקת יש לבדוק ב-Firebase Console.
+            </p>
+          </>
+        )}
       </CollapsibleSection>
     </div>
   );

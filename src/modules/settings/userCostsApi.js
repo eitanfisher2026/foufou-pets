@@ -44,6 +44,10 @@ export async function getGlobalCosts() {
     visualMatchCostUsd: data.visualMatchCostUsd || 0,
     currentMonthAiCostUsd: data.currentMonthAiCostUsd || 0,
     currentMonthVisualMatchCostUsd: data.currentMonthVisualMatchCostUsd || 0,
+    // Not a dollar amount - see the siglip2CallCount comment in
+    // functions/index.js. Turned into a labeled ESTIMATE on the Costs page
+    // (CostSettingsPage.jsx), never added into the $ totals above.
+    siglip2CallCount: data.siglip2CallCount || 0,
   };
 }
 

@@ -240,8 +240,18 @@ async function computeImageEmbedding(providerKind, model, photoUrl) {
     });
     if (!res.ok) throw new Error(`SigLIP2 endpoint error ${res.status}: ${(await res.text()).slice(0, 300)}`);
     const data = await res.json();
-    // Self-hosted, no per-call vendor bill - the only real cost here is the
-    // fixed Cloud Functions compute time, not tracked per-comparison.
+    // Self-hosted, no per-call vendor bill - the real cost is Cloud
+    // Functions compute time, billed by Google separately from this app's
+    // own AI-cost ledger (which only ever tracks real per-call vendor
+    // dollars - see recordCost/incrementGlobalCostDoc). This is a plain
+    // call counter, not a dollar amount; the Costs page turns it into a
+    // clearly labeled ESTIMATE of that compute cost, never mixed into the
+    // ledger's own real-dollar totals.
+    try {
+      await db.collection('config').doc('costLedger').set({ siglip2CallCount: FieldValue.increment(1) }, { merge: true });
+    } catch (err) {
+      console.error('siglip2CallCount increment failed', err.message);
+    }
     return { vector: data.embedding, costUsd: 0 };
   }
   throw new HttpsError('internal', `Unknown embedding provider: ${providerKind}`);
