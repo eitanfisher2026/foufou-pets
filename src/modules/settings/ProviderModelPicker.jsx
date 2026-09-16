@@ -25,7 +25,19 @@ export default function ProviderModelPicker({ task, providerKind, model, onProvi
 
   const availableKinds = AI_PROVIDER_KINDS.filter((p) => p.allowedFor.includes(task));
   const providerInfo = availableKinds.find((p) => p.value === providerKind) || availableKinds[0];
-  const modelOptions = (liveModels || providerInfo.fallbackModels).map((m) => ({ value: m.id, label: m.label }));
+  const baseModels = liveModels || providerInfo.fallbackModels;
+  // The saved model might be neither in the small hand-picked fallback list
+  // nor in whatever live list happened to load this time (e.g. it was
+  // chosen via "רענון רשימה" once, then the page reloaded without refreshing
+  // again) - SelectField shows nothing selected for a value absent from its
+  // own options, which looked exactly like "the model wasn't saved" even
+  // though it genuinely was. Worse, that blank state invited picking
+  // something else from the visible list and saving over the real value.
+  // Always keeping the current value in the list, even as a synthetic
+  // one-off entry, means it's never silently hidden.
+  const modelOptions = (model && !baseModels.some((m) => m.id === model) ? [{ id: model, label: model }, ...baseModels] : baseModels).map(
+    (m) => ({ value: m.id, label: m.label })
+  );
 
   function handleProviderChange(value) {
     setLiveModels(null);
