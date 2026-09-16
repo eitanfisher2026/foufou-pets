@@ -159,7 +159,10 @@ function estimateCostUsd(usage, priceInput, priceOutput) {
 // which provider/model actually ran.
 const PROVIDER_KINDS = {
   anthropic: { label: 'Claude', apiKeyField: null, defaultModel: 'claude-sonnet-5' },
-  gemini: { label: 'Gemini', apiKeyField: 'geminiApiKey', defaultModel: 'gemini-2.5-flash' },
+  // gemini-2.5-flash was the default until Google retired it for new API
+  // usage ("no longer available to new users... use models/gemini-3.6-flash"
+  // - confirmed live via a real 404 from Google's own API, not a guess).
+  gemini: { label: 'Gemini', apiKeyField: 'geminiApiKey', defaultModel: 'gemini-3.6-flash' },
   openai: { label: 'OpenAI', apiKeyField: 'openaiApiKey', defaultModel: 'gpt-4o-mini' },
   fireworks: { label: 'Fireworks', apiKeyField: 'fireworksApiKey', defaultModel: 'accounts/fireworks/models/qwen2p5-vl-32b-instruct' },
   // Embedding-based photo comparison, not an LLM judgment call - see

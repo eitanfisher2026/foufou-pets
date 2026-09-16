@@ -32,9 +32,15 @@ export const AI_PROVIDER_KINDS = [
     keyField: 'geminiApiKey',
     getKeyUrl: 'https://aistudio.google.com/apikey',
     allowedFor: ['extraction', 'photoCompare'],
+    // gemini-2.5-flash/-lite are retired (Google returns a 404 for new
+    // usage, pointing at gemini-3.6-flash instead - confirmed live, not
+    // guessed) - kept listed below only because "רענון רשימה" still needs
+    // something to show before it's ever pressed; the live list always
+    // wins once fetched.
     fallbackModels: [
-      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
-      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite' },
+      { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash' },
+      { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (הוצא משימוש)' },
+      { id: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash-Lite (הוצא משימוש)' },
     ],
   },
   {
