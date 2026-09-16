@@ -586,7 +586,17 @@ export const listProviderModels = onCall({ region: 'me-west1', cors: true, secre
       const data = await res.json();
       const models = (data.models || [])
         .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-        .filter((m) => !/embedding|aqa|imagen|veo/i.test(m.name))
+        // "imagen" (Google's separate Imagen product family) does NOT match
+        // an image-generation model named e.g. "gemini-2.5-flash-image" -
+        // "image" (5 letters) isn't a substring of "imagen" (6 letters,
+        // ends in an extra "n"). This let an image-GENERATION model (no
+        // structured JSON output support at all, and zero free-tier quota
+        // for this kind of call) through as if it were a normal vision/text
+        // model - confirmed live via functions:log, a real 429 from picking
+        // exactly this model for extraction. "image" alone also still
+        // matches "imagen" (a strict substring of it), so this one word
+        // covers both.
+        .filter((m) => !/embedding|aqa|image|veo/i.test(m.name))
         .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName || m.name }));
       return { models };
     }
