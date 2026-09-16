@@ -62,7 +62,7 @@ export default function Dashboard() {
   // them to reopen it themselves.
   useEffect(() => {
     function handleVisibility() {
-      if (document.visibilityState === 'visible') setShowHelp(false);
+      if (document.visibilityState === 'visible') setShowSearch(false);
     }
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
