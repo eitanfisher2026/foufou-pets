@@ -48,6 +48,15 @@ export async function countOldActiveRecords(cutoffDate) {
     lostDogs: bySpecies(lostCases, SPECIES.DOG),
     foundCats: bySpecies(foundReports, SPECIES.CAT),
     foundDogs: bySpecies(foundReports, SPECIES.DOG),
+    // Authoritative counts, NOT derived by summing the species buckets
+    // above - a record with a missing/unexpected species value (neither
+    // exactly SPECIES.CAT nor SPECIES.DOG) falls through both buckets and
+    // was silently invisible in the preview total, even though the actual
+    // deletion below never filters by species and deletes it anyway. That
+    // gap is exactly what made the preview count and the real run's total
+    // disagree.
+    lostTotal: lostCases.length,
+    foundTotal: foundReports.length,
   };
 }
 
@@ -69,35 +78,46 @@ export async function countOldActiveRecords(cutoffDate) {
  * - matches subcollection, Storage photos, the record doc - is identical to
  * a manual delete, just run in bulk.
  *
+ * Runs in fixed-size concurrent batches (BATCH_SIZE at a time), not fully
+ * sequential (too slow with any real backlog - see the fix for the
+ * scheduled cleanup timing out) and not fully unbounded either (every
+ * record's deletion is several Storage/Firestore calls on its own, so a
+ * large backlog turned into hundreds of simultaneous browser requests at
+ * once, which risked tripping a burst rate limit). A batch boundary also
+ * gives shouldStop somewhere real to take effect - already-started deletes
+ * in the current batch still finish (an in-flight delete can't be
+ * cancelled), but no new batch starts once it returns true.
+ *
  * onProgress(done, total) reports records processed, for a progress bar.
  */
-export async function archiveOldRecords(cutoffDate, onProgress) {
+const ARCHIVE_BATCH_SIZE = 10;
+
+export async function archiveOldRecords(cutoffDate, onProgress, shouldStop) {
   const { lostCases, foundReports } = await findOldActiveRecords(cutoffDate);
-  const total = lostCases.length + foundReports.length;
+  const queue = [
+    ...lostCases.map((d) => ({ kind: 'lost', d })),
+    ...foundReports.map((d) => ({ kind: 'found', d })),
+  ];
+  const total = queue.length;
   let done = 0;
+  let lostArchived = 0;
+  let foundArchived = 0;
   onProgress?.(done, total);
 
-  // Every record's own deletion runs concurrently instead of one at a time
-  // - each one is several sequential network round trips on its own
-  // (matches subcollection, Storage photos, the record doc), and doing that
-  // for every record one after another, from the browser, is what made this
-  // "take forever" with any real backlog. onProgress still ticks up
-  // per-record as each one actually finishes, just no longer waiting for it
-  // before starting the next.
-  await Promise.all([
-    ...lostCases.map((d) =>
-      deleteLostCase(d.id, d.data().photos || []).then(() => {
-        done += 1;
-        onProgress?.(done, total);
-      })
-    ),
-    ...foundReports.map((d) =>
-      deleteFoundReport(d.id, d.data().photos || []).then(() => {
-        done += 1;
-        onProgress?.(done, total);
-      })
-    ),
-  ]);
+  for (let i = 0; i < queue.length; i += ARCHIVE_BATCH_SIZE) {
+    if (shouldStop?.()) break;
+    const batch = queue.slice(i, i + ARCHIVE_BATCH_SIZE);
+    await Promise.all(
+      batch.map(({ kind, d }) =>
+        (kind === 'lost' ? deleteLostCase(d.id, d.data().photos || []) : deleteFoundReport(d.id, d.data().photos || [])).then(() => {
+          if (kind === 'lost') lostArchived += 1;
+          else foundArchived += 1;
+          done += 1;
+          onProgress?.(done, total);
+        })
+      )
+    );
+  }
 
-  return { lostCasesArchived: lostCases.length, foundReportsArchived: foundReports.length };
+  return { lostCasesArchived: lostArchived, foundReportsArchived: foundArchived };
 }

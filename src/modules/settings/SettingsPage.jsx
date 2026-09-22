@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider.jsx';
 import BackLink from '../shared/BackLink.jsx';
@@ -59,6 +59,12 @@ export default function SettingsPage() {
   const [archiveProgress, setArchiveProgress] = useState(null);
   const [archiveResult, setArchiveResult] = useState(null);
   const [archiveError, setArchiveError] = useState('');
+  const [archiveStopRequested, setArchiveStopRequested] = useState(false);
+  // A ref, not state - archiveOldRecords reads this via a shouldStop()
+  // callback checked between batches (see archiveOldRecordsApi.js), and
+  // needs the CURRENT value at call time, not whatever was captured in the
+  // closure when the run started.
+  const stopArchiveRef = useRef(false);
   // Pure preview, no side effects - unlike the real onboarding flow (see
   // Dashboard.jsx), closing this never touches hasSeenOnboarding, so
   // reviewing it here can't accidentally leave the admin's own account
@@ -190,17 +196,23 @@ export default function SettingsPage() {
   }
 
   async function handleConfirmArchive() {
-    const total = archivePreview.lostCats + archivePreview.lostDogs + archivePreview.foundCats + archivePreview.foundDogs;
+    const total = archivePreview.lostTotal + archivePreview.foundTotal;
     const ok = await confirm(
-      `למחוק לצמיתות ${total} רשומות (${archivePreview.lostCats + archivePreview.lostDogs} תיקי חיפוש, ${archivePreview.foundCats + archivePreview.foundDogs} דיווחים)? כולל התמונות וההתאמות שלהן - לא ניתן לשחזר. המספרים הכוללים ("כמה דווחו/הוחזרו אי-פעם") לא נפגעים - אלו נשמרים בנפרד.`,
+      `למחוק לצמיתות ${total} רשומות (${archivePreview.lostTotal} תיקי חיפוש, ${archivePreview.foundTotal} דיווחים)? כולל התמונות וההתאמות שלהן - לא ניתן לשחזר. המספרים הכוללים ("כמה דווחו/הוחזרו אי-פעם") לא נפגעים - אלו נשמרים בנפרד.`,
       { confirmLabel: 'מחיקה לצמיתות', danger: true }
     );
     if (!ok) return;
     setArchiving(true);
     setArchiveError('');
     setArchiveProgress({ done: 0, total: 0 });
+    stopArchiveRef.current = false;
+    setArchiveStopRequested(false);
     try {
-      const result = await archiveOldRecords(new Date(archivePreview.cutoffDate), (done, total) => setArchiveProgress({ done, total }));
+      const result = await archiveOldRecords(
+        new Date(archivePreview.cutoffDate),
+        (done, total) => setArchiveProgress({ done, total }),
+        () => stopArchiveRef.current
+      );
       setArchiveResult(result);
       setArchivePreview(null);
     } catch (err) {
@@ -208,6 +220,14 @@ export default function SettingsPage() {
     } finally {
       setArchiving(false);
     }
+  }
+
+  // Takes effect between batches, not mid-request (see archiveOldRecords) -
+  // whatever batch is already in flight still finishes, nothing new starts
+  // after it.
+  function handleStopArchive() {
+    stopArchiveRef.current = true;
+    setArchiveStopRequested(true);
   }
 
   return (
@@ -415,12 +435,19 @@ export default function SettingsPage() {
         {archivePreview && !archiving && (
           <div className="rounded-xl bg-slate-50 p-3">
             <p className="mb-3 text-sm text-slate-700">
-              נמצאו למחיקה: <strong>{archivePreview.lostCats + archivePreview.lostDogs}</strong> תיקי חיפוש (
-              {archivePreview.lostCats} חתולים, {archivePreview.lostDogs} כלבים) ו-
-              <strong>{archivePreview.foundCats + archivePreview.foundDogs}</strong> דיווחים ({archivePreview.foundCats}{' '}
-              חתולים, {archivePreview.foundDogs} כלבים).
+              נמצאו למחיקה: <strong>{archivePreview.lostTotal}</strong> תיקי חיפוש ({archivePreview.lostCats} חתולים,{' '}
+              {archivePreview.lostDogs} כלבים
+              {archivePreview.lostTotal > archivePreview.lostCats + archivePreview.lostDogs
+                ? `, ${archivePreview.lostTotal - archivePreview.lostCats - archivePreview.lostDogs} עם סוג חיה לא מזוהה`
+                : ''}
+              ) ו-<strong>{archivePreview.foundTotal}</strong> דיווחים ({archivePreview.foundCats} חתולים,{' '}
+              {archivePreview.foundDogs} כלבים
+              {archivePreview.foundTotal > archivePreview.foundCats + archivePreview.foundDogs
+                ? `, ${archivePreview.foundTotal - archivePreview.foundCats - archivePreview.foundDogs} עם סוג חיה לא מזוהה`
+                : ''}
+              ).
             </p>
-            {archivePreview.lostCats + archivePreview.lostDogs + archivePreview.foundCats + archivePreview.foundDogs === 0 ? (
+            {archivePreview.lostTotal + archivePreview.foundTotal === 0 ? (
               <button type="button" onClick={() => setArchivePreview(null)} className="text-sm text-slate-500 underline">
                 אין מה למחוק - סגירה
               </button>
@@ -445,7 +472,19 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {archiving && <ProgressBar current={archiveProgress.done} total={archiveProgress.total} label="מוחק..." />}
+        {archiving && (
+          <>
+            <ProgressBar current={archiveProgress.done} total={archiveProgress.total} label="מוחק..." />
+            <button
+              type="button"
+              onClick={handleStopArchive}
+              disabled={archiveStopRequested}
+              className="mt-2 rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+            >
+              {archiveStopRequested ? 'עוצר לאחר הקבוצה הנוכחית...' : 'עצירה'}
+            </button>
+          </>
+        )}
         {archiveResult && (
           <p className="mt-2 text-sm text-emerald-700">
             נמחקו לצמיתות {archiveResult.lostCasesArchived} תיקי חיפוש ו-{archiveResult.foundReportsArchived} דיווחים.

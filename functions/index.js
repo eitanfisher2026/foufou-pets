@@ -1625,19 +1625,24 @@ export const weeklyCleanupOldRecords = onSchedule(
     const oldLostCases = lostSnap.docs.filter((d) => qualifies(d.data()));
     const oldFoundReports = foundSnap.docs.filter((d) => qualifies(d.data()));
 
-    // Every record's own deletion now runs concurrently instead of one at a
-    // time (deleteRecordAdmin's own few steps per record still run in their
-    // necessary order, just no longer blocking every OTHER record's
-    // deletion) - this is what was actually timing out. A real backlog
-    // (e.g. after a missed week) previously needed roughly
+    // Every record's own deletion now runs in fixed-size concurrent batches
+    // instead of one at a time (deleteRecordAdmin's own few steps per record
+    // still run in their necessary order, just no longer blocking every
+    // OTHER record's deletion) - this is what was actually timing out. A
+    // real backlog (e.g. after a missed week) previously needed roughly
     // (lost+found count) x a few round trips, all sequential, easily
-    // exceeding a minute; now it's bounded by the single slowest record,
-    // not the sum of all of them.
+    // exceeding a minute. Batched rather than fully unbounded so a large
+    // backlog doesn't fire hundreds of simultaneous Storage/Firestore calls
+    // in one burst.
     const bucket = getStorage().bucket();
-    await Promise.all([
-      ...oldLostCases.map((d) => deleteRecordAdmin(bucket, 'lost', d.id, d.data().photos)),
-      ...oldFoundReports.map((d) => deleteRecordAdmin(bucket, 'found', d.id, d.data().photos)),
-    ]);
+    const cleanupQueue = [
+      ...oldLostCases.map((d) => ({ kind: 'lost', d })),
+      ...oldFoundReports.map((d) => ({ kind: 'found', d })),
+    ];
+    for (let i = 0; i < cleanupQueue.length; i += 10) {
+      const chunk = cleanupQueue.slice(i, i + 10);
+      await Promise.all(chunk.map(({ kind, d }) => deleteRecordAdmin(bucket, kind, d.id, d.data().photos)));
+    }
 
     console.log(
       `weeklyCleanupOldRecords: deleted ${oldLostCases.length} lost cases, ${oldFoundReports.length} found reports (cutoff ${cutoff.toISOString()})`
