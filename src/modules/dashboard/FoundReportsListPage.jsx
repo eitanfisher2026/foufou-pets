@@ -69,7 +69,7 @@ export default function FoundReportsListPage() {
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [focusReportId, reports]);
 
-  const visibleReports = reports.filter((r) => r.status !== RECORD_STATUS.ARCHIVED && r.status !== RECORD_STATUS.RESOLVED);
+  const visibleReports = reports.filter((r) => r.status !== RECORD_STATUS.RESOLVED);
 
   return (
     <div className="p-4">

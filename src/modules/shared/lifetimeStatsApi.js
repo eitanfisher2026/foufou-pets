@@ -23,8 +23,22 @@ export async function getLifetimeStats() {
     lostReportedDog: data.lostReportedDog || 0,
     foundReportedCat: data.foundReportedCat || 0,
     foundReportedDog: data.foundReportedDog || 0,
+    // A match that actually cleared the review bar and got surfaced as a
+    // real lead - see incrementNotableMatchCounter below. Counted once per
+    // lost case the first time a candidate of its reaches NEW, not once per
+    // candidate ever scored (most scored pairs never clear the bar at all).
+    notableMatchCat: data.notableMatchCat || 0,
+    notableMatchDog: data.notableMatchDog || 0,
     matchedToOwnerCat: data.matchedToOwnerCat || 0,
     matchedToOwnerDog: data.matchedToOwnerDog || 0,
+    // A record permanently deleted (timed out unresolved, or removed by
+    // hand) without ever reaching RESOLVED - see incrementLostUnresolvedCounter/
+    // incrementFoundUnresolvedCounter below and deleteLostCase/deleteFoundReport,
+    // which are the only callers.
+    lostUnresolvedCat: data.lostUnresolvedCat || 0,
+    lostUnresolvedDog: data.lostUnresolvedDog || 0,
+    foundUnresolvedCat: data.foundUnresolvedCat || 0,
+    foundUnresolvedDog: data.foundUnresolvedDog || 0,
   };
 }
 
@@ -47,4 +61,16 @@ export function incrementFoundReportedCounter(species) {
 
 export function incrementMatchedToOwnerCounter(species) {
   return incrementCounter('matchedToOwner', species);
+}
+
+export function incrementNotableMatchCounter(species) {
+  return incrementCounter('notableMatch', species);
+}
+
+export function incrementLostUnresolvedCounter(species) {
+  return incrementCounter('lostUnresolved', species);
+}
+
+export function incrementFoundUnresolvedCounter(species) {
+  return incrementCounter('foundUnresolved', species);
 }

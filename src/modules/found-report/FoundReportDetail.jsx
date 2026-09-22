@@ -383,7 +383,7 @@ export default function FoundReportDetail() {
     setDeleting(true);
     setActionError('');
     try {
-      await deleteFoundReport(reportId, report.photos || []);
+      await deleteFoundReport(reportId, report);
       navigate('/');
     } catch (err) {
       setActionError(getErrorMessage(err));
@@ -1047,7 +1047,7 @@ function ReverseMatchCard({
     if (!ok) return;
     setDeleting(true);
     try {
-      await deleteLostCase(lostCase.id, lostCase.photos || []);
+      await deleteLostCase(lostCase.id, lostCase);
       onDeleted?.(lostCase.id);
     } finally {
       setDeleting(false);

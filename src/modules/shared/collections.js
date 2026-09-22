@@ -209,10 +209,20 @@ export const CAT_CONDITIONS = [
 // Lifecycle status of a lost case or found report itself (not to be
 // confused with REPORT_STATUS below, which tracks the review status of one
 // lost-case/found-report *match*).
+//
+// No separate ARCHIVED status or closure-reason detail (removed - this app
+// no longer keeps a browsable record of how/why a case closed, see
+// lifetimeStatsApi.js for the permanent, aggregate replacement). RESOLVED is
+// the one terminal "done" status, set whenever a match is confirmed as the
+// real reunion - reached either via NotifyOwnerDialog's own flow or by
+// marking a match REPORT_STATUS.CLOSED (see updateMatchStatus in
+// matchingApi.js) - both mean the same thing now. A case that doesn't
+// resolve via a match is just deleted directly (the record's own delete
+// button, or the "מחיקת רשומות ישנות" cleanup once it ages out) rather than
+// moved to any other status first.
 export const RECORD_STATUS = {
   ACTIVE: 'active',
   SUSPENDED: 'suspended',
-  ARCHIVED: 'archived',
   RESOLVED: 'resolved',
 };
 
@@ -222,50 +232,13 @@ export const RECORD_STATUS = {
 export const LOST_CASE_STATUS_LABELS = {
   [RECORD_STATUS.ACTIVE]: 'פעיל - בחיפוש',
   [RECORD_STATUS.SUSPENDED]: 'מושהה',
-  [RECORD_STATUS.ARCHIVED]: 'בארכיון',
   [RECORD_STATUS.RESOLVED]: 'נמצא',
 };
 
 export const FOUND_REPORT_STATUS_LABELS = {
   [RECORD_STATUS.ACTIVE]: 'פעיל',
   [RECORD_STATUS.SUSPENDED]: 'מושהה',
-  [RECORD_STATUS.ARCHIVED]: 'בארכיון',
   [RECORD_STATUS.RESOLVED]: 'טופל - הוחזר לבעלים',
-};
-
-// Why a lost case was closed (RECORD_STATUS.ARCHIVED or RESOLVED) - shown
-// and filterable on the archive page. Separate from RECORD_STATUS itself:
-// that still controls whether the case shows up on the working dashboard,
-// this is just the detail of what actually happened.
-export const CLOSURE_REASON = {
-  RETURNED_TO_OWNER: 'returned_to_owner',
-  NOT_FOUND_TOO_LONG: 'not_found_too_long',
-  DIED: 'died',
-  OTHER: 'other',
-  // Set automatically (never by a person) by the admin "archive records
-  // older than X days" bulk action (see archiveOldRecordsApi.js) - kept
-  // distinct from NOT_FOUND_TOO_LONG, which implies someone actually looked
-  // at the case and concluded the search failed. This one means nothing
-  // was determined either way - the record just aged out of the working
-  // list on its own.
-  SYSTEM_ARCHIVED_OLD: 'system_archived_old',
-  // Set automatically (never by a person) when a match's own status is set
-  // to "נסגר" (REPORT_STATUS.CLOSED) - see updateMatchStatus in
-  // matchingApi.js. Applied to both sides of that match (the lost case and
-  // the found report), same reasoning as SYSTEM_ARCHIVED_OLD above: kept
-  // distinct from RETURNED_TO_OWNER since closing a match doesn't
-  // necessarily mean that's how the story ended, just that a person is
-  // done reviewing this particular pairing.
-  SYSTEM_MATCH_CLOSED: 'system_match_closed',
-};
-
-export const CLOSURE_REASON_LABELS = {
-  [CLOSURE_REASON.RETURNED_TO_OWNER]: 'הוחזר/ה לבעלים',
-  [CLOSURE_REASON.NOT_FOUND_TOO_LONG]: 'לא אותר/ה זמן רב',
-  [CLOSURE_REASON.DIED]: 'נפטר/ה',
-  [CLOSURE_REASON.OTHER]: 'אחר',
-  [CLOSURE_REASON.SYSTEM_ARCHIVED_OLD]: 'ארכוב אוטומטי - מעל חודש במערכת',
-  [CLOSURE_REASON.SYSTEM_MATCH_CLOSED]: 'ארכוב אוטומטי - ההתאמה סומנה כנסגרה',
 };
 
 export const REPORT_STATUS = {

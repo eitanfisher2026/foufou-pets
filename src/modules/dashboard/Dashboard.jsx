@@ -201,11 +201,11 @@ export default function Dashboard() {
   // went through handleSearch at all.
   useEffect(() => {
     if (roleLoading) return;
-    // Search deliberately covers archived/resolved records too, unlike the
-    // main working list below (openLostCases) - someone searching is
-    // usually looking for a specific animal/person by name or detail, and a
-    // case that already closed out is still a real, findable answer to
-    // that, not noise to hide the way it is from the day-to-day work list.
+    // Search deliberately covers resolved records too, unlike the main
+    // working list below (openLostCases) - someone searching is usually
+    // looking for a specific animal/person by name or detail, and a case
+    // that already closed out is still a real, findable answer to that, not
+    // noise to hide the way it is from the day-to-day work list.
     if (searchCriteria?.recordType === 'found' || searchCriteria?.recordType === 'both') {
       setLoadingFoundSearch(true);
       listFoundReports(preferredSpecies)
@@ -253,13 +253,13 @@ export default function Dashboard() {
     setLostCasesForSearch([]);
   }
 
-  // Archived and resolved cases move to their own archive view (see
-  // ArchivePage.jsx) instead of a same-page toggle - a resolved case
-  // (already found) doesn't need attention any more than an archived one
-  // does, so it doesn't belong cluttering the default working list either.
-  // Species itself is no longer filtered here - listLostCases(species)
-  // above only ever returns the current species to begin with.
-  const openLostCases = lostCases.filter((c) => c.status !== RECORD_STATUS.ARCHIVED && c.status !== RECORD_STATUS.RESOLVED);
+  // A resolved case (already found) doesn't need attention any more, so it
+  // doesn't belong cluttering the default working list - it stays findable
+  // via search (see above) until it eventually ages out and gets deleted
+  // (see archiveOldRecordsApi.js). Species itself is no longer filtered
+  // here - listLostCases(species) above only ever returns the current
+  // species to begin with.
+  const openLostCases = lostCases.filter((c) => c.status !== RECORD_STATUS.RESOLVED);
   const lostResults =
     activeRecordType === 'found'
       ? []
@@ -319,9 +319,6 @@ export default function Dashboard() {
         <Link to="/found" className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">
           {labels.allFoundReportsLink}
           {foundCount != null && foundCount > 0 && <span className="text-slate-400"> ({foundCount})</span>}
-        </Link>
-        <Link to="/archive" className="text-xs text-slate-500 underline">
-          ארכיון
         </Link>
       </div>
 

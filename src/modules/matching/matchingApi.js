@@ -12,7 +12,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '../../firebase.js';
-import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS, CLOSURE_REASON } from '../shared/collections.js';
+import { COLLECTIONS, REPORT_STATUS, RECORD_STATUS } from '../shared/collections.js';
 import {
   rankMatches,
   scoreMatch,
@@ -29,6 +29,7 @@ import { displayLostCaseName } from '../lost-report/lostFieldMapping.js';
 import { displayFoundReportName } from '../found-report/foundFieldMapping.js';
 import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
 import { archiveFoundReport } from '../found-report/foundReportApi.js';
+import { incrementNotableMatchCounter } from '../shared/lifetimeStatsApi.js';
 
 // A verdict worth actively surfacing to a person (see maybeCheckPhotoSimilarity
 // below and the visualMatches returned by the check functions) - "low" and
@@ -405,6 +406,10 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
       checkedAt: serverTimestamp(),
       ...(visual ? { visualSimilarity: visual } : {}),
     });
+    // Every brand-new candidate that actually clears the review bar - a
+    // real lead, whether or not it pans out - counts once toward the
+    // permanent notableMatch audit counter (see lifetimeStatsApi.js).
+    if (status === REPORT_STATUS.NEW) incrementNotableMatchCounter(lostCase.species);
     if (visual) {
       visualCostUsd += visual.costUsd;
       if (isNotableVisualVerdict(visual.verdict)) {
@@ -496,6 +501,9 @@ export async function checkSingleMatch(lostCaseId, foundReportId) {
     { foundReportId, score, reasons, breakdown, status, checkedAt: serverTimestamp(), ...(visual ? { visualSimilarity: visual } : {}) },
     { merge: true }
   );
+  // Only the first time this pairing actually becomes NEW - a recheck of an
+  // already-NEW match (e.g. after a photo comparison) isn't a second lead.
+  if (status === REPORT_STATUS.NEW && prevStatus !== REPORT_STATUS.NEW) incrementNotableMatchCounter(lostCase.species);
   await recomputeLostCaseCounts(lostCaseId);
   if (visual && visual !== reusableVisual && visual.costUsd > 0) {
     await setDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId), { visualMatchCostUsd: increment(visual.costUsd) }, { merge: true });
@@ -821,6 +829,7 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
       checkedAt: serverTimestamp(),
       ...(visual ? { visualSimilarity: visual } : {}),
     });
+    if (status === REPORT_STATUS.NEW) incrementNotableMatchCounter(lostCase.species);
     if (visual && isNotableVisualVerdict(visual.verdict)) {
       visualMatches.push(visual);
       if (status === REPORT_STATUS.NEW) hasNewNotableMatch = true;
@@ -963,16 +972,12 @@ export async function updateMatchStatus(lostCaseId, foundReportId, status) {
   }
 
   if (status === REPORT_STATUS.CLOSED) {
-    const closure = { closureDate: new Date().toISOString().slice(0, 10), closureReason: CLOSURE_REASON.SYSTEM_MATCH_CLOSED };
     // closedVia*Id lets firestore.rules verify this specific write: a real
     // match naming that exact counterpart must exist under this case, and
     // the requester must actually own that counterpart record - so someone
     // who owns only one side of a pairing can still close the other side
     // through this exact flow, without being handed general edit rights on
     // a record they don't own.
-    await Promise.all([
-      updateLostCaseClosure(lostCaseId, RECORD_STATUS.ARCHIVED, { ...closure, closedViaFoundReportId: foundReportId }),
-      archiveFoundReport(foundReportId, { ...closure, closedViaLostCaseId: lostCaseId }),
-    ]);
+    await Promise.all([updateLostCaseClosure(lostCaseId, foundReportId), archiveFoundReport(foundReportId, lostCaseId)]);
   }
 }

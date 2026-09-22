@@ -3,7 +3,6 @@ import DropdownBadge from './DropdownBadge.jsx';
 const STATUS_COLORS = {
   active: 'bg-emerald-100 text-emerald-800',
   suspended: 'bg-amber-100 text-amber-800',
-  archived: 'bg-slate-200 text-slate-600',
   resolved: 'bg-blue-100 text-blue-800',
 };
 

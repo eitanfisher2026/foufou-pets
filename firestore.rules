@@ -31,18 +31,6 @@ service cloud.firestore {
       return request.auth.token.email == 'eitanfisher100@gmail.com';
     }
 
-    // Reasons that legitimately close a record as a direct consequence of a
-    // confirmed match between two specific records (see the closedVia*
-    // carve-outs on lostCases/foundReports below) - 'system_match_closed'
-    // from marking a match's own status CLOSED (updateMatchStatus in
-    // matchingApi.js), 'returned_to_owner' from NotifyOwnerDialog's "mark as
-    // resolved" checkbox. Both are still gated on the same verified-pairing
-    // check either way; this only widens WHICH closure reason can use that
-    // check, not who can use it.
-    function isMatchCloseReason(reason) {
-      return reason == 'system_match_closed' || reason == 'returned_to_owner';
-    }
-
     // Everyone who has ever signed in gets a profile doc (see usersApi.js:
     // upsertUserOnLogin). Only an admin can change someone's role after
     // creation; a user can still update their own doc (lastLoginAt,
@@ -68,10 +56,10 @@ service cloud.firestore {
     //   "run matches" from the OTHER side of a pairing (a found report you
     //   own, being checked against lost cases you don't) can still refresh
     //   the summary numbers on cases you're not the owner of.
-    // - status/closureDate/closureReason/closedBy/closingComment/
-    //   closedViaFoundReportId/updatedAt ONLY when closureReason is a real
-    //   match-close reason (see isMatchCloseReason above) AND a real match
-    //   naming that exact found report exists under this exact case AND the
+    // - status/closedViaFoundReportId/updatedAt ONLY when the new status is
+    //   'resolved' (the one way a case ever closes now - see
+    //   updateLostCaseClosure in lostReportApi.js) AND a real match naming
+    //   that exact found report exists under this exact case AND the
     //   requester actually owns that found report - so marking a match
     //   CLOSED, or confirming it resolved via NotifyOwnerDialog, can close
     //   both sides even when the closer only owns one of them, without
@@ -89,10 +77,9 @@ service cloud.firestore {
         ]) ||
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment',
-            'closedViaFoundReportId', 'updatedAt'
+            'status', 'closedViaFoundReportId', 'updatedAt'
           ]) &&
-          isMatchCloseReason(request.resource.data.closureReason) &&
+          request.resource.data.status == 'resolved' &&
           exists(/databases/$(database)/documents/lostCases/$(caseId)/matches/$(request.resource.data.closedViaFoundReportId)) &&
           get(/databases/$(database)/documents/foundReports/$(request.resource.data.closedViaFoundReportId)).data.reportedByUid == request.auth.uid
         )
@@ -130,11 +117,10 @@ service cloud.firestore {
 
     // hasVisualMatch is the same denormalized counter carve-out as
     // lostCases' matchCount etc. above. The closure carve-out mirrors
-    // lostCases' own: only when closureReason is a real match-close reason
-    // (see isMatchCloseReason above) AND a real match under the named lost
-    // case actually references this found report AND the requester owns
-    // that lost case - so a lost case's owner can close out the found
-    // report on the other end of their match too.
+    // lostCases' own: only when the new status is 'resolved' AND a real
+    // match under the named lost case actually references this found report
+    // AND the requester owns that lost case - so a lost case's owner can
+    // close out the found report on the other end of their match too.
     match /foundReports/{reportId} {
       allow read: if signedIn();
       allow create: if signedIn();
@@ -144,10 +130,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hasVisualMatch']) ||
         (
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'status', 'closureDate', 'closureReason', 'closedBy', 'closingComment',
-            'closedViaLostCaseId', 'updatedAt'
+            'status', 'closedViaLostCaseId', 'updatedAt'
           ]) &&
-          isMatchCloseReason(request.resource.data.closureReason) &&
+          request.resource.data.status == 'resolved' &&
           exists(/databases/$(database)/documents/lostCases/$(request.resource.data.closedViaLostCaseId)/matches/$(reportId)) &&
           get(/databases/$(database)/documents/lostCases/$(request.resource.data.closedViaLostCaseId)).data.ownerId == request.auth.uid
         )
@@ -156,13 +141,15 @@ service cloud.firestore {
     }
 
     // Permanent audit counters (see lifetimeStatsApi.js) - how many lost/
-    // found reports and confirmed matches ever happened, per species. Any
-    // signed-in user increments these as a side effect of creating a report
-    // or closing a match (not an admin-only settings action), but only
-    // those six specific counter fields - matches the same narrow-carve-out
-    // pattern as lostCases'/foundReports' own denormalized counters above.
-    // More specific than the /config/{docId} rule below, so it wins for
-    // this exact path regardless of declaration order.
+    // found reports, notable matches, confirmed matches, and unresolved
+    // deletions ever happened, per species. Any signed-in user increments
+    // these as a side effect of creating a report, a match reaching review
+    // status, closing a match, or deleting a record (not an admin-only
+    // settings action), but only these specific counter fields - matches the
+    // same narrow-carve-out pattern as lostCases'/foundReports' own
+    // denormalized counters above. More specific than the /config/{docId}
+    // rule below, so it wins for this exact path regardless of declaration
+    // order.
     match /config/lifetimeStats {
       allow read: if signedIn();
       // Split create/update rather than one allow-write with diff() against
@@ -171,11 +158,13 @@ service cloud.firestore {
       // resource throws.
       allow create: if signedIn() && request.resource.data.keys().hasOnly([
         'lostReportedCat', 'lostReportedDog', 'foundReportedCat', 'foundReportedDog',
-        'matchedToOwnerCat', 'matchedToOwnerDog'
+        'notableMatchCat', 'notableMatchDog', 'matchedToOwnerCat', 'matchedToOwnerDog',
+        'lostUnresolvedCat', 'lostUnresolvedDog', 'foundUnresolvedCat', 'foundUnresolvedDog'
       ]);
       allow update: if signedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
         'lostReportedCat', 'lostReportedDog', 'foundReportedCat', 'foundReportedDog',
-        'matchedToOwnerCat', 'matchedToOwnerDog'
+        'notableMatchCat', 'notableMatchDog', 'matchedToOwnerCat', 'matchedToOwnerDog',
+        'lostUnresolvedCat', 'lostUnresolvedDog', 'foundUnresolvedCat', 'foundUnresolvedDog'
       ]);
     }
 

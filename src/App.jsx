@@ -27,7 +27,6 @@ const SmartIntakeForm = lazy(() => import('./modules/intake/SmartIntakeForm.jsx'
 const ShareTargetIntake = lazy(() => import('./modules/intake/ShareTargetIntake.jsx'));
 const MatchAnalysisPage = lazy(() => import('./modules/matching/MatchAnalysisPage.jsx'));
 const FoundReportsListPage = lazy(() => import('./modules/dashboard/FoundReportsListPage.jsx'));
-const ArchivePage = lazy(() => import('./modules/dashboard/ArchivePage.jsx'));
 
 // Settings (parameters, costs, user management) is admin-only - editors and
 // regular users shouldn't even know it exists, per the role spec, not just
@@ -82,7 +81,6 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/found" element={<FoundReportsListPage />} />
-          <Route path="/archive" element={<ArchivePage />} />
           <Route path="/lost/new" element={<LostReportForm />} />
           <Route path="/lost/:caseId" element={<LostCaseDetail />} />
           <Route path="/lost/:caseId/analysis/:foundReportId" element={<MatchAnalysisPage />} />

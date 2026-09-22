@@ -1,11 +1,4 @@
-import {
-  CAT_SIZES,
-  CAT_AGE_CLASSES,
-  CAT_FUR_TYPES,
-  DOG_FUR_TYPES,
-  SPECIES,
-  CLOSURE_REASON_LABELS,
-} from '../shared/collections.js';
+import { CAT_SIZES, CAT_AGE_CLASSES, CAT_FUR_TYPES, DOG_FUR_TYPES, SPECIES } from '../shared/collections.js';
 import { formatDate } from '../shared/formatDate.js';
 import { formatDateTime } from '../shared/formatDateTime.js';
 import { petLabels } from '../shared/petLabels.js';
@@ -72,15 +65,6 @@ export function buildLostCaseSections(lostCase) {
         { label: 'שם איש קשר', value: lostCase.contactName },
         { label: 'טלפון', value: lostCase.contactPhone },
         { label: 'הערות נוספות', value: lostCase.notes },
-      ],
-    },
-    {
-      title: 'סגירת התיק',
-      rows: [
-        { label: 'סטטוס סגירה', value: CLOSURE_REASON_LABELS[lostCase.closureReason] || '' },
-        { label: 'תאריך', value: lostCase.closureDate ? formatDate(lostCase.closureDate) : '', dir: 'ltr' },
-        { label: 'ע״י', value: lostCase.closedBy },
-        { label: 'הערה', value: lostCase.closingComment },
       ],
     },
     {

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { buildNotifyMessage, buildNotifyFinderMessage, buildWhatsAppUrl } from './notifyMessage.js';
 import { updateLostCaseClosure } from '../lost-report/lostReportApi.js';
 import { archiveFoundReport } from '../found-report/foundReportApi.js';
-import { RECORD_STATUS, CLOSURE_REASON } from './collections.js';
 import { useConfirm } from './useConfirm.jsx';
 import { getErrorMessage } from './errorMessages.js';
 
@@ -76,21 +75,8 @@ export default function NotifyOwnerDialog({ lostCase, report, foundReportId, dir
         // close out the other side through this confirmed-match flow,
         // without needing to own both records or be an editor/admin.
         await Promise.all([
-          updateLostCaseClosure(lostCase.id, RECORD_STATUS.RESOLVED, {
-            closureDate: new Date().toISOString().slice(0, 10),
-            closureReason: CLOSURE_REASON.RETURNED_TO_OWNER,
-            closedBy: '',
-            closingComment: 'סומן כהתאמה שנמצאה דרך התראת וואטסאפ',
-            closedViaFoundReportId: foundReportId,
-          }),
-          archiveFoundReport(foundReportId, {
-            status: RECORD_STATUS.RESOLVED,
-            closureDate: new Date().toISOString().slice(0, 10),
-            closureReason: CLOSURE_REASON.RETURNED_TO_OWNER,
-            closedBy: '',
-            closingComment: 'סומן כהתאמה שנמצאה דרך התראת וואטסאפ',
-            closedViaLostCaseId: lostCase.id,
-          }),
+          updateLostCaseClosure(lostCase.id, foundReportId),
+          archiveFoundReport(foundReportId, lostCase.id),
         ]);
         setResolved(true);
         onResolved?.();

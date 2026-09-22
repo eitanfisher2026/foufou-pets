@@ -1,18 +1,12 @@
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc } from 'firebase/firestore';
 import { ref, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../firebase.js';
-import { COLLECTIONS, RECORD_STATUS, CLOSURE_REASON, SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
+import { COLLECTIONS, RECORD_STATUS, SPECIES, DEFAULT_DOG_BREED } from '../shared/collections.js';
 import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
 import { generatePhotoThumbnail } from '../shared/photoThumbnailApi.js';
 import { normalizePhone } from '../shared/duplicateCheckApi.js';
-import { incrementLostReportedCounter, incrementMatchedToOwnerCounter } from '../shared/lifetimeStatsApi.js';
-
-// Closure reasons that represent a genuine confirmed match/reunion, not
-// just any closure (aging out, given up on, died) - see updateLostCaseClosure
-// below, which counts a closure toward the permanent matchedToOwner audit
-// counter only for these two.
-const MATCHED_CLOSURE_REASONS = new Set([CLOSURE_REASON.RETURNED_TO_OWNER, CLOSURE_REASON.SYSTEM_MATCH_CLOSED]);
+import { incrementLostReportedCounter, incrementMatchedToOwnerCounter, incrementLostUnresolvedCounter } from '../shared/lifetimeStatsApi.js';
 
 // A dog record saved with a truly blank breed (not even the "מעורב (לא
 // ידוע)" default) can't be usefully compared on breed at all - the
@@ -123,10 +117,6 @@ export async function updateLostCase(caseId, fields, newPhotoFiles = []) {
       contactPhone: fields.contactPhone || '',
       normalizedPhone: normalizePhone(fields.contactPhone),
       notes: fields.notes || '',
-      closureDate: fields.closureDate || '',
-      closedBy: fields.closedBy || '',
-      closureReason: fields.closureReason || '',
-      closingComment: fields.closingComment || '',
       sourceGroupName: fields.sourceGroupName || '',
       originalPosterName: fields.originalPosterName || '',
       sharedByName: fields.sharedByName || '',
@@ -175,39 +165,32 @@ export async function updateLostCaseStatus(caseId, status) {
 }
 
 /**
- * Sets status together with the closure record (date/reason/comment) in one
- * write - used when a case is marked archived or resolved, so a closed case
- * is never left without the details that explain why on the archive page.
+ * Marks a case RESOLVED - the one way a case ever closes by confirming a
+ * real reunion, reached either from NotifyOwnerDialog's own flow or from
+ * marking a match REPORT_STATUS.CLOSED (see updateMatchStatus in
+ * matchingApi.js). Always counts toward the permanent matchedToOwner audit
+ * counter (see lifetimeStatsApi.js) - there's no other reason left to close
+ * a case this way; anything that doesn't resolve just gets deleted directly
+ * instead (see deleteLostCase below).
  */
-export async function updateLostCaseClosure(caseId, status, closure) {
+export async function updateLostCaseClosure(caseId, closedViaFoundReportId) {
   await setDoc(
     doc(db, COLLECTIONS.LOST_CASES, caseId),
     {
-      status,
-      closureDate: closure.closureDate || '',
-      closureReason: closure.closureReason || '',
-      closedBy: closure.closedBy || '',
-      closingComment: closure.closingComment || '',
-      // Only ever set when a match's own status closes this case (see
-      // updateMatchStatus in matchingApi.js) - firestore.rules checks this
-      // against a real match under this case to let that found report's
-      // own owner close this side too, without a blank field here for an
-      // ordinary manual archive.
-      ...(closure.closedViaFoundReportId ? { closedViaFoundReportId: closure.closedViaFoundReportId } : {}),
+      status: RECORD_STATUS.RESOLVED,
+      // Only ever set when a match's own status closes this case - firestore.rules
+      // checks this against a real match under this case to let that found
+      // report's own owner close this side too.
+      ...(closedViaFoundReportId ? { closedViaFoundReportId } : {}),
       updatedAt: serverTimestamp(),
     },
     { merge: true }
   );
 
-  // A genuine reunion (not just aging out or giving up) - counted once,
-  // permanently, regardless of which of the three flows closed it (manual
-  // ClosureDialog, updateMatchStatus's CLOSED branch, or NotifyOwnerDialog's
-  // "mark as resolved"). One extra read of a doc this call just wrote to,
-  // only on the rare "this case just got closed" path, not a hot loop.
-  if (MATCHED_CLOSURE_REASONS.has(closure.closureReason)) {
-    const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
-    if (snap.exists()) incrementMatchedToOwnerCounter(snap.data().species);
-  }
+  // One extra read of a doc this call just wrote to, only on the rare
+  // "this case just got closed" path, not a hot loop.
+  const snap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
+  if (snap.exists()) incrementMatchedToOwnerCounter(snap.data().species);
 }
 
 /**
@@ -247,9 +230,15 @@ export async function makeLostCasePhotoMain(caseId, photo, currentPhotos) {
 
 /**
  * Permanently deletes a lost case: its photos from storage, its `matches`
- * subcollection, and the case document itself.
+ * subcollection, and the case document itself. `record` is the case's own
+ * data (species/status/photos) - if it was never resolved (no reunion ever
+ * confirmed), this counts once toward the permanent lostUnresolved audit
+ * counter (see lifetimeStatsApi.js); a RESOLVED case was already counted as
+ * a match at the moment it resolved, so deleting it later isn't a second
+ * event worth recording.
  */
-export async function deleteLostCase(caseId, photos = []) {
+export async function deleteLostCase(caseId, record = {}) {
+  const { photos = [], species, status } = record;
   const matchesSnap = await getDocs(collection(db, COLLECTIONS.LOST_CASES, caseId, 'matches'));
   await Promise.all(matchesSnap.docs.map((d) => deleteDoc(d.ref)));
   await Promise.all(
@@ -259,4 +248,5 @@ export async function deleteLostCase(caseId, photos = []) {
     ].filter(Boolean))
   );
   await deleteDoc(doc(db, COLLECTIONS.LOST_CASES, caseId));
+  if (status !== RECORD_STATUS.RESOLVED) incrementLostUnresolvedCounter(species);
 }

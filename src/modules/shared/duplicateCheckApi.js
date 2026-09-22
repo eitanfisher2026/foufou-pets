@@ -9,8 +9,8 @@ import { COLLECTIONS } from './collections.js';
  * Only checks within the same record type (a lost case only against other
  * lost cases, a found report only against other found reports), since a
  * shared URL across the two would be a different post being categorized
- * differently, not the same report entered twice. Archived/resolved records
- * are still included - re-entering an already-closed case's post is still
+ * differently, not the same report entered twice. Resolved records are
+ * still included - re-entering an already-closed case's post is still
  * worth flagging.
  */
 export async function findDuplicatesBySourceUrl(recordType, sourceUrl) {

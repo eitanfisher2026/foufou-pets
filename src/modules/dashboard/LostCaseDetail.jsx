@@ -67,7 +67,6 @@ import RecordStatusSelect from '../shared/RecordStatusSelect.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import RecordDetailsDialog from '../shared/RecordDetailsDialog.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
-import ClosureDialog from '../shared/ClosureDialog.jsx';
 import SelectField from '../shared/SelectField.jsx';
 import {
   MATCH_STATUS_LABELS,
@@ -167,7 +166,6 @@ export default function LostCaseDetail() {
   // the whole found-reports pool.
   const [newCandidateCount, setNewCandidateCount] = useState(0);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
-  const [pendingCloseStatus, setPendingCloseStatus] = useState(null);
   const {
     reading: extracting,
     error: extractError,
@@ -330,34 +328,21 @@ export default function LostCaseDetail() {
     setFields((prev) => ({ ...prev, [key]: value }));
   }
 
-  // Archiving or resolving a case closes it out - prompt for the closure
-  // details right then (see ClosureDialog) instead of applying the status
-  // change immediately, so a closed case is never left without them.
+  // Resolving a case closes it out - once closed there's nothing left to do
+  // on its detail page (matches, edit form), so head back to the working
+  // dashboard instead of staying on a page for a case that's no longer
+  // active. ACTIVE/SUSPENDED just apply in place.
   async function handleRecordStatusChange(status) {
-    if (status === RECORD_STATUS.ARCHIVED || status === RECORD_STATUS.RESOLVED) {
-      setPendingCloseStatus(status);
-      return;
-    }
     setActionError('');
     try {
+      if (status === RECORD_STATUS.RESOLVED) {
+        await updateLostCaseClosure(caseId);
+        navigate('/');
+        return;
+      }
       await updateLostCaseStatus(caseId, status);
       setLostCase((prev) => ({ ...prev, status }));
     } catch (err) {
-      setActionError(getErrorMessage(err));
-    }
-  }
-
-  // Once a case is closed there's nothing left to do on its detail page
-  // (matches, edit form) - head back to the working dashboard instead of
-  // staying on a page for a case that's no longer active.
-  async function handleConfirmClosure(closure) {
-    setActionError('');
-    try {
-      await updateLostCaseClosure(caseId, pendingCloseStatus, closure);
-      setPendingCloseStatus(null);
-      navigate('/');
-    } catch (err) {
-      setPendingCloseStatus(null);
       setActionError(getErrorMessage(err));
     }
   }
@@ -432,7 +417,7 @@ export default function LostCaseDetail() {
     setDeleting(true);
     setActionError('');
     try {
-      await deleteLostCase(caseId, lostCase.photos || []);
+      await deleteLostCase(caseId, lostCase);
       navigate('/');
     } catch (err) {
       setActionError(getErrorMessage(err));
@@ -575,21 +560,6 @@ export default function LostCaseDetail() {
                 {canManage && (
                   <button onClick={handleDelete} disabled={deleting} className="text-sm text-red-600 underline disabled:opacity-50">
                     {deleting ? 'מוחקים...' : 'מחיקת התיק'}
-                  </button>
-                )}
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleRecordStatusChange(
-                        lostCase.status === RECORD_STATUS.ARCHIVED || lostCase.status === RECORD_STATUS.RESOLVED
-                          ? lostCase.status
-                          : RECORD_STATUS.ARCHIVED
-                      )
-                    }
-                    className="text-sm text-slate-600 underline"
-                  >
-                    ארכיון
                   </button>
                 )}
               </div>
@@ -1049,16 +1019,6 @@ export default function LostCaseDetail() {
       {colorCheckPending && (
         <ColorCheckDialog colorOptions={colorOptions} onSave={handleColorCheckSave} onSkip={handleColorCheckSkip} />
       )}
-      {pendingCloseStatus && (
-        <ClosureDialog
-          initialDate={lostCase.closureDate}
-          initialReason={lostCase.closureReason}
-          initialClosedBy={lostCase.closedBy}
-          initialComment={lostCase.closingComment}
-          onConfirm={handleConfirmClosure}
-          onCancel={() => setPendingCloseStatus(null)}
-        />
-      )}
       {showDetails && (
         <RecordDetailsDialog
           title={displayLostCaseName(lostCase)}
@@ -1110,7 +1070,7 @@ function MatchCard({
     if (!ok) return;
     setDeleting(true);
     try {
-      await deleteFoundReport(match.foundReportId, report.photos || []);
+      await deleteFoundReport(match.foundReportId, report);
       onDeleted?.(match.foundReportId);
     } finally {
       setDeleting(false);

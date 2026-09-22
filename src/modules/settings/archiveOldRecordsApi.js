@@ -62,16 +62,15 @@ export async function countOldActiveRecords(cutoffDate) {
 
 /**
  * Admin bulk action: PERMANENTLY DELETES every active lost case and found
- * report created before cutoffDate - not a soft archive. Used to used to
- * move these into the archive (RECORD_STATUS.ARCHIVED, still browsable on
- * ArchivePage.jsx) instead of deleting; changed because a record that timed
- * out having never been resolved either way isn't worth keeping around
- * forever, unlike a record that reached a real, determined outcome (found,
- * returned, died - see ArchivePage.jsx, which still only ever shows those).
- * The permanent lifetimeStats counters (see lifetimeStatsApi.js) are what
- * preserve the audit trail across this - they were already incremented at
- * creation time and aren't touched by deletion, so "how many were ever
- * reported" survives this even though the records themselves don't.
+ * report created before cutoffDate - a record that timed out having never
+ * been resolved either way isn't worth keeping around forever, unlike one
+ * that actually reached a real reunion (RECORD_STATUS.RESOLVED), which is
+ * left alone here entirely (findOldActiveRecords only ever looks at ACTIVE
+ * records). The permanent lifetimeStats counters (see lifetimeStatsApi.js)
+ * are what preserve the audit trail across this - deleteLostCase/
+ * deleteFoundReport record the lostUnresolved/foundUnresolved counters right
+ * as they delete, so "how many were ever reported, and how many of those
+ * never resolved" survives this even though the records themselves don't.
  *
  * Reuses deleteLostCase/deleteFoundReport (the same functions the
  * individual "מחיקת התיק"/"מחיקת הדיווח" buttons use) so the cleanup itself
@@ -109,7 +108,7 @@ export async function archiveOldRecords(cutoffDate, onProgress, shouldStop) {
     const batch = queue.slice(i, i + ARCHIVE_BATCH_SIZE);
     await Promise.all(
       batch.map(({ kind, d }) =>
-        (kind === 'lost' ? deleteLostCase(d.id, d.data().photos || []) : deleteFoundReport(d.id, d.data().photos || [])).then(() => {
+        (kind === 'lost' ? deleteLostCase(d.id, d.data()) : deleteFoundReport(d.id, d.data())).then(() => {
           if (kind === 'lost') lostArchived += 1;
           else foundArchived += 1;
           done += 1;

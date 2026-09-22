@@ -7,12 +7,11 @@ import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
 import PhotoLightbox from '../shared/PhotoLightbox.jsx';
 
 // Shared between the dashboard's default list, the full found-reports
-// browsing page, the archive page, and search results, so the same case/
-// report always looks the same no matter which list it's showing up in.
+// browsing page, and search results, so the same case/report always looks
+// the same no matter which list it's showing up in.
 
 const STATUS_BADGE_COLORS = {
   [RECORD_STATUS.SUSPENDED]: 'bg-amber-100 text-amber-800',
-  [RECORD_STATUS.ARCHIVED]: 'bg-slate-200 text-slate-600',
   [RECORD_STATUS.RESOLVED]: 'bg-blue-100 text-blue-800',
 };
 

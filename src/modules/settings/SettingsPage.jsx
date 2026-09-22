@@ -376,34 +376,53 @@ export default function SettingsPage() {
       <CollapsibleSection icon="🗑️" title="מחיקת רשומות ישנות">
         <p className="mb-3 text-sm text-slate-500">
           מוחק לצמיתות כל תיק חיפוש ודיווח פעילים (חתולים וכלבים) שנוצרו לפני התאריך שנבחר ומעולם לא נסגרו - כולל
-          התמונות שלהם וההתאמות שנמצאו עבורם. לא הופך אותם לארכיון: הם נעלמים לגמרי, בדיוק כמו "מחיקת התיק"/"מחיקת
-          הדיווח" הידניים, רק בכל הרשומות הישנות יחד. רשומה שכבר נסגרה בדרך אמיתית (נמצאה, הוחזרה, נפטרה) לא נוגעים
-          בה כאן בכלל - היא ממשיכה להופיע בעמוד הארכיון כרגיל. התהליך הזה רץ גם אוטומטית, פעם בשבוע (יום ראשון), בלי
+          התמונות שלהם וההתאמות שנמצאו עבורם, בדיוק כמו "מחיקת התיק"/"מחיקת הדיווח" הידניים, רק בכל הרשומות הישנות
+          יחד. רשומה שכבר נמצאה/הוחזרה לבעלים לא נוגעים בה כאן בכלל - רק רשומה פעילה שמעולם לא נפתרה יכולה להימחק כך.
+          המספרים הכוללים למטה נשארים מדויקים גם אחרי המחיקה. התהליך הזה רץ גם אוטומטית, פעם בשבוע (יום ראשון), בלי
           צורך להריץ אותו ידנית.
         </p>
 
         {lifetimeStats && (
           <div className="mb-4 rounded-xl bg-slate-50 p-3">
             <p className="mb-2 text-xs font-medium text-slate-600">
-              מספרים כוללים לביקורת (לא נפגעים ממחיקה - נשמרים לצמיתות מרגע הדיווח/ההחזרה):
+              מספרים כוללים לביקורת (לא נפגעים ממחיקה - כל מספר נשמר לצמיתות מרגע שהאירוע שלו קרה, בין אם הרשומה
+              עצמה עדיין קיימת או לא):
             </p>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div className="grid grid-cols-2 gap-3 text-center text-xs sm:grid-cols-4">
               <div>
-                <p className="text-slate-400">דווחו כאבודים</p>
+                <p className="text-slate-400">דווחו למערכת</p>
                 <p className="font-semibold text-slate-800">
-                  {lifetimeStats.lostReportedCat} חתולים · {lifetimeStats.lostReportedDog} כלבים
+                  {lifetimeStats.lostReportedCat + lifetimeStats.foundReportedCat} חתולים
+                  <br />
+                  {lifetimeStats.lostReportedDog + lifetimeStats.foundReportedDog} כלבים
+                </p>
+                <p className="mt-0.5 text-slate-400">
+                  ({lifetimeStats.lostReportedCat} אבודים / {lifetimeStats.foundReportedCat} נמצאו · חתולים,{' '}
+                  {lifetimeStats.lostReportedDog} אבודים / {lifetimeStats.foundReportedDog} נמצאו · כלבים)
                 </p>
               </div>
               <div>
-                <p className="text-slate-400">דווחו כנראו/נמצאו</p>
+                <p className="text-slate-400">התאמות שהוצגו לבדיקה</p>
                 <p className="font-semibold text-slate-800">
-                  {lifetimeStats.foundReportedCat} חתולים · {lifetimeStats.foundReportedDog} כלבים
+                  {lifetimeStats.notableMatchCat} חתולים
+                  <br />
+                  {lifetimeStats.notableMatchDog} כלבים
                 </p>
               </div>
               <div>
-                <p className="text-slate-400">הותאמו/הוחזרו לבעלים</p>
+                <p className="text-slate-400">הוחזרו לבעלים בזכות התאמה</p>
+                <p className="font-semibold text-emerald-700">
+                  {lifetimeStats.matchedToOwnerCat} חתולים
+                  <br />
+                  {lifetimeStats.matchedToOwnerDog} כלבים
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-400">נמחקו מבלי להיפתר</p>
                 <p className="font-semibold text-slate-800">
-                  {lifetimeStats.matchedToOwnerCat} חתולים · {lifetimeStats.matchedToOwnerDog} כלבים
+                  {lifetimeStats.lostUnresolvedCat + lifetimeStats.foundUnresolvedCat} חתולים
+                  <br />
+                  {lifetimeStats.lostUnresolvedDog + lifetimeStats.foundUnresolvedDog} כלבים
                 </p>
               </div>
             </div>

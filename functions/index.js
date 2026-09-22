@@ -1580,7 +1580,24 @@ async function deleteStoragePhotos(bucket, photos) {
  * client code into a Cloud Function, so this is kept in sync by hand, same
  * pattern as the AI schema/color lists earlier in this file.
  */
-async function deleteRecordAdmin(bucket, recordType, docId, photos) {
+// Server-side mirror of incrementLostUnresolvedCounter/
+// incrementFoundUnresolvedCounter in src/modules/shared/lifetimeStatsApi.js -
+// that file is client-only, so this Admin SDK path needs its own copy of the
+// same "one small merge write per event" pattern against the same doc.
+async function incrementUnresolvedCounterAdmin(recordType, species) {
+  const field = `${recordType === 'lost' ? 'lostUnresolved' : 'foundUnresolved'}${species === 'dog' ? 'Dog' : 'Cat'}`;
+  try {
+    await db.collection('config').doc('lifetimeStats').set({ [field]: FieldValue.increment(1) }, { merge: true });
+  } catch (err) {
+    console.error('incrementUnresolvedCounterAdmin failed', err.message);
+  }
+}
+
+// Every record this deletes was found via isRecordActive (see
+// weeklyCleanupOldRecords below) - never a RESOLVED one - so every call here
+// is by definition an unresolved record aging out, unconditionally worth
+// counting toward the permanent audit trail.
+async function deleteRecordAdmin(bucket, recordType, docId, data) {
   if (recordType === 'lost') {
     const matchesSnap = await db.collection(COLLECTION_BY_RECORD_TYPE.lost).doc(docId).collection('matches').get();
     if (!matchesSnap.empty) {
@@ -1589,8 +1606,9 @@ async function deleteRecordAdmin(bucket, recordType, docId, photos) {
       await batch.commit();
     }
   }
-  await deleteStoragePhotos(bucket, photos);
+  await deleteStoragePhotos(bucket, data.photos);
   await db.collection(COLLECTION_BY_RECORD_TYPE[recordType]).doc(docId).delete();
+  await incrementUnresolvedCounterAdmin(recordType, data.species);
 }
 
 /**
@@ -1598,10 +1616,7 @@ async function deleteRecordAdmin(bucket, recordType, docId, photos) {
  * Settings (see archiveOldRecordsApi.js) - same rule (active records only,
  * never touched a real closed outcome, older than CLEANUP_MAX_AGE_DAYS),
  * just running itself on a schedule instead of needing an admin to
- * remember to click it. The permanent lifetimeStats counters (see
- * lifetimeStatsApi.js) were already incremented when each record was first
- * created/closed, so nothing here needs to touch them - the audit trail
- * survives this deletion the same way it does the manual button.
+ * remember to click it.
  */
 export const weeklyCleanupOldRecords = onSchedule(
   // timeoutSeconds explicit (was left at the 60s default) - deletions below
@@ -1641,7 +1656,7 @@ export const weeklyCleanupOldRecords = onSchedule(
     ];
     for (let i = 0; i < cleanupQueue.length; i += 10) {
       const chunk = cleanupQueue.slice(i, i + 10);
-      await Promise.all(chunk.map(({ kind, d }) => deleteRecordAdmin(bucket, kind, d.id, d.data().photos)));
+      await Promise.all(chunk.map(({ kind, d }) => deleteRecordAdmin(bucket, kind, d.id, d.data())));
     }
 
     console.log(

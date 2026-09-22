@@ -6,7 +6,7 @@ import { uploadPhotos } from '../shared/uploadPhotos.js';
 import { nextRecordNumber } from '../shared/recordNumberApi.js';
 import { generatePhotoThumbnail } from '../shared/photoThumbnailApi.js';
 import { normalizePhone } from '../shared/duplicateCheckApi.js';
-import { incrementFoundReportedCounter } from '../shared/lifetimeStatsApi.js';
+import { incrementFoundReportedCounter, incrementFoundUnresolvedCounter } from '../shared/lifetimeStatsApi.js';
 
 // A dog record saved with a truly blank breed (not even the "מעורב (לא
 // ידוע)" default) can't be usefully compared on breed at all - the
@@ -148,37 +148,26 @@ export async function updateFoundReportStatus(reportId, status) {
 }
 
 /**
- * Sets status together with the closure record (date/reason/comment) in one
- * write - the found-report equivalent of updateLostCaseClosure in
- * lostReportApi.js. Found reports don't have their own archive-browsing
- * page or manual closure UI yet (see ArchivePage.jsx, currently lost-cases
- * only), but the fields are still worth recording consistently. Status
- * defaults to ARCHIVED (the admin "archive records older than X days" bulk
- * action and updateMatchStatus's own CLOSED branch both want that), but
- * NotifyOwnerDialog's "mark as resolved" checkbox needs RESOLVED instead -
- * closure.status lets it override without a second, near-duplicate function.
+ * Marks a found report RESOLVED - the found-report equivalent of
+ * updateLostCaseClosure in lostReportApi.js, always fired in the same
+ * breath as that call (a match resolving closes both sides together).
  */
-export async function archiveFoundReport(reportId, closure) {
+export async function archiveFoundReport(reportId, closedViaLostCaseId) {
   await setDoc(
     doc(db, COLLECTIONS.FOUND_REPORTS, reportId),
     {
-      status: closure.status || RECORD_STATUS.ARCHIVED,
-      closureDate: closure.closureDate || '',
-      closureReason: closure.closureReason || '',
-      closedBy: closure.closedBy || '',
-      closingComment: closure.closingComment || '',
+      status: RECORD_STATUS.RESOLVED,
       // Same reasoning as lostCases' closedViaFoundReportId (see
       // updateLostCaseClosure) mirrored for the other direction.
-      ...(closure.closedViaLostCaseId ? { closedViaLostCaseId: closure.closedViaLostCaseId } : {}),
+      ...(closedViaLostCaseId ? { closedViaLostCaseId } : {}),
       updatedAt: serverTimestamp(),
     },
     { merge: true }
   );
   // The permanent matchedToOwner audit counter is only incremented once per
   // confirmed match, from updateLostCaseClosure - every flow that closes a
-  // found report this way (updateMatchStatus's CLOSED branch,
-  // NotifyOwnerDialog's "mark as resolved") always closes the paired lost
-  // case in the same breath, so counting here too would double it.
+  // found report this way always closes the paired lost case in the same
+  // breath, so counting here too would double it.
 }
 
 /**
@@ -244,7 +233,14 @@ export async function makeFoundReportPhotoMain(reportId, photo, currentPhotos) {
  * broken references - lost-case detail pages already skip rendering a
  * match whose found report no longer exists.
  */
-export async function deleteFoundReport(reportId, photos = []) {
+/**
+ * Permanently deletes a found report's photos and the doc itself. `record`
+ * is the report's own data (species/status/photos) - if it was never
+ * resolved, this counts once toward the permanent foundUnresolved audit
+ * counter (see lifetimeStatsApi.js), same reasoning as deleteLostCase.
+ */
+export async function deleteFoundReport(reportId, record = {}) {
+  const { photos = [], species, status } = record;
   await Promise.all(
     photos.flatMap((p) => [
       deleteObject(ref(storage, p.path)).catch(() => {}),
@@ -252,4 +248,5 @@ export async function deleteFoundReport(reportId, photos = []) {
     ].filter(Boolean))
   );
   await deleteDoc(doc(db, COLLECTIONS.FOUND_REPORTS, reportId));
+  if (status !== RECORD_STATUS.RESOLVED) incrementFoundUnresolvedCounter(species);
 }

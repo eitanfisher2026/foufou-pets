@@ -151,7 +151,7 @@ export default function MatchAnalysisPage() {
   // all the way back to that side's own main list (not just one case/
   // report's own page), focused on the pet the whole review was actually
   // about - see Dashboard.jsx/FoundReportsListPage.jsx. CLOSED is the one
-  // exception: updateMatchStatus archives both the lost case and the found
+  // exception: updateMatchStatus resolves both the lost case and the found
   // report when it's set, so there's no other candidate left worth
   // reviewing for either side - this always goes straight to the fallback,
   // even if some other still-NEW candidate technically exists.
