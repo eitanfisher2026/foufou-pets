@@ -65,7 +65,7 @@ import {
   ORDERED_MATCH_STATUSES,
 } from '../matching/matchStatusLabels.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
-import ProgressBar from '../shared/ProgressBar.jsx';
+import PhotoCheckProgress from '../shared/PhotoCheckProgress.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import DropdownBadge from '../shared/DropdownBadge.jsx';
 import { getErrorMessage } from '../shared/errorMessages.js';
@@ -126,6 +126,9 @@ export default function FoundReportDetail() {
   // LostCaseDetail.jsx for why this counts settled photo checks, not a
   // fixed step count.
   const [checkProgress, setCheckProgress] = useState(null);
+  // Drives PhotoCheckProgress's cold-start caution note - only meaningful
+  // when the self-hosted SigLIP2 provider is actually the one running.
+  const [photoCompareProviderKind, setPhotoCompareProviderKind] = useState(null);
   // Persists until the next scan starts (not a timed flash).
   const [checkResult, setCheckResult] = useState(null);
   // See the same state in LostCaseDetail.jsx - a scan failing used to be
@@ -172,7 +175,10 @@ export default function FoundReportDetail() {
   }, [reportId]);
 
   useEffect(() => {
-    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
+    getMatchConfig().then((c) => {
+      setConfidenceColors(c.confidenceColors);
+      setPhotoCompareProviderKind(c.photoCompareProviderKind);
+    });
   }, []);
 
   // Compares against the last-loaded/last-saved report, not just whether
@@ -849,15 +855,20 @@ export default function FoundReportDetail() {
       {!showEditForm && (
         <>
           {canManage && checking && checkProgress?.total > 0 && checkProgress.done < checkProgress.total && (
-            <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+            <PhotoCheckProgress
+              done={checkProgress.done}
+              total={checkProgress.total}
+              isSlowProvider={photoCompareProviderKind === 'siglip2'}
+            />
           )}
-          {/* Same reasoning as LostCaseDetail.jsx's own second phase: the
-              per-candidate scan finishing isn't the same as being done -
-              saving the results still takes a real, previously unexplained
-              beat of its own. */}
-          {canManage && checking && checkProgress?.total > 0 && checkProgress.done === checkProgress.total && (
+          {/* See LostCaseDetail.jsx's own version of this fallback - an
+              honest "still working" state for everything that has no
+              meaningful sub-progress to report (fetching/scoring, a run
+              with nothing to photo-check, or saving once photo checks
+              finish), not a fake bar pretending to know more than it does. */}
+          {canManage && checking && !(checkProgress?.total > 0 && checkProgress.done < checkProgress.total) && (
             <div className="mb-4">
-              <p className="mb-1 text-xs text-slate-500">שומרים את התוצאות...</p>
+              <p className="mb-1 text-xs text-slate-500">מעבד...</p>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-800" />
               </div>

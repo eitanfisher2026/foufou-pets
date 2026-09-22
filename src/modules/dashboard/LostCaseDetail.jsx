@@ -52,7 +52,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { getMatchConfidence } from '../matching/matchingEngine.js';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
-import ProgressBar from '../shared/ProgressBar.jsx';
+import PhotoCheckProgress from '../shared/PhotoCheckProgress.jsx';
 import VisualSimilarityNote from '../shared/VisualSimilarityNote.jsx';
 import { useScreenshotReader } from '../shared/useScreenshotReader.js';
 import EditablePhotoGrid from '../shared/EditablePhotoGrid.jsx';
@@ -166,6 +166,9 @@ export default function LostCaseDetail() {
   // the whole found-reports pool.
   const [newCandidateCount, setNewCandidateCount] = useState(0);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  // Drives PhotoCheckProgress's cold-start caution note - only meaningful
+  // when the self-hosted SigLIP2 provider is actually the one running.
+  const [photoCompareProviderKind, setPhotoCompareProviderKind] = useState(null);
   const {
     reading: extracting,
     error: extractError,
@@ -186,7 +189,10 @@ export default function LostCaseDetail() {
   }, [caseId]);
 
   useEffect(() => {
-    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
+    getMatchConfig().then((c) => {
+      setConfidenceColors(c.confidenceColors);
+      setPhotoCompareProviderKind(c.photoCompareProviderKind);
+    });
   }, []);
 
   // Compares against the last-loaded/last-saved case, not just whether
@@ -880,15 +886,21 @@ export default function LostCaseDetail() {
       )}
 
       {canManage && checking && checkProgress?.total > 0 && checkProgress.done < checkProgress.total && (
-        <ProgressBar current={checkProgress.done} total={checkProgress.total} label="סורק התאמות..." />
+        <PhotoCheckProgress
+          done={checkProgress.done}
+          total={checkProgress.total}
+          isSlowProvider={photoCompareProviderKind === 'siglip2'}
+        />
       )}
-      {/* The per-candidate scan itself is done once done===total, but
-          saving the results (writing every match, updating this case's
-          counters) still takes a real beat of its own - previously
-          unexplained, silent time once the bar above hit 100%. */}
-      {canManage && checking && checkProgress?.total > 0 && checkProgress.done === checkProgress.total && (
+      {/* Everything else about a scan - fetching/scoring candidates before
+          the real AI-check total is even known, a run with nothing to
+          photo-check at all, and saving the results once photo checks (if
+          any) finish - has no meaningful sub-progress to report, so this is
+          deliberately just an honest "still working" state, not a fake bar
+          pretending to know more than it does. */}
+      {canManage && checking && !(checkProgress?.total > 0 && checkProgress.done < checkProgress.total) && (
         <div className="mb-4">
-          <p className="mb-1 text-xs text-slate-500">שומרים את התוצאות...</p>
+          <p className="mb-1 text-xs text-slate-500">מעבד...</p>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
             <div className="h-full w-1/3 animate-indeterminate rounded-full bg-slate-800" />
           </div>

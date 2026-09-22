@@ -15,6 +15,7 @@ import DropdownBadge from '../shared/DropdownBadge.jsx';
 import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, ORDERED_MATCH_STATUSES } from './matchStatusLabels.js';
 import { getMatchConfig } from './matchConfigApi.js';
 import { getErrorMessage } from '../shared/errorMessages.js';
+import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
 
 const VERDICT_STYLES = {
   match: { label: 'תואם', badge: 'bg-emerald-100 text-emerald-800' },
@@ -61,6 +62,10 @@ export default function MatchAnalysisPage() {
   const [lostCase, setLostCase] = useState(null);
   const [foundReport, setFoundReport] = useState(null);
   const [confidenceColors, setConfidenceColors] = useState(undefined);
+  // Drives AnalyzingIndicator's cold-start caution note during a recheck -
+  // only meaningful when the self-hosted SigLIP2 provider is the one
+  // actually running.
+  const [photoCompareProviderKind, setPhotoCompareProviderKind] = useState(null);
   const [rechecking, setRechecking] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -80,7 +85,10 @@ export default function MatchAnalysisPage() {
         setFoundReport(fr);
       }
     );
-    getMatchConfig().then((c) => setConfidenceColors(c.confidenceColors));
+    getMatchConfig().then((c) => {
+      setConfidenceColors(c.confidenceColors);
+      setPhotoCompareProviderKind(c.photoCompareProviderKind);
+    });
   }, [caseId, foundReportId]);
 
   useEffect(() => {
@@ -221,6 +229,17 @@ export default function MatchAnalysisPage() {
           </button>
         )}
       </div>
+
+      {rechecking && (
+        <AnalyzingIndicator
+          label="בודק מחדש..."
+          note={
+            photoCompareProviderKind === 'siglip2'
+              ? 'הספק הנוכחי (SigLIP2, עצמאי) לפעמים לוקח עד כ-30 שניות לטעינה ראשונה לפני שהוא עונה - זה תקין, לא תקוע.'
+              : undefined
+          }
+        />
+      )}
 
       {actionError && <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{actionError}</p>}
 

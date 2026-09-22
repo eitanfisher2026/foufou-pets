@@ -314,13 +314,15 @@ async function recomputeFoundReportVisualFlag(foundReportId) {
  * { newCount, visualMatches } - visualMatches lists only the notable
  * verdicts (see NOTABLE_VISUAL_VERDICTS), for a caller to alert on.
  *
- * onProgress(done, total) fires as each candidate's photo check settles
- * (done still counts a candidate that skipped the AI call entirely,
- * immediately) - the field scoring above is instant, but with dozens of
- * candidates clearing the photo threshold, the AI calls are what can
- * actually take a while, and a caller has no other way to show real
- * progress through a batch that's running in parallel rather than one at a
- * time.
+ * onProgress(done, total) reports ONLY the AI photo-comparison calls, not
+ * every candidate - field scoring is synchronous and already finished by
+ * the time this ever fires. `total` is the real number of candidates that
+ * actually need a photo check (0 if none do), known up front before any AI
+ * call starts, and `done` only advances when one of those calls genuinely
+ * settles. Counting every candidate the instant its (often instantly-
+ * skipped) check settled used to make the reported total race far ahead of
+ * the real, slow work and then sit still for however long the actually-slow
+ * calls took - a caller now sees a fraction that means exactly what it says.
  */
 export async function checkMatchesForLostCase(lostCaseId, onProgress) {
   const caseSnap = await getDoc(doc(db, COLLECTIONS.LOST_CASES, lostCaseId));
@@ -352,8 +354,6 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
 
   const ranked = rankMatches(lostCase, newCandidates, config);
 
-  let done = 0;
-  onProgress?.(done, ranked.length);
   // ranked is already sorted best-first (see rankMatches), so a plain
   // running count of candidates that both clear the threshold AND are still
   // under the cap gives the top-K by score, computed synchronously before
@@ -366,13 +366,25 @@ export async function checkMatchesForLostCase(lostCaseId, onProgress) {
     photoChecksUsed += 1;
     return true;
   });
+  // onProgress now tracks ONLY the AI photo-comparison calls, not every
+  // candidate - field scoring above is synchronous and already done by the
+  // time this fires. The old version counted every candidate the instant
+  // its (often instantly-skipped) check settled, so the bar raced to
+  // e.g. 25/30 in under a second and then genuinely sat still for the
+  // real 15-30s a slow provider (SigLIP2 cold-starting) took on the
+  // handful that actually needed a call - reading as "stuck", because it
+  // effectively was, just on a denominator that never matched the real
+  // work. A caller sees the true total up front (0 if nothing needs a
+  // photo check at all) and only sees it move for work that's actually
+  // slow.
+  let photoChecksDone = 0;
+  onProgress?.(photoChecksDone, photoChecksUsed);
   const visuals = await Promise.all(
     ranked.map(async ({ report, score }, i) => {
-      const result = withinCap[i]
-        ? await maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found')
-        : null;
-      done += 1;
-      onProgress?.(done, ranked.length);
+      if (!withinCap[i]) return null;
+      const result = await maybeCheckPhotoSimilarity(lostCase, lostCaseId, report, report.id, score, config, 'found');
+      photoChecksDone += 1;
+      onProgress?.(photoChecksDone, photoChecksUsed);
       return result;
     })
   );
@@ -788,8 +800,6 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
   // synchronous top-K cap below actually keeps the K best candidates, not
   // an arbitrary K in whatever order newCandidates happened to come back.
   const scored = newCandidates.map((lostCase) => ({ lostCase, ...scoreMatch(lostCase, report, config) })).sort((a, b) => b.score - a.score);
-  let done = 0;
-  onProgress?.(done, scored.length);
   let photoChecksUsed = 0;
   const photoChecksCap = config.unlimitedPhotoChecks ? Infinity : config.maxPhotoChecksPerScan;
   const withinCap = scored.map(({ score }) => {
@@ -798,13 +808,16 @@ export async function checkMatchesForFoundReport(foundReportId, onProgress) {
     photoChecksUsed += 1;
     return true;
   });
+  // Same fix as checkMatchesForLostCase - onProgress tracks only the AI
+  // photo-comparison calls (the actually-slow part), not every candidate.
+  let photoChecksDone = 0;
+  onProgress?.(photoChecksDone, photoChecksUsed);
   const visuals = await Promise.all(
     scored.map(async ({ lostCase, score }, i) => {
-      const result = withinCap[i]
-        ? await maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost')
-        : null;
-      done += 1;
-      onProgress?.(done, scored.length);
+      if (!withinCap[i]) return null;
+      const result = await maybeCheckPhotoSimilarity(lostCase, lostCase.id, report, foundReportId, score, config, 'lost');
+      photoChecksDone += 1;
+      onProgress?.(photoChecksDone, photoChecksUsed);
       return result;
     })
   );
