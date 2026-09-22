@@ -120,6 +120,11 @@ function AppRoutes() {
               </RequireAdmin>
             }
           />
+          {/* Catch-all for any unmatched URL - a removed route (like the old
+              /archive), a stale bookmark, or a typo used to just render
+              nothing at all with zero indication why. Bouncing back to the
+              dashboard is always a safe, sensible fallback here. */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </div>
