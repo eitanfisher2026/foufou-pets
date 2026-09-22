@@ -1,8 +1,9 @@
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { COLLECTIONS, RECORD_STATUS, SPECIES } from '../shared/collections.js';
 import { deleteLostCase } from '../lost-report/lostReportApi.js';
 import { deleteFoundReport } from '../found-report/foundReportApi.js';
+import { incrementMatchedToOwnerCounter } from '../shared/lifetimeStatsApi.js';
 
 function toDate(createdAt) {
   if (!createdAt) return null;
@@ -119,4 +120,78 @@ export async function archiveOldRecords(cutoffDate, onProgress, shouldStop) {
   }
 
   return { lostCasesArchived: lostArchived, foundReportsArchived: foundArchived };
+}
+
+// The old string value directly - RECORD_STATUS.ARCHIVED was removed from
+// the app's own code (see collections.js) along with the whole archive
+// feature, but any record that reached that status before the removal is
+// still sitting in Firestore with the literal string "archived" as its
+// status. Nothing in the app's normal cleanup paths ever looks at this
+// status any more (they only ever touch ACTIVE, once aged out, or RESOLVED,
+// never touched at all), so these are permanently stuck otherwise - this is
+// a one-time sweep to finish moving them into the new model, not an
+// ongoing feature. Whichever of the old closure reasons genuinely meant "a
+// real match closed this" (see the removed CLOSURE_REASON.RETURNED_TO_OWNER/
+// SYSTEM_MATCH_CLOSED) still counts toward matchedToOwner here, exactly as
+// it would have under the old code; everything else (died, gave up, aged
+// out, or no reason recorded at all) counts as unresolved, same as any
+// other record that never reached a real reunion.
+const LEGACY_ARCHIVED_STATUS = 'archived';
+const LEGACY_MATCHED_REASONS = new Set(['returned_to_owner', 'system_match_closed']);
+const LEGACY_BATCH_SIZE = 10;
+
+/**
+ * One-time admin action: finds every lost case/found report still sitting
+ * with the old "archived" status (from before the archive feature was
+ * removed - see collections.js) and deletes them the same correct way
+ * archiveOldRecords above does (photos, matches subcollection, the record
+ * doc, and the right permanent lifetimeStats counter), classifying each by
+ * its old closureReason first. Safe to run more than once - a second run
+ * simply finds nothing left to do, since nothing else can ever set this
+ * status again.
+ */
+export async function countLegacyArchivedRecords() {
+  const [lostSnap, foundSnap] = await Promise.all([
+    getDocs(query(collection(db, COLLECTIONS.LOST_CASES), where('status', '==', LEGACY_ARCHIVED_STATUS))),
+    getDocs(query(collection(db, COLLECTIONS.FOUND_REPORTS), where('status', '==', LEGACY_ARCHIVED_STATUS))),
+  ]);
+  return { lostTotal: lostSnap.docs.length, foundTotal: foundSnap.docs.length };
+}
+
+export async function cleanupLegacyArchivedRecords(onProgress) {
+  const [lostSnap, foundSnap] = await Promise.all([
+    getDocs(query(collection(db, COLLECTIONS.LOST_CASES), where('status', '==', LEGACY_ARCHIVED_STATUS))),
+    getDocs(query(collection(db, COLLECTIONS.FOUND_REPORTS), where('status', '==', LEGACY_ARCHIVED_STATUS))),
+  ]);
+  const queue = [
+    ...lostSnap.docs.map((d) => ({ kind: 'lost', d })),
+    ...foundSnap.docs.map((d) => ({ kind: 'found', d })),
+  ];
+  const total = queue.length;
+  let done = 0;
+  onProgress?.(done, total);
+
+  for (let i = 0; i < queue.length; i += LEGACY_BATCH_SIZE) {
+    const batch = queue.slice(i, i + LEGACY_BATCH_SIZE);
+    await Promise.all(
+      batch.map(async ({ kind, d }) => {
+        const data = d.data();
+        const wasMatched = LEGACY_MATCHED_REASONS.has(data.closureReason);
+        // Passing a locally-overridden status (never written back to
+        // Firestore, just what deleteLostCase/deleteFoundReport see) is
+        // what keeps their own automatic "wasn't resolved" counter from
+        // firing for a record this sweep has already classified as a real
+        // match - incrementMatchedToOwnerCounter below covers that case
+        // instead, exactly once either way.
+        const record = wasMatched ? { ...data, status: RECORD_STATUS.RESOLVED } : data;
+        if (kind === 'lost') await deleteLostCase(d.id, record);
+        else await deleteFoundReport(d.id, record);
+        if (wasMatched) incrementMatchedToOwnerCounter(data.species);
+        done += 1;
+        onProgress?.(done, total);
+      })
+    );
+  }
+
+  return { lostCasesRemoved: lostSnap.docs.length, foundReportsRemoved: foundSnap.docs.length };
 }

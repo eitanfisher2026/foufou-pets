@@ -6,7 +6,7 @@ import { rescanAllLostCases, backfillPhotoSimilarityForExistingMatches } from '.
 import { getMatchConfig } from '../matching/matchConfigApi.js';
 import { CONFIDENCE_BUCKETS } from '../matching/matchingEngine.js';
 import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
-import { countOldActiveRecords, archiveOldRecords } from './archiveOldRecordsApi.js';
+import { countOldActiveRecords, archiveOldRecords, countLegacyArchivedRecords, cleanupLegacyArchivedRecords } from './archiveOldRecordsApi.js';
 import { getLifetimeStats } from '../shared/lifetimeStatsApi.js';
 import { useMaintenanceMode } from '../shared/useMaintenanceMode.js';
 import { setMaintenanceMode } from '../shared/maintenanceApi.js';
@@ -65,6 +65,16 @@ export default function SettingsPage() {
   // needs the CURRENT value at call time, not whatever was captured in the
   // closure when the run started.
   const stopArchiveRef = useRef(false);
+  // One-time sweep for records still sitting with the old, now-removed
+  // "archived" status (see cleanupLegacyArchivedRecords) - separate state
+  // from the regular cutoff-based cleanup above since this one has no date
+  // to pick, just a count to preview and a single button to run.
+  const [legacyCount, setLegacyCount] = useState(null);
+  const [legacyChecking, setLegacyChecking] = useState(false);
+  const [legacyCleaning, setLegacyCleaning] = useState(false);
+  const [legacyProgress, setLegacyProgress] = useState(null);
+  const [legacyResult, setLegacyResult] = useState(null);
+  const [legacyError, setLegacyError] = useState('');
   // Pure preview, no side effects - unlike the real onboarding flow (see
   // Dashboard.jsx), closing this never touches hasSeenOnboarding, so
   // reviewing it here can't accidentally leave the admin's own account
@@ -228,6 +238,40 @@ export default function SettingsPage() {
   function handleStopArchive() {
     stopArchiveRef.current = true;
     setArchiveStopRequested(true);
+  }
+
+  async function handleCheckLegacyArchived() {
+    setLegacyChecking(true);
+    setLegacyError('');
+    try {
+      setLegacyCount(await countLegacyArchivedRecords());
+    } catch (err) {
+      setLegacyError(getErrorMessage(err));
+    } finally {
+      setLegacyChecking(false);
+    }
+  }
+
+  async function handleCleanupLegacyArchived() {
+    const total = (legacyCount?.lostTotal || 0) + (legacyCount?.foundTotal || 0);
+    const ok = await confirm(
+      `למחוק לצמיתות ${total} רשומות (${legacyCount?.lostTotal || 0} תיקי חיפוש, ${legacyCount?.foundTotal || 0} דיווחים) שנשארו במצב "ארכיון" הישן? כולל התמונות וההתאמות שלהן - לא ניתן לשחזר. רשומה שהייתה בעבר התאמה שהוחזרה בהצלחה עדיין תיספר כך במספרים הכוללים.`,
+      { confirmLabel: 'מחיקה לצמיתות', danger: true }
+    );
+    if (!ok) return;
+    setLegacyCleaning(true);
+    setLegacyError('');
+    setLegacyProgress({ done: 0, total: 0 });
+    try {
+      const result = await cleanupLegacyArchivedRecords((done, total) => setLegacyProgress({ done, total }));
+      setLegacyResult(result);
+      setLegacyCount(null);
+      getLifetimeStats().then(setLifetimeStats);
+    } catch (err) {
+      setLegacyError(getErrorMessage(err));
+    } finally {
+      setLegacyCleaning(false);
+    }
   }
 
   return (
@@ -510,6 +554,61 @@ export default function SettingsPage() {
           </p>
         )}
         {archiveError && <p className="mt-2 text-sm font-medium text-red-600">{archiveError}</p>}
+      </CollapsibleSection>
+
+      <CollapsibleSection icon="🧹" title='ניקוי רשומות "ארכיון" ישנות (חד-פעמי)'>
+        <p className="mb-3 text-sm text-slate-500">
+          פעולת ניקוי חד-פעמית: רשומות שנשארו במצב "ארכיון" מלפני שהתכונה הזו הוסרה מהאפליקציה - הן לא נמחקות
+          אוטומטית בשום מקום אחר יותר, כי הסטטוס הזה כבר לא קיים בקוד. מוחקת אותן לצמיתות (תמונות, התאמות והרשומה
+          עצמה) ומזכה את המספרים הכוללים בהתאם - הוחזרו בהצלחה נספרות ככה, כל השאר נספרות כלא נפתרו. בטוח להריץ שוב
+          - אחרי שהכל נוקה, לא יימצא יותר מה לעשות.
+        </p>
+        {legacyCount === null && !legacyResult && (
+          <button
+            type="button"
+            onClick={handleCheckLegacyArchived}
+            disabled={legacyChecking}
+            className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 disabled:opacity-50"
+          >
+            {legacyChecking ? 'בודק...' : 'בדיקה'}
+          </button>
+        )}
+        {legacyCount && !legacyCleaning && (
+          <div className="rounded-xl bg-slate-50 p-3">
+            <p className="mb-3 text-sm text-slate-700">
+              נמצאו: <strong>{legacyCount.lostTotal}</strong> תיקי חיפוש ו-<strong>{legacyCount.foundTotal}</strong> דיווחים.
+            </p>
+            {legacyCount.lostTotal + legacyCount.foundTotal === 0 ? (
+              <button type="button" onClick={() => setLegacyCount(null)} className="text-sm text-slate-500 underline">
+                אין מה למחוק - סגירה
+              </button>
+            ) : (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCleanupLegacyArchived}
+                  className="rounded-xl bg-red-600 px-4 py-2 text-sm font-medium text-white"
+                >
+                  מחיקה לצמיתות
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLegacyCount(null)}
+                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600"
+                >
+                  ביטול
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+        {legacyCleaning && <ProgressBar current={legacyProgress.done} total={legacyProgress.total} label="מוחק..." />}
+        {legacyResult && (
+          <p className="mt-2 text-sm text-emerald-700">
+            נמחקו לצמיתות {legacyResult.lostCasesRemoved} תיקי חיפוש ו-{legacyResult.foundReportsRemoved} דיווחים.
+          </p>
+        )}
+        {legacyError && <p className="mt-2 text-sm font-medium text-red-600">{legacyError}</p>}
       </CollapsibleSection>
 
       <AppFooter />
