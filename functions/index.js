@@ -1604,7 +1604,11 @@ async function deleteRecordAdmin(bucket, recordType, docId, photos) {
  * survives this deletion the same way it does the manual button.
  */
 export const weeklyCleanupOldRecords = onSchedule(
-  { schedule: 'every sunday 03:00', timeZone: 'Asia/Jerusalem', region: 'me-west1' },
+  // timeoutSeconds explicit (was left at the 60s default) - deletions below
+  // now run in parallel instead of one record at a time, but a generous
+  // safety margin still matters for a real backlog (a missed or partial
+  // week compounds into a bigger one the next time this runs).
+  { schedule: 'every sunday 03:00', timeZone: 'Asia/Jerusalem', region: 'me-west1', timeoutSeconds: 300 },
   async () => {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - CLEANUP_MAX_AGE_DAYS);
@@ -1621,13 +1625,19 @@ export const weeklyCleanupOldRecords = onSchedule(
     const oldLostCases = lostSnap.docs.filter((d) => qualifies(d.data()));
     const oldFoundReports = foundSnap.docs.filter((d) => qualifies(d.data()));
 
+    // Every record's own deletion now runs concurrently instead of one at a
+    // time (deleteRecordAdmin's own few steps per record still run in their
+    // necessary order, just no longer blocking every OTHER record's
+    // deletion) - this is what was actually timing out. A real backlog
+    // (e.g. after a missed week) previously needed roughly
+    // (lost+found count) x a few round trips, all sequential, easily
+    // exceeding a minute; now it's bounded by the single slowest record,
+    // not the sum of all of them.
     const bucket = getStorage().bucket();
-    for (const d of oldLostCases) {
-      await deleteRecordAdmin(bucket, 'lost', d.id, d.data().photos);
-    }
-    for (const d of oldFoundReports) {
-      await deleteRecordAdmin(bucket, 'found', d.id, d.data().photos);
-    }
+    await Promise.all([
+      ...oldLostCases.map((d) => deleteRecordAdmin(bucket, 'lost', d.id, d.data().photos)),
+      ...oldFoundReports.map((d) => deleteRecordAdmin(bucket, 'found', d.id, d.data().photos)),
+    ]);
 
     console.log(
       `weeklyCleanupOldRecords: deleted ${oldLostCases.length} lost cases, ${oldFoundReports.length} found reports (cutoff ${cutoff.toISOString()})`

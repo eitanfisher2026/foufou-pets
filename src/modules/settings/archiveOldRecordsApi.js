@@ -77,16 +77,27 @@ export async function archiveOldRecords(cutoffDate, onProgress) {
   let done = 0;
   onProgress?.(done, total);
 
-  for (const d of lostCases) {
-    await deleteLostCase(d.id, d.data().photos || []);
-    done += 1;
-    onProgress?.(done, total);
-  }
-  for (const d of foundReports) {
-    await deleteFoundReport(d.id, d.data().photos || []);
-    done += 1;
-    onProgress?.(done, total);
-  }
+  // Every record's own deletion runs concurrently instead of one at a time
+  // - each one is several sequential network round trips on its own
+  // (matches subcollection, Storage photos, the record doc), and doing that
+  // for every record one after another, from the browser, is what made this
+  // "take forever" with any real backlog. onProgress still ticks up
+  // per-record as each one actually finishes, just no longer waiting for it
+  // before starting the next.
+  await Promise.all([
+    ...lostCases.map((d) =>
+      deleteLostCase(d.id, d.data().photos || []).then(() => {
+        done += 1;
+        onProgress?.(done, total);
+      })
+    ),
+    ...foundReports.map((d) =>
+      deleteFoundReport(d.id, d.data().photos || []).then(() => {
+        done += 1;
+        onProgress?.(done, total);
+      })
+    ),
+  ]);
 
   return { lostCasesArchived: lostCases.length, foundReportsArchived: foundReports.length };
 }
