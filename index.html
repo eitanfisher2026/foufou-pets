@@ -10,7 +10,12 @@
     <meta name="theme-color" content="#d97706" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- "default" (not "black-translucent") keeps the status bar opaque and
+         pushes page content below it, instead of overlaying content behind
+         a translucent bar - the app has no safe-area-inset padding anywhere
+         to compensate for an overlay, so black-translucent risked content
+         rendering up against the notch/Dynamic Island on newer iPhones. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="חיות אבודות" />
     <script>
       window.__installPrompt = null;
