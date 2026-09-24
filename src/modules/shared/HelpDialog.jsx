@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HelpCard from './HelpCard.jsx';
-import { GETTING_STARTED_CARDS, ADDITIONAL_CARDS } from './helpContent.js';
+import { getGettingStartedCards, ADDITIONAL_CARDS } from './helpContent.js';
+import { usePwaInstall } from './usePwaInstall.js';
 
 /**
  * "How does this work" explainer, reached via the ℹ️ button next to the
@@ -13,6 +14,8 @@ import { GETTING_STARTED_CARDS, ADDITIONAL_CARDS } from './helpContent.js';
  */
 export default function HelpDialog({ onClose }) {
   const [tab, setTab] = useState('start');
+  const { isIOS, isAndroid } = usePwaInstall();
+  const gettingStartedCards = getGettingStartedCards({ isIOS, isAndroid });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -53,7 +56,7 @@ export default function HelpDialog({ onClose }) {
         </div>
 
         <div className="space-y-2 overflow-y-auto p-4">
-          {(tab === 'start' ? GETTING_STARTED_CARDS : ADDITIONAL_CARDS).map((card) => (
+          {(tab === 'start' ? gettingStartedCards : ADDITIONAL_CARDS).map((card) => (
             <HelpCard key={card.title} {...card} />
           ))}
         </div>

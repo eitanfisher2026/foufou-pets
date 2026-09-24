@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePwaInstall } from './usePwaInstall.js';
 import HelpCard from './HelpCard.jsx';
-import { GETTING_STARTED_CARDS } from './helpContent.js';
+import { getGettingStartedCards } from './helpContent.js';
 
 /**
  * Shown automatically, once, the first time someone ever signs in (see
@@ -14,13 +14,14 @@ import { GETTING_STARTED_CARDS } from './helpContent.js';
  * HelpDialog shows, so the whole thing read as "the ordinary help screen,
  * just appeared instantly" rather than an actual welcome moment. Now step 2
  * only shows once someone deliberately presses "המשך", not the instant the
- * dialog opens. Reuses the exact same GETTING_STARTED_CARDS as HelpDialog.jsx
- * (see helpContent.js) - just that one list, not the "יכולות נוספות" tab,
+ * dialog opens. Reuses the exact same getGettingStartedCards() as
+ * HelpDialog.jsx (see helpContent.js) - just that one list, not the
+ * "יכולות נוספות" tab,
  * since a brand-new user needs the walkthrough first, not the full
  * reference - so there's only ever one copy of that content to keep current.
  */
 export default function OnboardingDialog({ onClose }) {
-  const { installed, canPrompt, isIOS, promptInstall } = usePwaInstall();
+  const { installed, canPrompt, isIOS, isAndroid, promptInstall } = usePwaInstall();
   const [step, setStep] = useState(1);
   const [showIosGuide, setShowIosGuide] = useState(false);
 
@@ -108,7 +109,7 @@ export default function OnboardingDialog({ onClose }) {
           </div>
         ) : (
           <div className="max-h-[60vh] space-y-2 overflow-y-auto p-4">
-            {GETTING_STARTED_CARDS.map((card) => (
+            {getGettingStartedCards({ isIOS, isAndroid }).map((card) => (
               <HelpCard key={card.title} {...card} />
             ))}
           </div>

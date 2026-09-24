@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const isAndroid = /Android/.test(navigator.userAgent);
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || !!window.navigator.standalone;
 
 /**
@@ -38,5 +39,5 @@ export function usePwaInstall() {
     return choice.outcome === 'accepted';
   }
 
-  return { installed, canPrompt, isIOS, promptInstall };
+  return { installed, canPrompt, isIOS, isAndroid, promptInstall };
 }

@@ -6,12 +6,13 @@
 // long paragraph stored in Firestore) - a structured walkthrough like this
 // is something worth getting right in code and reviewing like any other
 // content, not something that holds up well as a wall of text in a
-// textarea. Exported as plain data, not JSX, so both HelpDialog.jsx (both
-// tabs) and OnboardingDialog.jsx (just the getting-started list, for a new
-// user's first look) render the exact same cards - one copy to keep
-// current, not two that can drift apart.
+// textarea. getGettingStartedCards() is a function, not plain data, because
+// one step (Facebook sharing) depends on the viewer's own device - both
+// HelpDialog.jsx and OnboardingDialog.jsx call it with the same
+// usePwaInstall() flags so there's still one copy of the wording to keep
+// current, not device-specific copies that can drift apart.
 
-export const GETTING_STARTED_CARDS = [
+const STATIC_GETTING_STARTED_CARDS_TOP = [
   {
     icon: '😿',
     title: '1. החיה שלכם אבדה?',
@@ -28,25 +29,13 @@ export const GETTING_STARTED_CARDS = [
     body: 'אפשר להעלות צילום מסך מפייסבוק או וואטסאפ במקום למלא טופס ריק - המערכת קוראת אותו אוטומטית וממלאת את רוב השדות, ונשאר רק לבדוק ולאשר.',
   },
   {
-    icon: '🤖',
-    title: '4.1 שיתוף ישיר מפייסבוק - אנדרואיד',
-    body: 'אחרי התקנת האפליקציה למסך הבית (מתפריט החשבון ⚙️ ← "התקנת האפליקציה"), אפשר ללחוץ "שיתוף" על פוסט בפייסבוק ולבחור "איתור חיות מחמד" מרשימת האפשרויות - בלי התקנה, האפליקציה פשוט לא תופיע שם.',
-  },
-  {
-    icon: '🍏',
-    title: '4.2 שיתוף מפייסבוק - אייפון',
-    body: 'באייפון אין אפשרות "שיתוף" ישירה לאפליקציה בכלל, גם עם התקנה (מגבלה של אפל, לא ניתנת לעקיפה). במקום זאת: מעתיקים את הקישור לפוסט או את הטקסט שלו, או מצלמים מסך שלו, ומדביקים/מעלים ב"הוספה חכמה" (אם לא בטוחים מה זה) או ישירות בטופס הספציפי (חתול/כלב, אבד/נמצא) אם כבר יודעים.',
-  },
-  {
-    icon: '💻',
-    title: '4.3 שיתוף מפייסבוק - מחשב',
-    body: 'במחשב אין בכלל תפריט "שיתוף" לאפליקציות חיצוניות (זו יכולת של טלפון בלבד) - אז השיטה תמיד זהה לאייפון: מעתיקים את הקישור לפוסט או את הטקסט שלו, או שומרים צילום מסך שלו, ומדביקים/מעלים ב"הוספה חכמה" או ישירות בטופס הספציפי.',
-  },
-  {
     icon: '✨',
-    title: '5. לא בטוחים מה זה?',
+    title: '4. לא בטוחים מה זה?',
     body: 'כפתור "הוספה חכמה" בעמוד הראשי מזהה הכל לבד - גם אם זה חתול או כלב, וגם אם זו אבידה או מציאה - מהתמונה או מהפוסט.',
   },
+];
+
+const STATIC_GETTING_STARTED_CARDS_BOTTOM = [
   {
     icon: '🔍',
     title: '6. בדיקת התאמות',
@@ -64,16 +53,40 @@ export const GETTING_STARTED_CARDS = [
   },
 ];
 
+// The Facebook-sharing step depends entirely on the device someone's
+// actually reading this on, so - unlike the rest of the walkthrough - it's
+// built from the viewer's own isIOS/isAndroid (see usePwaInstall.js)
+// instead of being static data: showing all three platforms to everyone
+// just made people read past the two that don't apply to them.
+export function getGettingStartedCards({ isIOS, isAndroid }) {
+  let shareCard;
+  if (isIOS) {
+    shareCard = {
+      icon: '🍏',
+      title: '5. שיתוף ישיר מפייסבוק',
+      body: 'באייפון אין אפשרות "שיתוף" ישירה מפייסבוק לאפליקציה בכלל, גם עם התקנה (מגבלה של אפל, לא ניתנת לעקיפה). במקום זאת: מעתיקים את הקישור לפוסט או את הטקסט שלו, או מצלמים מסך שלו, ומדביקים/מעלים ב"הוספה חכמה" (אם לא בטוחים מה זה) או ישירות בטופס הספציפי (חתול/כלב, אבד/נמצא) אם כבר יודעים.',
+    };
+  } else if (isAndroid) {
+    shareCard = {
+      icon: '🤖',
+      title: '5. שיתוף ישיר מפייסבוק',
+      body: 'אחרי התקנת האפליקציה למסך הבית (מתפריט החשבון ⚙️ ← "התקנת האפליקציה"), אפשר ללחוץ "שיתוף" על פוסט בפייסבוק ולבחור "איתור חיות מחמד" מרשימת האפשרויות - בלי התקנה, האפליקציה פשוט לא תופיע שם.',
+    };
+  } else {
+    shareCard = {
+      icon: '💻',
+      title: '5. שיתוף ישיר מפייסבוק',
+      body: 'במחשב אין בכלל תפריט "שיתוף" לאפליקציות חיצוניות (זו יכולת של טלפון בלבד). הדרך להביא פוסט מפייסבוק: מעתיקים את הקישור לפוסט או את הטקסט שלו, או שומרים צילום מסך שלו, ומדביקים/מעלים ב"הוספה חכמה" או ישירות בטופס הספציפי.',
+    };
+  }
+  return [...STATIC_GETTING_STARTED_CARDS_TOP, shareCard, ...STATIC_GETTING_STARTED_CARDS_BOTTOM];
+}
+
 export const ADDITIONAL_CARDS = [
   {
     icon: '🐈',
     title: 'חתולים וכלבים בנפרד',
     body: 'מתג חתול/כלב בראש עמוד הבית - לכל סוג חיה הרשימה, הטפסים והגזעים שמתאימים לו.',
-  },
-  {
-    icon: '🗂️',
-    title: 'ארכיון',
-    body: 'תיקים ודיווחים שנסגרו או שלא היו פעילים זמן רב עוברים לארכיון - עדיין זמינים לצפייה, בלי לבלגן את הרשימה הפעילה.',
   },
   {
     icon: '🎯',
