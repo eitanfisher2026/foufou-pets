@@ -14,6 +14,7 @@ import BreedCheckDialog from '../shared/BreedCheckDialog.jsx';
 import ColorCheckDialog from '../shared/ColorCheckDialog.jsx';
 import { findDuplicatesBySourceUrlAnyType } from '../shared/duplicateCheckApi.js';
 import { useSmartIntake } from './useSmartIntake.js';
+import { usePwaInstall } from '../shared/usePwaInstall.js';
 
 /**
  * One upload button that doesn't ask the user to pre-decide lost vs. found -
@@ -25,6 +26,7 @@ import { useSmartIntake } from './useSmartIntake.js';
  */
 export default function SmartIntakeForm() {
   const navigate = useNavigate();
+  const { isIOS } = usePwaInstall();
   const {
     files,
     setFiles,
@@ -132,6 +134,20 @@ export default function SmartIntakeForm() {
           <p>נזהה אוטומטית אם זה חתול או כלב, ואם זה דיווח על אבידה או מציאה, ונפתח את הרשומה המתאימה לבדיקה ותיקון.</p>
         </InfoButton>
       </div>
+
+      {/* iPhone can't use the OS "שיתוף" menu to send a Facebook post
+          straight into the app at all - Apple doesn't support that for any
+          web app, regardless of whether this one is installed. The upload/
+          paste tools right below are the actual (and only) way in on
+          iPhone, not a fallback for something broken - phrased that way so
+          it reads as "here's how", not as an apology. */}
+      {isIOS && (
+        <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-800">
+          באייפון אי אפשר לשתף פוסט מפייסבוק ישירות לתוך האפליקציה דרך תפריט "שיתוף" - זו מגבלה של אפל, לא ניתנת
+          לעקיפה. הדרך להוסיף פוסט מפייסבוק היא לצלם מסך של הפוסט ואז להעלות את הצילום כאן למטה (או להדביק את הטקסט/
+          הקישור שלו).
+        </p>
+      )}
 
       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
         <textarea

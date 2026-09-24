@@ -54,7 +54,15 @@ export default function OnboardingDialog({ onClose }) {
               שנראו או נמצאו.
             </p>
 
-            {!installed && (canPrompt || isIOS) && (
+            {/* isIOS gets fundamentally different copy, not just a
+                worded-differently version of the same claim - "install to
+                enable Facebook sharing" is true on Android (installing IS
+                what registers the app as a share target), but false on
+                iPhone: Apple doesn't support a web app receiving an OS-level
+                share at all, regardless of installation. Telling iPhone
+                users that installing unlocks it would be actively
+                misleading, not just imprecise. */}
+            {!installed && canPrompt && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <p className="mb-2 text-sm font-medium text-amber-900">📲 התקנה למסך הבית</p>
                 <p className="mb-1 text-xs leading-relaxed text-amber-800">
@@ -71,9 +79,27 @@ export default function OnboardingDialog({ onClose }) {
                 >
                   התקנת האפליקציה
                 </button>
+              </div>
+            )}
+            {!installed && isIOS && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="mb-2 text-sm font-medium text-amber-900">📲 שיתוף מפייסבוק באייפון</p>
+                <p className="mb-1 text-xs leading-relaxed text-amber-800">
+                  באייפון אי אפשר לשתף פוסט מפייסבוק ישירות לתוך האפליקציה דרך תפריט "שיתוף" - זו מגבלה של אפל שלא
+                  ניתנת לעקיפה, גם אם האפליקציה מותקנת. במקום זאת: צלמו מסך של הפוסט, ואז ב"הוספה חכמה" באפליקציה
+                  העלו את הצילום (או הדביקו את הטקסט/הקישור שלו) - זה עובד מצוין, רק בלי תפריט השיתוף של הטלפון.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleInstallClick}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-medium text-white"
+                >
+                  {showIosGuide ? 'הסתרת ההוראות' : 'להוסיף בכל זאת למסך הבית'}
+                </button>
                 {showIosGuide && (
                   <p className="mt-2 text-xs text-amber-800">
-                    ב-Safari: לחצו על כפתור השיתוף (הריבוע עם החץ למעלה), ואז על "הוסף למסך הבית".
+                    ב-Safari: לחצו על כפתור השיתוף (הריבוע עם החץ למעלה), ואז על "הוסף למסך הבית". זה לא פותח את
+                    אפשרות השיתוף מפייסבוק, רק נותן גישה מהירה יותר לאפליקציה.
                   </p>
                 )}
               </div>
