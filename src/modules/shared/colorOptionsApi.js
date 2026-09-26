@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { SPECIES, CAT_COLORS, DOG_COLORS } from './collections.js';
+import { normalizeOption, dedupeOptions } from './dedupeOptions.js';
 
 const CONFIG_DOC_PATH = ['config', 'colorOptions'];
 
@@ -37,11 +38,11 @@ export async function getColorOptions(species) {
   const snap = await getDoc(doc(db, ...CONFIG_DOC_PATH));
   const saved = snap.exists() ? snap.data()[species] : null;
   const custom = Array.isArray(saved)
-    ? [...saved, ...defaultsWithoutOther.filter((c) => !saved.includes(c))]
+    ? [...saved, ...defaultsWithoutOther.filter((c) => !saved.some((s) => normalizeOption(s) === normalizeOption(c)))]
     : defaultsWithoutOther;
-  return [...custom, OTHER];
+  return dedupeOptions([...custom, OTHER]);
 }
 
 export async function saveColorOptions(species, colors) {
-  await setDoc(doc(db, ...CONFIG_DOC_PATH), { [species]: colors.filter((c) => c !== OTHER) }, { merge: true });
+  await setDoc(doc(db, ...CONFIG_DOC_PATH), { [species]: dedupeOptions(colors.filter((c) => c !== OTHER)) }, { merge: true });
 }

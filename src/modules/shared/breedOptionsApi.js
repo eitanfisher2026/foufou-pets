@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { SPECIES, CAT_BREEDS, DOG_BREEDS } from './collections.js';
+import { normalizeOption, dedupeOptions } from './dedupeOptions.js';
 
 const CONFIG_DOC_PATH = ['config', 'breedOptions'];
 
@@ -37,11 +38,11 @@ export async function getBreedOptions(species) {
   const snap = await getDoc(doc(db, ...CONFIG_DOC_PATH));
   const saved = snap.exists() ? snap.data()[species] : null;
   const custom = Array.isArray(saved)
-    ? [...saved, ...defaultsWithoutOther.filter((b) => !saved.includes(b))]
+    ? [...saved, ...defaultsWithoutOther.filter((b) => !saved.some((s) => normalizeOption(s) === normalizeOption(b)))]
     : defaultsWithoutOther;
-  return [...custom, OTHER];
+  return dedupeOptions([...custom, OTHER]);
 }
 
 export async function saveBreedOptions(species, breeds) {
-  await setDoc(doc(db, ...CONFIG_DOC_PATH), { [species]: breeds.filter((b) => b !== OTHER) }, { merge: true });
+  await setDoc(doc(db, ...CONFIG_DOC_PATH), { [species]: dedupeOptions(breeds.filter((b) => b !== OTHER)) }, { merge: true });
 }

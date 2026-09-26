@@ -1,6 +1,7 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebase.js';
 import { CAT_PATTERNS } from './collections.js';
+import { normalizeOption, dedupeOptions } from './dedupeOptions.js';
 
 const CONFIG_DOC_PATH = ['config', 'patternOptions'];
 
@@ -23,11 +24,11 @@ export async function getPatternOptions() {
   const snap = await getDoc(doc(db, ...CONFIG_DOC_PATH));
   const saved = snap.exists() ? snap.data().cat : null;
   const custom = Array.isArray(saved)
-    ? [...saved, ...defaultsWithoutOther.filter((p) => !saved.includes(p))]
+    ? [...saved, ...defaultsWithoutOther.filter((p) => !saved.some((s) => normalizeOption(s) === normalizeOption(p)))]
     : defaultsWithoutOther;
-  return [...custom, OTHER];
+  return dedupeOptions([...custom, OTHER]);
 }
 
 export async function savePatternOptions(patterns) {
-  await setDoc(doc(db, ...CONFIG_DOC_PATH), { cat: patterns.filter((p) => p !== OTHER) }, { merge: true });
+  await setDoc(doc(db, ...CONFIG_DOC_PATH), { cat: dedupeOptions(patterns.filter((p) => p !== OTHER)) }, { merge: true });
 }

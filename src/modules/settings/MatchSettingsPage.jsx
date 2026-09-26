@@ -11,6 +11,7 @@ import {
 import { getColorOptions, saveColorOptions } from '../shared/colorOptionsApi.js';
 import { getBreedOptions, saveBreedOptions } from '../shared/breedOptionsApi.js';
 import { getPatternOptions, savePatternOptions } from '../shared/patternOptionsApi.js';
+import { normalizeOption } from '../shared/dedupeOptions.js';
 import { SPECIES, SPECIES_LABELS, CAT_COLORS, DOG_COLORS, CAT_BREEDS, DOG_BREEDS, CAT_PATTERNS } from '../shared/collections.js';
 import { useConfirm } from '../shared/useConfirm.jsx';
 import ConfidenceBadge from '../shared/ConfidenceBadge.jsx';
@@ -144,7 +145,7 @@ export default function MatchSettingsPage() {
 
   function addColorOption() {
     const value = colorInput.trim();
-    if (!value || colorOptions.includes(value)) return;
+    if (!value || colorOptions.some((c) => normalizeOption(c) === normalizeOption(value))) return;
     setColorOptions((prev) => [...prev, value]);
     setColorInput('');
   }
@@ -159,7 +160,10 @@ export default function MatchSettingsPage() {
       danger: true,
     });
     if (!ok) return;
-    setColorOptions((prev) => prev.filter((c) => c !== color));
+    // Compares normalized, not just c !== color, so a look-alike duplicate
+    // (e.g. two different apostrophe characters that render identically)
+    // gets fully removed by this one click instead of leaving a copy behind.
+    setColorOptions((prev) => prev.filter((c) => normalizeOption(c) !== normalizeOption(color)));
     // A color removed from the list shouldn't linger in a similarity group -
     // only this species' groups, colorGroups is keyed by species (see
     // matchingEngine.js).
@@ -167,14 +171,16 @@ export default function MatchSettingsPage() {
       ...prev,
       colorGroups: {
         ...prev.colorGroups,
-        [listSpecies]: (prev.colorGroups?.[listSpecies] || []).map((g) => g.filter((c) => c !== color)),
+        [listSpecies]: (prev.colorGroups?.[listSpecies] || []).map((g) =>
+          g.filter((c) => normalizeOption(c) !== normalizeOption(color))
+        ),
       },
     }));
   }
 
   function addBreedOption() {
     const value = breedInput.trim();
-    if (!value || breedOptions.includes(value)) return;
+    if (!value || breedOptions.some((b) => normalizeOption(b) === normalizeOption(value))) return;
     setBreedOptions((prev) => [...prev, value]);
     setBreedInput('');
   }
@@ -186,7 +192,8 @@ export default function MatchSettingsPage() {
       danger: true,
     });
     if (!ok) return;
-    setBreedOptions((prev) => prev.filter((b) => b !== breed));
+    // Compares normalized - see removeColorOption above.
+    setBreedOptions((prev) => prev.filter((b) => normalizeOption(b) !== normalizeOption(breed)));
     // A breed removed from the list shouldn't linger in a similarity group.
     // breedGroups is keyed by species, same as colorGroups (see
     // matchingEngine.js).
@@ -194,14 +201,16 @@ export default function MatchSettingsPage() {
       ...prev,
       breedGroups: {
         ...prev.breedGroups,
-        [listSpecies]: (prev.breedGroups?.[listSpecies] || []).map((g) => g.filter((b) => b !== breed)),
+        [listSpecies]: (prev.breedGroups?.[listSpecies] || []).map((g) =>
+          g.filter((b) => normalizeOption(b) !== normalizeOption(breed))
+        ),
       },
     }));
   }
 
   function addPatternOption() {
     const value = patternInput.trim();
-    if (!value || patternOptions.includes(value)) return;
+    if (!value || patternOptions.some((p) => normalizeOption(p) === normalizeOption(value))) return;
     setPatternOptions((prev) => [...prev, value]);
     setPatternInput('');
   }
@@ -209,7 +218,8 @@ export default function MatchSettingsPage() {
   async function removePatternOption(pattern) {
     const ok = await confirm(`להסיר את תבנית הפרווה "${pattern}"?`, { confirmLabel: 'הסרה', danger: true });
     if (!ok) return;
-    setPatternOptions((prev) => prev.filter((p) => p !== pattern));
+    // Compares normalized - see removeColorOption above.
+    setPatternOptions((prev) => prev.filter((p) => normalizeOption(p) !== normalizeOption(pattern)));
   }
 
   function updateParam(index, patch) {
