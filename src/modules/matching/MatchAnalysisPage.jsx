@@ -16,6 +16,7 @@ import { MATCH_STATUS_LABELS, MATCH_STATUS_COLORS, ORDERED_MATCH_STATUSES } from
 import { getMatchConfig } from './matchConfigApi.js';
 import { getErrorMessage } from '../shared/errorMessages.js';
 import AnalyzingIndicator from '../shared/AnalyzingIndicator.jsx';
+import NotifyOwnerDialog from '../shared/NotifyOwnerDialog.jsx';
 
 const VERDICT_STYLES = {
   match: { label: 'תואם', badge: 'bg-emerald-100 text-emerald-800' },
@@ -70,6 +71,7 @@ export default function MatchAnalysisPage() {
   const [changingStatus, setChangingStatus] = useState(false);
   const [actionError, setActionError] = useState('');
   const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [showNotify, setShowNotify] = useState(false);
   // The full candidate list for whichever side dir names, sorted by score
   // (see getMatches/getMatchesForFoundReport) - lets marking "אין התאמה"
   // below jump straight to the next candidate instead of leaving the
@@ -182,6 +184,30 @@ export default function MatchAnalysisPage() {
     } finally {
       setChangingStatus(false);
     }
+  }
+
+  // Same "opening WhatsApp marks this pairing contacted" convention as the
+  // match cards (see LostCaseDetail.jsx/FoundReportDetail.jsx's onSent) -
+  // deliberately doesn't reuse handleStatusChange above, since that always
+  // navigates away to the next candidate, and sending a WhatsApp message
+  // shouldn't yank the reviewer off this page while NotifyOwnerDialog is
+  // still open for them to copy the text or send again.
+  async function handleContactSent() {
+    try {
+      await updateMatchStatus(caseId, foundReportId, REPORT_STATUS.CONTACTED);
+      setMatch((prev) => ({ ...prev, status: REPORT_STATUS.CONTACTED }));
+    } catch (err) {
+      setActionError(getErrorMessage(err));
+    }
+  }
+
+  // Confirming the match via NotifyOwnerDialog's checkbox resolves both
+  // records, same as choosing CLOSED from the status dropdown above - so it
+  // goes to the same fallback destination, since there's no candidate left
+  // worth reviewing for either side once that happens.
+  function handleContactResolved() {
+    if (dir === 'report') navigate(`/found?focus=${foundReportId}&focusSpecies=${foundReport.species}`);
+    else navigate(`/?focus=${caseId}&focusSpecies=${lostCase.species}`);
   }
 
   if (!match || !lostCase || !foundReport) return <p className="p-4 text-slate-500">טוען...</p>;
@@ -329,6 +355,28 @@ export default function MatchAnalysisPage() {
         </div>
       )}
 
+      <div className="mb-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-500">
+        {foundReport.sourceGroupName && <p>מקור הדיווח: {foundReport.sourceGroupName}</p>}
+        {foundReport.originalPosterName && <p>פורסם ע"י: {foundReport.originalPosterName}</p>}
+        {foundReport.contactPhone && <p>טלפון בדיווח: {foundReport.contactPhone}</p>}
+        {lostCase.contactPhone && <p>טלפון בתיק החיפוש: {lostCase.contactPhone}</p>}
+        {foundReport.sourceUrl && (
+          <a href={foundReport.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">
+            צפייה בפוסט המקורי
+          </a>
+        )}
+      </div>
+
+      {canManageMatch && (
+        <button
+          type="button"
+          onClick={() => setShowNotify(true)}
+          className="mb-4 w-full rounded-lg bg-emerald-50 py-2 text-sm font-medium text-emerald-700"
+        >
+          {dir === 'report' ? '📱 יצירת קשר עם מי שמצא/ה בוואטסאפ' : '📱 עדכון הבעלים בוואטסאפ'}
+        </button>
+      )}
+
       <div className="space-y-2">
         {(match.breakdown || []).map((b, i) => {
           const style = VERDICT_STYLES[b.verdict] || VERDICT_STYLES.skipped;
@@ -378,6 +426,18 @@ export default function MatchAnalysisPage() {
       </div>
 
       <PhotoLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
+
+      {showNotify && (
+        <NotifyOwnerDialog
+          lostCase={lostCase}
+          report={foundReport}
+          foundReportId={foundReportId}
+          direction={dir === 'report' ? 'toFinder' : 'toOwner'}
+          onClose={() => setShowNotify(false)}
+          onSent={handleContactSent}
+          onResolved={handleContactResolved}
+        />
+      )}
     </div>
   );
 }
