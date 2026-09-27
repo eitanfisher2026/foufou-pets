@@ -15,10 +15,8 @@ import { getGettingStartedCards } from './helpContent.js';
  * just appeared instantly" rather than an actual welcome moment. Now step 2
  * only shows once someone deliberately presses "המשך", not the instant the
  * dialog opens. Reuses the exact same getGettingStartedCards() as
- * HelpDialog.jsx (see helpContent.js) - just that one list, not the
- * "יכולות נוספות" tab,
- * since a brand-new user needs the walkthrough first, not the full
- * reference - so there's only ever one copy of that content to keep current.
+ * HelpDialog.jsx (see helpContent.js) - so there's only ever one copy of
+ * that content to keep current.
  */
 export default function OnboardingDialog({ onClose }) {
   const { installed, canPrompt, isIOS, isAndroid, promptInstall } = usePwaInstall();

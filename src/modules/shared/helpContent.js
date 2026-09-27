@@ -1,10 +1,12 @@
 // Structured help content - icon + title + short plain-language body per
-// card, grouped the same way SuperZola's help screen is: a sequential
-// "getting started" walkthrough, and a separate, order-independent list of
-// features someone would only look for once they already know the basics.
-// Hardcoded rather than admin-editable free text (the old approach, one
-// long paragraph stored in Firestore) - a structured walkthrough like this
-// is something worth getting right in code and reviewing like any other
+// card, one single sequential walkthrough (used to be two tabs - a
+// walkthrough plus a separate "additional capabilities" list - merged into
+// one list per Eitan's & Alona's feedback: with the archive card gone,
+// what was left in the second tab was too little to justify a second tab,
+// and some of it already overlapped what the walkthrough said). Hardcoded
+// rather than admin-editable free text (the old approach, one long
+// paragraph stored in Firestore) - a structured walkthrough like this is
+// something worth getting right in code and reviewing like any other
 // content, not something that holds up well as a wall of text in a
 // textarea. getGettingStartedCards() is a function, not plain data, because
 // one step (Facebook sharing) depends on the viewer's own device - both
@@ -26,7 +28,7 @@ const STATIC_GETTING_STARTED_CARDS_TOP = [
   {
     icon: '📸',
     title: '3. יש צילום מסך של פוסט קיים?',
-    body: 'אפשר להעלות צילום מסך מפייסבוק או וואטסאפ במקום למלא טופס ריק - המערכת קוראת אותו אוטומטית וממלאת את רוב השדות, ונשאר רק לבדוק ולאשר.',
+    body: 'אפשר להעלות צילום מסך מפייסבוק או וואטסאפ במקום למלא טופס ריק - המערכת קוראת אותו אוטומטית וממלאת את רוב השדות, ונשאר רק לבדוק ולאשר. עם זאת, מילוי ידני של הטופס עדיף כשאפשר - הוא מבטיח שכל הפרטים החשובים יוזנו, בעוד שקריאה אוטומטית מפוסט עלולה לפספס פרט שלא הוזכר בו.',
   },
   {
     icon: '✨',
@@ -37,19 +39,34 @@ const STATIC_GETTING_STARTED_CARDS_TOP = [
 
 const STATIC_GETTING_STARTED_CARDS_BOTTOM = [
   {
+    icon: '🐈',
+    title: '6. חתולים וכלבים בנפרד',
+    body: 'מתג חתול/כלב בראש עמוד הבית - לכל סוג חיה הרשימה, הטפסים והגזעים שמתאימים לו.',
+  },
+  {
     icon: '🔍',
-    title: '6. בדיקת התאמות',
-    body: 'בכל תיק חיפוש יש כפתור "בדיקת התאמות" שמשווה אותו מול כל הדיווחים הפעילים, ומציג התאמות אפשריות לפי רמת סבירות - כל התאמה עם הסבר פשוט למה היא נראית מתאימה.',
+    title: '7. בדיקת התאמות',
+    body: 'בכל תיק חיפוש יש כפתור "בדיקת התאמות" שמשווה אותו מול כל הדיווחים הפעילים, ומציג התאמות מדורגות לפי רמת סבירות (נמוכה/בינונית/גבוהה) - כולל השוואת תמונות אוטומטית כשהתמונות מספיק דומות - וכל התאמה מגיעה עם הסבר פשוט למה היא נראית מתאימה.',
   },
   {
     icon: '📞',
-    title: '7. יצירת קשר',
-    body: 'כשנמצאת התאמה, פרטי הקשר (שם וטלפון) שכל צד מסר גלויים לצד השני - זו הדרך שבה בעל החיה האבודה ומי שמצא אותה יכולים לתאם ביניהם ישירות.',
+    title: '8. יצירת קשר',
+    body: 'כשנמצאת התאמה, פרטי הקשר (שם וטלפון) שכל צד מסר גלויים לצד השני - זו הדרך שבה בעל החיה האבודה ומי שמצא אותה יכולים לתאם ביניהם ישירות. ברוב דיווחי המציאה אין מספר טלפון - במקרה כזה אפשר להעתיק את פרטי הפוסט המקורי בפייסבוק (הקבוצה, מועד הפרסום, שם המפרסם) כדי ליצור קשר דרכו.',
   },
   {
     icon: '✅',
-    title: '8. מצאתם את החיה?',
+    title: '9. מצאתם את החיה?',
     body: 'עדכנו את הסטטוס בתיק כדי שלא ימשיכו לחפש אותה - זה גם מסמן למערכת שהחיפוש הסתיים.',
+  },
+  {
+    icon: '💬',
+    title: 'משוב',
+    body: 'תפריט החשבון (⚙️ למעלה) ← "שליחת משוב" - לדיווח על באג, רעיון, או כל שאלה. התשובות מגיעות לאותה שיחה.',
+  },
+  {
+    icon: '🔒',
+    title: 'פרטיות',
+    body: 'תפריט החשבון ← "מדיניות פרטיות" - אילו נתונים נשמרים, לשם מה, ואיך אפשר לבקש שהם יימחקו.',
   },
 ];
 
@@ -70,7 +87,7 @@ export function getGettingStartedCards({ isIOS, isAndroid }) {
     shareCard = {
       icon: '🤖',
       title: '5. שיתוף ישיר מפייסבוק',
-      body: 'אחרי התקנת האפליקציה למסך הבית (מתפריט החשבון ⚙️ ← "התקנת האפליקציה"), אפשר ללחוץ "שיתוף" על פוסט בפייסבוק ולבחור "איתור חיות מחמד" מרשימת האפשרויות - בלי התקנה, האפליקציה פשוט לא תופיע שם.',
+      body: 'אחרי התקנת האפליקציה למסך הבית (מתפריט החשבון ⚙️ ← "התקנת האפליקציה"), אפשר ללחוץ "שיתוף" על פוסט בפייסבוק ולבחור "איתור חיות מחמד" מרשימת האפשרויות - בלי התקנה, האפליקציה פשוט לא תופיע שם. שיתוף מקבוצה סגורה לפעמים לא מעביר את התמונה אוטומטית - במקרה כזה צריך להוסיף אותה ידנית בתוך האפליקציה.',
     };
   } else {
     shareCard = {
@@ -81,26 +98,3 @@ export function getGettingStartedCards({ isIOS, isAndroid }) {
   }
   return [...STATIC_GETTING_STARTED_CARDS_TOP, shareCard, ...STATIC_GETTING_STARTED_CARDS_BOTTOM];
 }
-
-export const ADDITIONAL_CARDS = [
-  {
-    icon: '🐈',
-    title: 'חתולים וכלבים בנפרד',
-    body: 'מתג חתול/כלב בראש עמוד הבית - לכל סוג חיה הרשימה, הטפסים והגזעים שמתאימים לו.',
-  },
-  {
-    icon: '🎯',
-    title: 'רמת סבירות של התאמה',
-    body: 'כל התאמה מסומנת ברמת סבירות (נמוכה/בינונית/גבוהה) לפי כמה פרטים תואמים - כולל השוואת תמונות אוטומטית כשהתמונות מספיק דומות כדי שכדאי לבדוק.',
-  },
-  {
-    icon: '💬',
-    title: 'משוב',
-    body: 'תפריט החשבון (⚙️ למעלה) ← "שליחת משוב" - לדיווח על באג, רעיון, או כל שאלה. התשובות מגיעות לאותה שיחה.',
-  },
-  {
-    icon: '🔒',
-    title: 'פרטיות',
-    body: 'תפריט החשבון ← "מדיניות פרטיות" - אילו נתונים נשמרים, לשם מה, ואיך אפשר לבקש שהם יימחקו.',
-  },
-];

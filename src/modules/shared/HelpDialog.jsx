@@ -1,21 +1,22 @@
-import { useState } from 'react';
 import HelpCard from './HelpCard.jsx';
-import { getGettingStartedCards, ADDITIONAL_CARDS } from './helpContent.js';
+import { getGettingStartedCards } from './helpContent.js';
 import { usePwaInstall } from './usePwaInstall.js';
 
 /**
  * "How does this work" explainer, reached via the ℹ️ button next to the
- * dashboard header - two tabs (a sequential getting-started walkthrough,
- * and a reference list of features that don't have a natural order), same
- * shape as SuperZola's own help screen. Used to be one long admin-editable
- * paragraph; this content is hardcoded now (see helpContent.js) since a
- * structured walkthrough like this is worth reviewing like any other code
- * change, not something that holds up as a wall of text in a textarea.
+ * dashboard header - one single walkthrough list, same shape as SuperZola's
+ * own help screen. Used to be one long admin-editable paragraph; this
+ * content is hardcoded now (see helpContent.js) since a structured
+ * walkthrough like this is worth reviewing like any other code change, not
+ * something that holds up as a wall of text in a textarea. Used to be two
+ * tabs (this walkthrough plus a separate "additional capabilities" list) -
+ * merged into one list once the archive card was removed and left too
+ * little content to justify a second tab, some of it already repeating
+ * what the walkthrough said.
  */
 export default function HelpDialog({ onClose }) {
-  const [tab, setTab] = useState('start');
   const { isIOS, isAndroid } = usePwaInstall();
-  const gettingStartedCards = getGettingStartedCards({ isIOS, isAndroid });
+  const cards = getGettingStartedCards({ isIOS, isAndroid });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
@@ -32,31 +33,8 @@ export default function HelpDialog({ onClose }) {
           </button>
         </div>
 
-        <div className="flex justify-center border-b border-slate-100 px-4 pt-3">
-          <div className="flex gap-1 rounded-full bg-slate-100 p-1">
-            <button
-              type="button"
-              onClick={() => setTab('start')}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                tab === 'start' ? 'bg-slate-800 text-white' : 'text-slate-500'
-              }`}
-            >
-              התחלת עבודה
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('more')}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition ${
-                tab === 'more' ? 'bg-slate-800 text-white' : 'text-slate-500'
-              }`}
-            >
-              יכולות נוספות
-            </button>
-          </div>
-        </div>
-
         <div className="space-y-2 overflow-y-auto p-4">
-          {(tab === 'start' ? gettingStartedCards : ADDITIONAL_CARDS).map((card) => (
+          {cards.map((card) => (
             <HelpCard key={card.title} {...card} />
           ))}
         </div>
