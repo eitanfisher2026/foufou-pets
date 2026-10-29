@@ -23,7 +23,8 @@ export default function ProfileMenu() {
   // App.jsx already shows every non-admin the maintenance screen instead of
   // the whole app, so nobody else is ever around to subscribe to this or
   // need reminding about it.
-  const maintenanceMode = useMaintenanceMode(isRealAdmin);
+  const maintenance = useMaintenanceMode(isRealAdmin);
+  const maintenanceMode = maintenance.blocked;
   const [open, setOpen] = useState(false);
   const [showIosGuide, setShowIosGuide] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
@@ -98,7 +99,7 @@ export default function ProfileMenu() {
           ⚙️
         </span>
         {isRealAdmin && maintenanceMode && (
-          <span className="absolute -bottom-1 -left-1 text-[11px] leading-none">🚧</span>
+          <span className="absolute -bottom-1 -left-1 text-[11px] leading-none">{maintenance.paused ? '⏸️' : '🚧'}</span>
         )}
       </button>
 
@@ -113,8 +114,10 @@ export default function ProfileMenu() {
               onClick={() => setOpen(false)}
               className="flex items-center gap-2 border-b border-slate-100 bg-amber-50 px-4 py-2.5 text-xs font-bold text-amber-800"
             >
-              <span>🚧</span>
-              <span>מצב תחזוקה פעיל - משתמשים רגילים חסומים</span>
+              <span>{maintenance.paused ? '⏸️' : '🚧'}</span>
+              <span>
+                {maintenance.paused ? 'המערכת מושהית - משתמשים רגילים חסומים' : 'מצב תחזוקה פעיל - משתמשים רגילים חסומים'}
+              </span>
             </Link>
           )}
 

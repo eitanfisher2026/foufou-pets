@@ -40,23 +40,29 @@ function RequireAdmin({ children }) {
 }
 
 function AppRoutes() {
-  const { user, loading, roleLoading, isRealAdmin, signOut, viewingAsRegular, toggleViewAsRegular } = useAuth();
+  const { user, loading, roleLoading, isRealAdmin, signInWithGoogle, signOut, viewingAsRegular, toggleViewAsRegular } =
+    useAuth();
   // isRealAdmin, not the simulation-aware isAdmin - an admin previewing
   // "as regular user" is still testing a live change under their own
   // account and shouldn't get stuck behind maintenance mode just for
   // having that preview toggle on; only an actually-demoted/disconnected
-  // admin should ever see the maintenance screen themselves.
-  const maintenanceMode = useMaintenanceMode(!!user);
+  // admin should ever see the maintenance screen themselves. Read before
+  // sign-in too, so a full pause greets a visitor with its message instead
+  // of a sign-in screen.
+  const maintenance = useMaintenanceMode();
   useHomeHistoryGuard();
 
   if (loading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
+  if (!user && maintenance.paused) {
+    return <MaintenanceScreen paused message={maintenance.message} onSignIn={signInWithGoogle} />;
+  }
   if (!user) return <LoginScreen />;
-  // Only waits on role (and only blocks) when maintenance is actually on -
-  // the normal, overwhelmingly common case (maintenanceMode false) never
-  // pays for this at all, so nobody's regular page load gets slower just
-  // because this feature exists.
-  if (maintenanceMode && roleLoading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
-  if (maintenanceMode && !isRealAdmin) return <MaintenanceScreen onSignOut={signOut} />;
+  // Only waits on role (and only blocks) when maintenance/pause is actually
+  // on - the normal case never pays for this at all.
+  if (maintenance.blocked && roleLoading) return <p className="p-8 text-center text-slate-500">טוען...</p>;
+  if (maintenance.blocked && !isRealAdmin) {
+    return <MaintenanceScreen paused={maintenance.paused} message={maintenance.message} onSignOut={signOut} />;
+  }
 
   // One responsive width cap for the whole app, same pattern as Buli: pages
   // themselves stay full-width and just fill this container, so the app

@@ -117,6 +117,25 @@ async function enforceAiRateLimit(uid) {
   });
 }
 
+// System pause (config/maintenance.paused, set from Settings): every
+// function that costs money refuses everyone except an admin, and the
+// weekly cleanup skips its run. Cached 30s per instance so a busy function
+// doesn't pay a Firestore read per call just to learn nothing changed.
+let pauseCache = { at: 0, paused: false };
+async function isSystemPaused() {
+  if (Date.now() - pauseCache.at < 30000) return pauseCache.paused;
+  const snap = await db.collection('config').doc('maintenance').get();
+  pauseCache = { at: Date.now(), paused: !!snap.data()?.paused };
+  return pauseCache.paused;
+}
+
+async function assertNotPaused(uid) {
+  if (!(await isSystemPaused())) return;
+  const userSnap = await db.collection('users').doc(uid).get();
+  if (userSnap.data()?.role === 'admin') return;
+  throw new HttpsError('unavailable', 'המערכת מושהית זמנית - נסו שוב מאוחר יותר.');
+}
+
 // Haiku, not Sonnet: the species pre-detect call (used only by the
 // smart-add/share-target flow, where species isn't known up front - see
 // detectPetSpecies below) is a plain single-label visual classification
@@ -970,6 +989,7 @@ export const detectPetSpecies = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await assertNotPaused(request.auth.uid);
     await enforceAiRateLimit(request.auth.uid);
 
     const image = request.data?.image;
@@ -1030,6 +1050,7 @@ export const extractReportFromImages = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await assertNotPaused(request.auth.uid);
     await enforceAiRateLimit(request.auth.uid);
 
     const images = request.data?.images;
@@ -1187,6 +1208,7 @@ export const fetchFacebookLinkPreview = onCall({ region: 'me-west1', cors: true,
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.');
   }
+  await assertNotPaused(request.auth.uid);
 
   const url = request.data?.url;
   if (typeof url !== 'string' || !isFacebookUrl(url)) {
@@ -1312,6 +1334,7 @@ export const generatePhotoThumbnail = onCall({ region: 'me-west1', cors: true, t
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.');
   }
+  await assertNotPaused(request.auth.uid);
 
   const { path, url } = request.data || {};
   if (typeof path !== 'string' || typeof url !== 'string') {
@@ -1348,6 +1371,7 @@ export const uploadReportPhoto = onCall({ region: 'me-west1', cors: true, timeou
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Sign in required.');
   }
+  await assertNotPaused(request.auth.uid);
 
   const { recordType, recordId, path, base64, thumbPath, thumbBase64 } = request.data || {};
   const folder = UPLOAD_FOLDER_BY_RECORD_TYPE[recordType];
@@ -1455,6 +1479,7 @@ export const comparePhotoSimilarity = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Sign in required.');
     }
+    await assertNotPaused(request.auth.uid);
     await enforceAiRateLimit(request.auth.uid);
 
     const { lostPhotoUrl, foundPhotoUrl, lostCaseId, foundReportId } = request.data || {};
@@ -1626,6 +1651,10 @@ export const weeklyCleanupOldRecords = onSchedule(
   // week compounds into a bigger one the next time this runs).
   { schedule: 'every sunday 03:00', timeZone: 'Asia/Jerusalem', region: 'me-west1', timeoutSeconds: 300 },
   async () => {
+    if (await isSystemPaused()) {
+      console.log('weeklyCleanupOldRecords: system paused, skipping');
+      return;
+    }
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - CLEANUP_MAX_AGE_DAYS);
 

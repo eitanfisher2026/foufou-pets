@@ -9,7 +9,7 @@ import { useVisualMatchAlert } from '../shared/useVisualMatchAlert.jsx';
 import { countOldActiveRecords, archiveOldRecords, countLegacyArchivedRecords, cleanupLegacyArchivedRecords } from './archiveOldRecordsApi.js';
 import { getLifetimeStats } from '../shared/lifetimeStatsApi.js';
 import { useMaintenanceMode } from '../shared/useMaintenanceMode.js';
-import { setMaintenanceMode } from '../shared/maintenanceApi.js';
+import { setMaintenanceMode, setSystemPaused, savePauseMessage, PAUSE_DEFAULT_MESSAGE } from '../shared/maintenanceApi.js';
 import { listUsers } from '../users/usersApi.js';
 import OnboardingDialog from '../shared/OnboardingDialog.jsx';
 import AppFooter from '../shared/AppFooter.jsx';
@@ -88,9 +88,19 @@ export default function SettingsPage() {
   // Live, not a one-time read - see useMaintenanceMode.js. This page is
   // already admin-only (RequireAdmin in App.jsx), so signed-in is already
   // guaranteed here.
-  const maintenanceMode = useMaintenanceMode(true);
+  const maintenance = useMaintenanceMode(true);
+  const maintenanceMode = maintenance.enabled;
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
   const [maintenanceError, setMaintenanceError] = useState('');
+  const [pauseSaving, setPauseSaving] = useState(false);
+  const [pauseError, setPauseError] = useState('');
+  // null until the live doc first arrives, so the textarea starts from the
+  // saved message instead of being overwritten by the default.
+  const [pauseMessageDraft, setPauseMessageDraft] = useState(null);
+  const [pauseMessageNotice, setPauseMessageNotice] = useState('');
+  useEffect(() => {
+    setPauseMessageDraft((prev) => (prev === null ? maintenance.message || PAUSE_DEFAULT_MESSAGE : prev));
+  }, [maintenance.message]);
 
   useEffect(() => {
     getMatchConfig().then((c) => {
@@ -144,6 +154,37 @@ export default function SettingsPage() {
       setMaintenanceError(getErrorMessage(err));
     } finally {
       setMaintenanceSaving(false);
+    }
+  }
+
+  // Resuming is harmless, so it happens immediately; pausing asks first.
+  async function handleTogglePause() {
+    setPauseError('');
+    if (!maintenance.paused) {
+      const ok = await confirm(
+        'להשהות את המערכת? משתמשים רגילים יראו את הודעת ההשהיה, ושום פעולה בתשלום לא תרוץ: קריאת צילומי מסך ב-AI, השוואת תמונות, העלאת תמונות והניקוי השבועי. אתם ממשיכים לראות הכל. הנתונים הקיימים נשמרים.',
+        { confirmLabel: 'השהיה', danger: true }
+      );
+      if (!ok) return;
+    }
+    setPauseSaving(true);
+    try {
+      await setSystemPaused(!maintenance.paused);
+    } catch (err) {
+      setPauseError(getErrorMessage(err));
+    } finally {
+      setPauseSaving(false);
+    }
+  }
+
+  async function handleSavePauseMessage() {
+    setPauseError('');
+    try {
+      await savePauseMessage(pauseMessageDraft || '');
+      setPauseMessageNotice('ההודעה נשמרה');
+      setTimeout(() => setPauseMessageNotice(''), 2500);
+    } catch (err) {
+      setPauseError(getErrorMessage(err));
     }
   }
 
@@ -338,6 +379,57 @@ export default function SettingsPage() {
           </span>
         </button>
         {maintenanceError && <p className="mt-2 text-sm font-medium text-red-600">{maintenanceError}</p>}
+      </CollapsibleSection>
+
+      <CollapsibleSection icon="⏸️" title="השהיית מערכת" subtitle={maintenance.paused ? 'מושהית' : 'פועלת'}>
+        <button
+          type="button"
+          onClick={handleTogglePause}
+          disabled={pauseSaving}
+          className={`flex w-full items-center justify-between rounded-xl border px-3 py-3 text-right transition disabled:opacity-50 ${
+            maintenance.paused ? 'border-red-300 bg-red-50' : 'border-transparent bg-slate-50'
+          }`}
+        >
+          <p className="text-xs text-slate-500">
+            {maintenance.paused
+              ? 'מושהית - אין עבודת שרת ואין עלויות AI, משתמשים רגילים רואים את הודעת ההשהיה. אתם ממשיכים לראות הכל.'
+              : 'פועלת - כל שירותי השרת והניקוי השבועי פעילים'}
+          </p>
+          <span className={`shrink-0 text-xs font-bold ${maintenance.paused ? 'text-red-700' : 'text-slate-400'}`}>
+            {pauseSaving ? '...' : maintenance.paused ? 'מושהית' : 'פועלת'}
+          </span>
+        </button>
+        <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2.5">
+          <label className="mb-1 block text-xs font-semibold text-slate-600">ההודעה שמשתמשים יראו בזמן השהיה</label>
+          <textarea
+            className="input w-full resize-none"
+            rows={3}
+            value={pauseMessageDraft || ''}
+            onChange={(e) => setPauseMessageDraft(e.target.value)}
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setPauseMessageDraft(PAUSE_DEFAULT_MESSAGE)}
+              className="text-[11px] text-slate-500 underline"
+            >
+              חזרה לנוסח ברירת המחדל
+            </button>
+            <button
+              type="button"
+              onClick={handleSavePauseMessage}
+              className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white"
+            >
+              שמירת ההודעה
+            </button>
+          </div>
+          {pauseMessageNotice && <p className="mt-1 text-xs text-emerald-600">{pauseMessageNotice}</p>}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+          הנתונים והתמונות הקיימים נשארים שמורים בזמן ההשהיה - העלות היחידה שנשארת היא אחסון שלהם, שבכמות כזו היא
+          אגורות בחודש לכל היותר.
+        </p>
+        {pauseError && <p className="mt-2 text-sm font-medium text-red-600">{pauseError}</p>}
       </CollapsibleSection>
 
       <CollapsibleSection icon="🔄" title="סריקה מחדש של כל ההתאמות">

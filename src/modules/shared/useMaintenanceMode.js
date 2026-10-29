@@ -4,27 +4,27 @@ import { db } from '../../firebase.js';
 import { MAINTENANCE_DOC_PATH } from './maintenanceApi.js';
 
 /**
- * Live subscription to the single admin on/off switch (config/maintenance)
- * that takes the whole app offline for everyone except admins - lets an
- * admin ship and verify a change live under their own account (see
- * App.jsx/SettingsPage.jsx) without regular users seeing a mid-deploy,
- * half-working app. A live onSnapshot rather than a one-time read, unlike
- * this project's other config hooks (useColorOptions etc.) - the whole
- * point is that flipping it in Settings takes effect immediately for every
- * other tab someone already has open, not just on their next reload. Only
- * subscribes once signed in (`active`) - firestore.rules' config/{docId}
- * rule already requires signedIn() to read, and a signed-out visitor sees
- * the normal login screen regardless of this value.
+ * Live subscription to config/maintenance - both admin switches there
+ * (maintenance mode and the full system pause, see maintenanceApi.js). A
+ * live onSnapshot rather than a one-time read, unlike this project's other
+ * config hooks - flipping either switch in Settings has to take effect
+ * immediately for every tab someone already has open, not on their next
+ * reload. `blocked` is true when either one should keep non-admins out.
  */
-export function useMaintenanceMode(active) {
-  const [enabled, setEnabled] = useState(false);
+export function useMaintenanceMode(active = true) {
+  const [state, setState] = useState({ enabled: false, paused: false, message: '' });
 
   useEffect(() => {
     if (!active) return;
-    return onSnapshot(doc(db, ...MAINTENANCE_DOC_PATH), (snap) => {
-      setEnabled(!!snap.data()?.enabled);
-    });
+    return onSnapshot(
+      doc(db, ...MAINTENANCE_DOC_PATH),
+      (snap) => {
+        const d = snap.data() || {};
+        setState({ enabled: !!d.enabled, paused: !!d.paused, message: d.pauseMessage || '' });
+      },
+      () => {}
+    );
   }, [active]);
 
-  return enabled;
+  return { ...state, blocked: state.enabled || state.paused };
 }

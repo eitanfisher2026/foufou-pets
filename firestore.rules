@@ -187,6 +187,13 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // System pause flag + message. Readable before sign-in so a visitor
+    // sees the pause message instead of a sign-in screen; holds no secrets.
+    match /config/maintenance {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Shared config (match weights, the customizable color list, the
     // about-dialog text) - read by everyone (forms/matching/AboutDialog use
     // these), written only from the admin-only settings screens that edit
